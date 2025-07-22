@@ -1,3 +1,3 @@
-export function sayHello() {
-    console.log('Function "say hello"');
+export function throwError(error: Error): never {
+    throw error;
 }

@@ -9,7 +9,7 @@ typedef struct
 
 int main(int argc, const char **argv)
 {
-    S s;
+    S 1s;
 
     s->f = 71213.123;
     int x = 1;

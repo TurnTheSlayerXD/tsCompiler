@@ -1,0 +1,52 @@
+
+export enum TokenType {
+
+    HASH,
+
+    BUILTIN_TYPE,
+    NAME,
+    KEYWORD,
+
+    O_PAREN,
+    C_PAREN,
+
+    O_CURL,
+    C_CURL,
+
+    NUM_INT,
+    NUM_FLOAT,
+    STRING_LITERAL,
+    CHAR_LITERAL,
+    STRING_LITERAL_SQUARE,
+
+    COMMA,
+
+    SEMICOLON,
+
+    PREPROCESSOR,
+
+    OP_PLUS,
+    OP_MINUS,
+    OP_ASTERISK,
+    OP_DIVIDE,
+    OP_PERCENT,
+
+    OP_DOT,
+    OP_ARROW,
+
+
+    OP_COMP_EQUAL,
+    OP_COMP_LESS,
+    OP_COMP_GREATER,
+    OP_COMP_GREATER_EQ,
+    OP_COMP_LESS_EQ,
+
+
+    OP_ASSIGNMENT,
+
+    KWD_RETURN,
+    KWD_CONST,
+
+    KWD_IF,
+    KWD_ELSE,
+}
