@@ -3,7 +3,7 @@ export enum TokenType {
 
     HASH,
 
-    BUILTIN_TYPE,
+    IN_TYPE,
     NAME,
     KEYWORD,
 
@@ -49,4 +49,6 @@ export enum TokenType {
 
     KWD_IF,
     KWD_ELSE,
+    KWD_FOR,
+    KWD_WHILE,
 }

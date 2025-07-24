@@ -1,0 +1,4 @@
+
+> tscompiler@1.0.0 assembly
+> clang -c ./example/main.s -o ./example/main.o && clang ./example/main.o -o ./example/main.exe && .\example.\main.exe
+

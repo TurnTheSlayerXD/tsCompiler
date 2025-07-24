@@ -4,9 +4,7 @@
 main:                                   # @main
 .seh_proc main
 	subq	$40, %rsp
-	.seh_stackalloc 40
-	.seh_endprologue
-	leaq	""(%rip), %rcx
+	leaq	"lel"(%rip), %rcx
 	callq	printf
 	xorl	%eax, %eax
 	addq	$40, %rsp

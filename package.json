@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npx tsc",
-    "start": "npx ts-node ."
+    "start": "npx ts-node .",
+    "assembly": "clang -c ./example/main.s -o ./example/main.o && clang ./example/main.o -o ./example/main.exe && .\\example.\\main.exe"
   },
   "author": "",
   "license": "ISC",

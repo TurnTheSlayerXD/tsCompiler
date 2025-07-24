@@ -1,322 +1,127 @@
-import { throwError } from "./helper";
+import { LexerError, ParserError, throwError } from "./helper";
 import { strict } from "assert";
 import { error } from "console";
 import { readFileSync } from "fs";
 import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
+import { Lexer, Token, toString } from "./lexer"
 
-class Position {
-    instance_type?: string;
-    constructor(public row: number, public col: number, public count: number) {
-        this.instance_type = 'position';
-     }
+
+interface ValueType {
+    is_const: boolean;
+    canAdd(value: ValueType): string;
+    canSubtract(value: ValueType): string;
+    canAssignTo(value: ValueType): string;
+    toString(): string;
 }
 
-function toString(obj: Position | Token): string {
-    if (obj.instance_type === 'position') {
-        return `${(obj as Position).row}:${(obj as Position).col}:${(obj as Position).count}`;
+class VarType implements ValueType {
+    constructor() {
     }
-    else if (obj.instance_type === 'token') {
-        return ` [${TokenType[(obj as Token).type]}]  [${(obj as Token).text}]  [${toString((obj as Token).pos)}]`;
+
+    is_const: boolean = false;
+    canAdd(value: ValueType): string {
+        throw new Error("Method not implemented.");
     }
-    const type = obj.instance_type;
-    throw new Error(`Can't convert object of type [${type}] to string`);
-}
+    canSubtract(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    canAssignTo(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
 
-function equal(lhs: Position, rhs: Position): boolean {
-    return lhs.count === rhs.count && lhs.row === rhs.row && lhs.col === rhs.col;
-}
-
-function not_equal(lhs: Position, rhs: Position): boolean {
-    return lhs.count !== rhs.count;
-}
-
-
-class Token {
-    instance_type?: string;
-    pos: Position;
-    type: TokenType;
-    text: string;
-    constructor(pos: Position, text: string, type: TokenType) {
-        this.pos = pos;
-        this.text = text;
-        this.type = type;
-        this.instance_type = 'token';
+    toString(): string {
+        throw new Error("Method not implemented.");
     }
 }
 
-function TODO(msg: string) {
-    throw new Error(`TODO: ${msg}`);
-}
+class IntType extends VarType {
 
-function isspace(str: string): boolean {
-    return str === ' ' || str === '\n';
-}
-
-class LexerError extends Error {
-    constructor(lexer: Lexer, msg: string) {
-        super(`Lexer Error at ${toString(lexer.prev_cursor)}:\n${msg}\n`);
+    override toString(): string {
+        return "int";
     }
 }
 
+class CharType extends VarType {
 
+    override toString(): string {
+        return "char";
+    }
+}
 
-class Lexer {
-    type?: string = 'lexer';
-    cursor: Position = { row: 1, col: 0, count: 0 };
-    prev_cursor: Position = { row: 1, col: 0, count: 0 };
-    last_token: Token | null = null;
-    text: string;
-    constructor(text: string) {
-        this.text = text;
-        this.clear_from_tabulations();
+class PtrType implements ValueType {
+    constructor(public ptrTo: ValueType) { }
+
+    is_const: boolean = false;
+    canAdd(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    canSubtract(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    canAssignTo(value: ValueType): string {
+        throw new Error("Method not implemented.");
     }
 
-    iseof(cursor: Position): boolean {
-        return cursor.count >= this.text.length;
+    toString(): string {
+        return `${this.ptrTo.toString()} *`;
+    }
+}
+
+class FunctionType implements ValueType {
+    constructor(public returnType: ValueType, public paramTypes: ValueType) { }
+
+    is_const: boolean = false;
+    canAdd(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    canSubtract(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    canAssignTo(value: ValueType): string {
+        throw new Error("Method not implemented.");
+    }
+    toString(): string {
+        throw new Error("Method not implemented.");
+    }
+}
+
+
+class Value {
+    constructor(public name: string, public valueType: ValueType) { }
+}
+
+
+class Context {
+
+    BUILT_IN_TYPES = {
+        int: IntType.constructor,
+    };
+
+    constructor(public lexer: Lexer) { }
+
+
+    isFamiliarVarType(typename: string): VarType | null {
+        if (typename in this.BUILT_IN_TYPES) {
+            return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
+        }
+        return null
     }
 
-    iter_cursor(cursor: Position, count: number): void {
-        for (let i = 0; i < count; ++i) {
-            if (this.iseof(cursor)) {
-                break;
-            }
-            if (this.text[this.cursor.count] === '\n') {
-                cursor.row++;
-                cursor.col = 0;
-            } else {
-                cursor.col++;
-            }
-            cursor.count++;
+    isFamiliarVarTypeOrThrow(typename: string): VarType {
+        if (typename in this.BUILT_IN_TYPES) {
+            return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
         }
-    }
-    backward_iter_cursor(cursor: Position): void {
-        if (this.cursor.count - 1 < 0) {
-            throw new LexerError(this, 'Trying to backwar before ZEROR');
-        }
-        if (this.text[this.cursor.count - 1] === '\n') {
-            const index = this.text.substring(0, this.cursor.count - 1).lastIndexOf('\n');
-            cursor.row--;
-            cursor.col = cursor.count - index;
-        } else {
-            cursor.col--;
-        }
-        cursor.count--;
+        throw new ParserError(this.lexer, `Unknown type: [${typename}]`);
     }
 
-
-    clear_from_tabulations() {
-        this.text = this.text.replaceAll('\r', ' ');
-        this.text = this.text.replaceAll('\t', ' ');
-    }
-
-    ltrim(cursor: Position): void {
-        while (!this.iseof(cursor) && isspace(this.at(cursor))) {
-            this.iter_cursor(cursor, 1);
-        }
-    }
-
-    is_equal_to_expr(cursor: Position, expr: string) {
-        return cursor.count + expr.length < this.text.length &&
-            this.text.substring(this.cursor.count, this.cursor.count + expr.length) === expr;
-    }
-
-    at(cursor: Position): string {
-        return this.iseof(this.cursor) ?
-            throwError(new LexerError(this, "UNCHECKED BOUNDARIES")) :
-            this.text[cursor.count] as string;
-    }
-
-    iter_while_not_equal(cursor: Position, symbols: string | string[]) {
-        if (typeof symbols === "string") {
-            while (!this.iseof(cursor) && this.at(cursor) !== symbols) {
-                this.iter_cursor(cursor, 1);
-            }
-        }
-        else if (Array.isArray(symbols)) {
-            while (!this.iseof(cursor) && !symbols.includes(this.at(cursor))) {
-                this.iter_cursor(cursor, 1);
-            }
-        }
-    }
-
-
-    is_correct_preprocessor(directive: string): Token {
-        if (!["#include", "#define", "#if", "#else"].includes(directive)) {
-            throw new LexerError(this, `No such preprocessor directive: [${directive}]`);
-        }
-        return new Token({ ...this.prev_cursor }, directive, TokenType.PREPROCESSOR);
-    }
-
-
-    substr(prev_cursor: Position, cursor: Position): string {
-        return this.text.substring(prev_cursor.count, cursor.count);
-    }
-
-    next_token(): Token | null {
-        this.ltrim(this.cursor);
-        if (this.cursor.count === this.prev_cursor.count && this.cursor.count !== 0) {
-            console.warn(`WARNING: spotted unknown sequnce: ${this.substr(this.prev_cursor, this.cursor)}\n`);
-            this.iter_cursor(this.cursor, 1);
-        }
-        this.prev_cursor = { ...this.cursor };
-
-        if (this.iseof(this.cursor)) {
-            return null;
-        }
-
-        if (this.at(this.cursor) === '#') {
-            this.iter_while_not_equal(this.cursor, ['\n', ' ']);
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `No such preprocessor directive: 
-                    ${this.text.substring(this.prev_cursor.count)}`);
-            }
-            const directive = this.text.substring(this.prev_cursor.count, this.cursor.count).trimEnd();
-            const token = this.is_correct_preprocessor(directive);
-            return token;
-        }
-        if (this.at(this.cursor) === '(') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '(', TokenType.O_PAREN);
-        }
-        if (this.at(this.cursor) === ')') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ')', TokenType.C_PAREN);
-        }
-        if (this.at(this.cursor) === '{') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '{', TokenType.O_CURL);
-        }
-        if (this.at(this.cursor) === '}') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '}', TokenType.C_CURL);
-        }
-        if (this.at(this.cursor) === '"') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `Unmatched quota ["]`);
-            }
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count, this.cursor.count), TokenType.STRING_LITERAL);
-        }
-        if (this.at(this.cursor) === '\'') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `Unmatched quota [']`);
-            }
-            if (this.cursor.count - this.prev_cursor.count < 2) {
-                throw new LexerError(this, `Char Quotas cannot contain underline string length less than 1 [${this.text.substring(this.prev_cursor.count, this.cursor.count + 1)}]`);
-            }
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count, this.cursor.count), TokenType.CHAR_LITERAL);
-        }
-
-        if (this.is_equal_to_expr(this.cursor, '->')) {
-            this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '->', TokenType.OP_ARROW);
-        }
-        if (this.is_equal_to_expr(this.cursor, '==')) {
-            this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '.', TokenType.OP_COMP_EQUAL);
-        }
-        if (this.is_equal_to_expr(this.cursor, '<=')) {
-            this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '.', TokenType.OP_COMP_LESS_EQ);
-        }
-        if (this.is_equal_to_expr(this.cursor, '>=')) {
-            this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '>=', TokenType.OP_COMP_GREATER_EQ);
-        }
-
-
-        if (this.at(this.cursor) === '+') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '+', TokenType.OP_PLUS);
-        }
-        if (this.at(this.cursor) === '-') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '-', TokenType.OP_MINUS);
-        }
-        if (this.at(this.cursor) === ';') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ';', TokenType.SEMICOLON);
-        }
-        if (this.at(this.cursor) === '*') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '*', TokenType.OP_ASTERISK);
-        }
-        if (this.at(this.cursor) === '/') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '/', TokenType.OP_DIVIDE);
-        }
-        if (this.at(this.cursor) === '.') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '.', TokenType.OP_DOT);
-        }
-        if (this.at(this.cursor) === ',') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ',', TokenType.COMMA);
-        }
-
-        if (this.at(this.cursor) === '<') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '<', TokenType.OP_COMP_LESS);
-        }
-        if (this.at(this.cursor) === '>') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '>', TokenType.OP_COMP_GREATER);
-        }
-        if (this.at(this.cursor) === '=') {
-            this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '=', TokenType.OP_ASSIGNMENT);
-        }
-
-        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '(', ')', '{', '}', ';', '=', '==', '<', '>', '->'];
-
-        this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
-
-        const text = this.text.substring(this.prev_cursor.count, this.cursor.count);
-        if (text.match(/^[+-]?\d+$/g) && !this.iseof(this.cursor) && this.at(this.cursor) === '.') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
-
-            const float_text = this.substr(this.prev_cursor, this.cursor);
-            if (/^[+-]?\d+(\.\d+)?$/g.test(float_text)) {
-                return new Token({ ...this.prev_cursor }, float_text, TokenType.NUM_FLOAT);
-            }
-        }
-
-        if (/^[+-]?\d+$/.test(text)) {
-            return new Token({ ...this.prev_cursor }, text, TokenType.NUM_INT);
-        }
-
-        type Keyword = {
-            'return': TokenType,
-            'const': TokenType,
-            'if': TokenType,
-            'else': TokenType,
-        };
-
-        const KEYWORDS: Keyword = {
-            'return': TokenType.KWD_RETURN, 'const': TokenType.KWD_CONST,
-            'if': TokenType.KWD_IF,
-            'else': TokenType.KWD_ELSE,
-        };
-
-        if (text in KEYWORDS) {
-            return new Token({ ...this.prev_cursor }, text, KEYWORDS[text as keyof Keyword]);
-        }
-
-        if (!(/^[a-zA-Z]+[0-9]*$/.test(text))) {
-            throwError(new LexerError(this, `[${text}] - Not correct variabler name`));
-        }
-
-        return new Token({ ...this.prev_cursor }, text, TokenType.NAME,);
+    isFamiliarNameInScope(name: string) {
+        return false;
     }
 
 }
+
+
 
 const main = (() => {
 
@@ -331,25 +136,92 @@ const main = (() => {
 
     const tokens = [];
 
-    while (1) {
-        token = lexer.next_token();
-        if (!token) {
-            break;
-        }
+    const context = new Context(lexer);
+
+    while (token = lexer.next_token()) {
         console.log(`${i++}-th token: ${toString(token)}\n`);
         let cur = toString(token);
         tokens.push(token);
-
-
         if (cur === prev) {
             throw new LexerError(lexer, `REPETITION: cur=[${cur}] prev=[${prev}])`);
         }
-
         prev = cur;
-    }
 
+        if (token.type === TokenType.PREPROCESSOR) {
+            continue;
+        }
+
+        const parseDeclarationType = (token: Token): [Token, ValueType] => {
+            let type: ValueType;
+            let name: string;
+            let isConst = false;
+            let first = token, second = lexer.next_token_or_throw();
+            if (first.text === 'const') {
+                isConst = true;
+                type = context.isFamiliarVarTypeOrThrow(second.text);
+                token = lexer.next_token_or_throw();
+            } else if (second.text === 'const') {
+                isConst = true;
+                type = context.isFamiliarVarTypeOrThrow(first.text);
+                token = lexer.next_token_or_throw();
+            } else {
+                type = context.isFamiliarVarTypeOrThrow(first.text);
+                token = second;
+            }
+
+            if (isConst) {
+                type.is_const = true;
+            }
+
+            while (token.type === TokenType.OP_ASTERISK) {
+                type = new PtrType(type);
+                let next_token = lexer.next_token_or_throw();
+                if (next_token.text === 'const') {
+                    type.is_const = true;
+                    next_token = lexer.next_token_or_throw();
+                }
+                token = next_token;
+            }
+            token = lexer.next_token_or_throw();
+            return [token, type];
+        };
+
+        const parseDeclarationTypeWithName = (token: Token): [Token, Value] => {
+            const [next_token, type] = parseDeclarationType(token);
+            if (next_token.type !== TokenType.NAME || context.isFamiliarNameInScope(next_token.text)) {
+                throwError(new ParserError(lexer, `Declared name ${next_token.text}`));
+            }
+            return [lexer.next_token_or_throw(), new Value(next_token.text, type)];
+        }
+
+        let type: ValueType;
+        [token, type] = parseDeclarationType(token);
+
+        let obj: Value;
+
+        if (token.type === TokenType.NAME && !context.isFamiliarNameInScope(token.text)) {
+            let name = token.text;
+
+            token = lexer.next_token_or_throw();
+            if (token.type === TokenType.O_PAREN) {
+                token = lexer.next_token_or_throw();
+                let val: Value;
+                while (([token, val] = parseDeclarationTypeWithName(token)) && token.type === TokenType.COMMA) {
+                    token = lexer.next_token_or_throw();
+                    if(token.type === TokenType.C_PAREN){
+                        break;
+                    }
+                }
+                
+
+            }
+
+        }
+    }
     // console.log(tokens.map((t) => t.text).join(' @\n\r'));
 
-})();
+}
+
+)();
 
 
