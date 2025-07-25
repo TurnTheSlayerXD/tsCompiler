@@ -13,7 +13,8 @@ export function toString(obj: Position | Token): string {
         return `${(obj as Position).row}:${(obj as Position).col}:${(obj as Position).count}`;
     }
     else if (obj.instance_type === 'token') {
-        return ` [${TokenType[(obj as Token).type]}]  [${(obj as Token).text}]  [${toString((obj as Token).pos)}]`;
+        const tok = (obj as Token);
+        return ` [${TokenType[(obj as Token).type]}]  [${tok.type === TokenType.NAME ? tok.text : ''}]  [${toString((obj as Token).pos)}]`;
     }
     const type = obj.instance_type;
     console.log(JSON.stringify(obj));
@@ -29,16 +30,33 @@ function not_equal(lhs: Position, rhs: Position): boolean {
 }
 
 
+export class TokenAccessException extends Error {
+    constructor(tok: Token) {
+        super(`Cannot access text property of token with type ${TokenType[tok.type]}`);
+    }
+}
+
 export class Token {
     instance_type?: string;
     pos: Position;
     type: TokenType;
-    text: string;
+    _text: string;
     constructor(pos: Position, text: string, type: TokenType) {
         this.pos = pos;
-        this.text = text;
+        this._text = text;
         this.type = type;
         this.instance_type = 'token';
+    }
+
+    get text(): string {
+        if (this.type !== TokenType.NAME) {
+            throw new TokenAccessException(this);
+        }
+        return this._text;
+    }
+
+    set text(text: string) {
+        this._text = text;
     }
 }
 
@@ -49,8 +67,6 @@ function TODO(msg: string) {
 function isspace(str: string): boolean {
     return str === ' ' || str === '\n';
 }
-
-
 
 export class Lexer {
     type?: string = 'lexer';
@@ -147,7 +163,7 @@ export class Lexer {
     next_token_or_throw(): Token {
         return this.next_token() ?? throwError(new ParserError(this, "Cannot parse"));
     }
-    
+
     next_token(): Token | null {
         this.ltrim(this.cursor);
         if (this.cursor.count === this.prev_cursor.count && this.cursor.count !== 0) {
@@ -287,16 +303,17 @@ export class Lexer {
             'if': TokenType,
             'else': TokenType,
             'for': TokenType,
-            'while': TokenType.KWD_WHILE,
+            'while': TokenType,
+            'const': TokenType,
         };
 
         const KEYWORDS: Keyword = {
             'return': TokenType.KWD_RETURN,
-            // 'const': TokenType.KWD_CONST,
             'if': TokenType.KWD_IF,
             'else': TokenType.KWD_ELSE,
             'for': TokenType.KWD_FOR,
             'while': TokenType.KWD_WHILE,
+            'const': TokenType.KWD_CONST,
         };
 
         if (text in KEYWORDS) {

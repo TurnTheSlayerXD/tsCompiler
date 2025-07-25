@@ -5,99 +5,19 @@ import { readFileSync } from "fs";
 import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
 import { Lexer, Token, toString } from "./lexer"
+import { IntType, CharType, VarType, PtrType, Value, FunctionType, ValueType } from "./value_types";
 
 
-interface ValueType {
-    is_const: boolean;
-    canAdd(value: ValueType): string;
-    canSubtract(value: ValueType): string;
-    canAssignTo(value: ValueType): string;
-    toString(): string;
-}
-
-class VarType implements ValueType {
-    constructor() {
-    }
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-
-    toString(): string {
-        throw new Error("Method not implemented.");
-    }
-}
-
-class IntType extends VarType {
-
-    override toString(): string {
-        return "int";
-    }
-}
-
-class CharType extends VarType {
-
-    override toString(): string {
-        return "char";
-    }
-}
-
-class PtrType implements ValueType {
-    constructor(public ptrTo: ValueType) { }
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-
-    toString(): string {
-        return `${this.ptrTo.toString()} *`;
-    }
-}
-
-class FunctionType implements ValueType {
-    constructor(public returnType: ValueType, public paramTypes: ValueType) { }
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    toString(): string {
-        throw new Error("Method not implemented.");
-    }
-}
-
-
-class Value {
-    constructor(public name: string, public valueType: ValueType) { }
-}
 
 
 class Context {
 
     BUILT_IN_TYPES = {
         int: IntType.constructor,
+        char: CharType.constructor,
     };
 
+    
     constructor(public lexer: Lexer) { }
 
 
@@ -123,7 +43,7 @@ class Context {
 
 
 
-const main = (() => {
+const main = () => {
 
 
     const text = readFileSync("./example/main.c").toString();
@@ -138,6 +58,48 @@ const main = (() => {
 
     const context = new Context(lexer);
 
+
+    const parseDeclarationType = (token: Token): [Token, ValueType] => {
+        let type: ValueType;
+        let isConst = false;
+        let first = token, second = lexer.next_token_or_throw();
+        if (first.type === TokenType.KWD_CONST) {
+            isConst = true;
+            type = context.isFamiliarVarTypeOrThrow(second.text);
+            token = lexer.next_token_or_throw();
+        } else if (second.type === TokenType.KWD_CONST) {
+            isConst = true;
+            type = context.isFamiliarVarTypeOrThrow(first.text);
+            token = lexer.next_token_or_throw();
+        } else {
+            type = context.isFamiliarVarTypeOrThrow(first.text);
+            token = second;
+        }
+
+        if (isConst) {
+            type.is_const = true;
+        }
+
+        while (token.type === TokenType.OP_ASTERISK) {
+            type = new PtrType(type);
+            let next_token = lexer.next_token_or_throw();
+            if (next_token.type === TokenType.KWD_CONST) {
+                type.is_const = true;
+                next_token = lexer.next_token_or_throw();
+            }
+            token = next_token;
+        }
+
+        return [token, type];
+    };
+    const parseDeclarationTypeWithName = (token: Token): [Token, Value] => {
+        const [next_token, type] = parseDeclarationType(token);
+        if (next_token.type !== TokenType.NAME || context.isFamiliarNameInScope(next_token.text)) {
+            throwError(new ParserError(lexer, `Token type ${TokenType[next_token.type]}`));
+        }
+        return [lexer.next_token_or_throw(), new Value(next_token.text, type)];
+    }
+
     while (token = lexer.next_token()) {
         console.log(`${i++}-th token: ${toString(token)}\n`);
         let cur = toString(token);
@@ -151,77 +113,47 @@ const main = (() => {
             continue;
         }
 
-        const parseDeclarationType = (token: Token): [Token, ValueType] => {
-            let type: ValueType;
-            let name: string;
-            let isConst = false;
-            let first = token, second = lexer.next_token_or_throw();
-            if (first.text === 'const') {
-                isConst = true;
-                type = context.isFamiliarVarTypeOrThrow(second.text);
-                token = lexer.next_token_or_throw();
-            } else if (second.text === 'const') {
-                isConst = true;
-                type = context.isFamiliarVarTypeOrThrow(first.text);
-                token = lexer.next_token_or_throw();
-            } else {
-                type = context.isFamiliarVarTypeOrThrow(first.text);
-                token = second;
-            }
-
-            if (isConst) {
-                type.is_const = true;
-            }
-
-            while (token.type === TokenType.OP_ASTERISK) {
-                type = new PtrType(type);
-                let next_token = lexer.next_token_or_throw();
-                if (next_token.text === 'const') {
-                    type.is_const = true;
-                    next_token = lexer.next_token_or_throw();
-                }
-                token = next_token;
-            }
-            token = lexer.next_token_or_throw();
-            return [token, type];
-        };
-
-        const parseDeclarationTypeWithName = (token: Token): [Token, Value] => {
-            const [next_token, type] = parseDeclarationType(token);
-            if (next_token.type !== TokenType.NAME || context.isFamiliarNameInScope(next_token.text)) {
-                throwError(new ParserError(lexer, `Declared name ${next_token.text}`));
-            }
-            return [lexer.next_token_or_throw(), new Value(next_token.text, type)];
-        }
-
-        let type: ValueType;
-        [token, type] = parseDeclarationType(token);
+        let decl_type: ValueType;
+        [token, decl_type] = parseDeclarationType(token);
 
         let obj: Value;
 
-        if (token.type === TokenType.NAME && !context.isFamiliarNameInScope(token.text)) {
-            let name = token.text;
+        if (token.type === TokenType.O_CURL) {
 
+
+        }
+
+
+        if (token.type === TokenType.NAME && !context.isFamiliarNameInScope(token.text)) {
+            const name = token.text;
             token = lexer.next_token_or_throw();
             if (token.type === TokenType.O_PAREN) {
                 token = lexer.next_token_or_throw();
                 let val: Value;
+                const fun_params: Value[] = [];
                 while (([token, val] = parseDeclarationTypeWithName(token)) && token.type === TokenType.COMMA) {
+                    console.log(token, val);
+                    fun_params.push(val);
                     token = lexer.next_token_or_throw();
-                    if(token.type === TokenType.C_PAREN){
+                    if (token.type === TokenType.C_PAREN) {
                         break;
                     }
                 }
-                
-
+                const decl_function = new FunctionType(decl_type, fun_params.map(v => v.valueType));
+                const new_val = new Value(name, decl_function);
             }
-
         }
+
+
+
     }
     // console.log(tokens.map((t) => t.text).join(' @\n\r'));
 
+};
+
+
+try {
+    main();
+} catch (err: any) {
+    console.error(err);
 }
-
-)();
-
-

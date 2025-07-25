@@ -15,12 +15,12 @@ export function throwError(error: any | undefined = undefined): never {
 
 export class LexerError extends Error {
     constructor(lexer: Lexer, msg: string) {
-        super(`Lexer Error at ${toString(lexer.prev_cursor)}:\n${msg}\n`);
+        super(`Lexer Error at ${toString(lexer.prev_cursor)}\n${msg}\n`);
     }
 }
 export class ParserError extends Error {
     constructor(lexer: Lexer, msg: string) {
-        super(`Parser Error at ${toString(lexer.prev_cursor)}:\n${msg}\n`);
+        super(`Parser Error at ${toString(lexer.prev_cursor)}\n${msg}\n`);
     }
 }
 
