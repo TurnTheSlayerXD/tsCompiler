@@ -72,7 +72,6 @@ export class Lexer {
     type?: string = 'lexer';
     cursor: Position = new Position(1, 0, 0);
     prev_cursor: Position = new Position(1, 0, 0);
-    last_token: Token | null = null;
     text: string;
     constructor(text: string) {
         this.text = text;
@@ -326,5 +325,24 @@ export class Lexer {
 
         return new Token({ ...this.prev_cursor }, text, TokenType.NAME,);
     }
+
+}
+
+
+class ArrayLexer extends Lexer {
+    iter: number = 0;
+    constructor(private tokens: Token[]) {
+        super('');
+
+    }
+
+    override next_token_or_throw(): Token {
+        return this.tokens[this.iter++] ?? throwError(new LexerError(this, 'Out of tokens'));
+    }
+
+    override next_token(): Token | null {
+        return this.tokens[this.iter++] ?? null;
+    }
+
 
 }

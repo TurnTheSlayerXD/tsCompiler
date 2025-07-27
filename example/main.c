@@ -1,10 +1,7 @@
 #include <stdio.h>
 
-
-const int main(int argc, char **argv)
+const int main(const const int const const argc, const char const *const *const argv)
 {
-    const int const const *const *const p;
-    int const i;
     printf("Hello, world");
     return 0;
 }

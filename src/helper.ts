@@ -24,3 +24,6 @@ export class ParserError extends Error {
     }
 }
 
+export function TODO(): never {
+    throw new Error("NOT IMPLEMENTED");
+}

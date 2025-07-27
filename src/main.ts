@@ -1,11 +1,11 @@
-import { LexerError, ParserError, throwError } from "./helper";
+import { LexerError, ParserError, throwError, TODO } from "./helper";
 import { strict } from "assert";
 import { error } from "console";
 import { readFileSync } from "fs";
 import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
 import { Lexer, Token, toString } from "./lexer"
-import { IntType, CharType, VarType, PtrType, Value, FunctionType, ValueType } from "./value_types";
+import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 
 
 
@@ -17,25 +17,58 @@ class Context {
         char: CharType.constructor,
     };
 
-    
+    private scopeValues: (Value[])[] = [[],];
+    private scopeTypes: (ValueType[])[] = [[],];
+    private literals: string[] = [];
+
     constructor(public lexer: Lexer) { }
 
 
-    isFamiliarVarType(typename: string): VarType | null {
-        if (typename in this.BUILT_IN_TYPES) {
-            return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
+    isFamiliarTypename(typename: string): ValueType | null {
+        switch (typename) {
+            case 'int': return IntType.getInstance();
+            case 'char': return CharType.getInstance();
+            case 'void': return VoidType.getInstance();
+            default: return null;
         }
-        return null
     }
 
-    isFamiliarVarTypeOrThrow(typename: string): VarType {
+    isFamiliarTypenameOrThrow(typename: string): ValueType {
         if (typename in this.BUILT_IN_TYPES) {
             return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
         }
         throw new ParserError(this.lexer, `Unknown type: [${typename}]`);
     }
 
-    isFamiliarNameInScope(name: string) {
+    pushScope() {
+        this.scopeValues.push([]);
+        this.scopeTypes.push([]);
+    }
+
+    popScope() {
+        this.scopeValues.pop();
+        this.scopeTypes.pop();
+    }
+
+    addScopeType() {
+        TODO();
+    }
+
+    addScopeValue(value: Value) {
+        this.scopeValues.at(-1)!.push(value);
+    }
+
+
+    addStringLiteral(literal: string) {
+        if (!this.literals.includes(literal)) {
+            this.literals.push(literal);
+        }
+    }
+
+    isFamiliarValue(name: string): Value | null {
+        if (name === 'printf') {
+            return true;
+        }
         return false;
     }
 
@@ -45,7 +78,7 @@ class Context {
 
 const main = () => {
 
-
+    let asm: string = "";
     const text = readFileSync("./example/main.c").toString();
 
     const lexer = new Lexer(text);
@@ -59,45 +92,39 @@ const main = () => {
     const context = new Context(lexer);
 
 
-    const parseDeclarationType = (token: Token): [Token, ValueType] => {
-        let type: ValueType;
+    const parseDeclarationType = (token: Token, gen: Lexer): [Token, ValueType] => {
+        let type: ValueType | null;
         let isConst = false;
-        let first = token, second = lexer.next_token_or_throw();
-        if (first.type === TokenType.KWD_CONST) {
+        while (token.type === TokenType.KWD_CONST) {
             isConst = true;
-            type = context.isFamiliarVarTypeOrThrow(second.text);
-            token = lexer.next_token_or_throw();
-        } else if (second.type === TokenType.KWD_CONST) {
+            token = gen.next_token_or_throw();
+        }
+        if (!(type = context.isFamiliarTypename(token.text))) {
+            throwError(new LexerError(gen, `Unknown VALUE TYPE: [${token.text}]`));
+        }
+        while ((token = gen.next_token_or_throw()).type === TokenType.KWD_CONST) {
             isConst = true;
-            type = context.isFamiliarVarTypeOrThrow(first.text);
-            token = lexer.next_token_or_throw();
-        } else {
-            type = context.isFamiliarVarTypeOrThrow(first.text);
-            token = second;
         }
-
-        if (isConst) {
-            type.is_const = true;
-        }
+        type.is_const = isConst;
 
         while (token.type === TokenType.OP_ASTERISK) {
-            type = new PtrType(type);
-            let next_token = lexer.next_token_or_throw();
+            type = PtrType.getInstance(type);
+            let next_token = gen.next_token_or_throw();
             if (next_token.type === TokenType.KWD_CONST) {
                 type.is_const = true;
-                next_token = lexer.next_token_or_throw();
+                next_token = gen.next_token_or_throw();
             }
             token = next_token;
         }
 
         return [token, type];
     };
-    const parseDeclarationTypeWithName = (token: Token): [Token, Value] => {
-        const [next_token, type] = parseDeclarationType(token);
-        if (next_token.type !== TokenType.NAME || context.isFamiliarNameInScope(next_token.text)) {
-            throwError(new ParserError(lexer, `Token type ${TokenType[next_token.type]}`));
+    const parseDeclarationTypeWithName = (token: Token, gen: Lexer): [Token, Value] => {
+        const [next_token, type] = parseDeclarationType(token, gen);
+        if (next_token.type !== TokenType.NAME || context.isFamiliarValue(next_token.text)) {
+            throwError(new ParserError(gen, `Token type ${TokenType[next_token.type]}`));
         }
-        return [lexer.next_token_or_throw(), new Value(next_token.text, type)];
+        return [gen.next_token_or_throw(), new Value(next_token.text, type)];
     }
 
     while (token = lexer.next_token()) {
@@ -114,14 +141,9 @@ const main = () => {
         }
 
         let decl_type: ValueType;
-        [token, decl_type] = parseDeclarationType(token);
+        [token, decl_type] = parseDeclarationType(token, lexer);
 
         let obj: Value;
-
-        if (token.type === TokenType.O_CURL) {
-
-
-        }
 
 
         if (token.type === TokenType.NAME && !context.isFamiliarNameInScope(token.text)) {
@@ -131,16 +153,49 @@ const main = () => {
                 token = lexer.next_token_or_throw();
                 let val: Value;
                 const fun_params: Value[] = [];
-                while (([token, val] = parseDeclarationTypeWithName(token)) && token.type === TokenType.COMMA) {
-                    console.log(token, val);
+                while ([token, val] = parseDeclarationTypeWithName(token, lexer)) {
+                    // console.log(toString(token), val.toString());
                     fun_params.push(val);
+                    if (token.type === TokenType.C_PAREN) {
+                        break;
+                    }
+                    if (token.type !== TokenType.COMMA) {
+                        throwError(new ParserError(lexer, `Unexpected token in function parameters ${toString(token)}`));
+                    }
                     token = lexer.next_token_or_throw();
                     if (token.type === TokenType.C_PAREN) {
                         break;
                     }
                 }
-                const decl_function = new FunctionType(decl_type, fun_params.map(v => v.valueType));
-                const new_val = new Value(name, decl_function);
+                const decl_function = FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType));
+                console.log(decl_function.toString());
+                const new_fun = new Value(name, decl_function);
+                context.addScopeValue(new_fun);
+
+                asm += `.def	${new_fun.name};
+                        .endef
+                        .globl	${new_fun.name}
+                        ${new_fun.name}:
+                        .seh_proc ${new_fun.name}
+                        subq	$40, %rsp
+                        `;
+
+                token = lexer.next_token_or_throw();
+                if (token.type === TokenType.O_CURL) {
+                    context.pushScope();
+                    while ((token = lexer.next_token_or_throw()).type !== TokenType.C_CURL) {
+                        if (token.type === TokenType.NAME) {
+                            if (context.isFamiliarTypename(token.text)) {
+                                parseDeclarationTypeWithName(token, lexer);
+                                TODO();
+                            }
+                            else if (context.isFamiliarNameInScope(token.text)) {
+
+                            }
+                        }
+                    }
+                }
+
             }
         }
 
