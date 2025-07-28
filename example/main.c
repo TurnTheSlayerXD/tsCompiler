@@ -1,7 +1,11 @@
 #include <stdio.h>
+#include <Windows.h>
 
-const int main(const const int const const argc, const char const *const *const argv)
+int main(int argc, char **argv)
 {
-    printf("Hello, world");
+    void* stdOut = GetStdHandle(-11);
+    unsigned long written = 0;
+    const char *message = "hello world";
+    WriteConsole(stdOut, message, 11, &written, NULL);
     return 0;
 }

@@ -6,74 +6,7 @@ import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
 import { Lexer, Token, toString } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
-
-
-
-
-class Context {
-
-    BUILT_IN_TYPES = {
-        int: IntType.constructor,
-        char: CharType.constructor,
-    };
-
-    private scopeValues: (Value[])[] = [[],];
-    private scopeTypes: (ValueType[])[] = [[],];
-    private literals: string[] = [];
-
-    constructor(public lexer: Lexer) { }
-
-
-    isFamiliarTypename(typename: string): ValueType | null {
-        switch (typename) {
-            case 'int': return IntType.getInstance();
-            case 'char': return CharType.getInstance();
-            case 'void': return VoidType.getInstance();
-            default: return null;
-        }
-    }
-
-    isFamiliarTypenameOrThrow(typename: string): ValueType {
-        if (typename in this.BUILT_IN_TYPES) {
-            return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
-        }
-        throw new ParserError(this.lexer, `Unknown type: [${typename}]`);
-    }
-
-    pushScope() {
-        this.scopeValues.push([]);
-        this.scopeTypes.push([]);
-    }
-
-    popScope() {
-        this.scopeValues.pop();
-        this.scopeTypes.pop();
-    }
-
-    addScopeType() {
-        TODO();
-    }
-
-    addScopeValue(value: Value) {
-        this.scopeValues.at(-1)!.push(value);
-    }
-
-
-    addStringLiteral(literal: string) {
-        if (!this.literals.includes(literal)) {
-            this.literals.push(literal);
-        }
-    }
-
-    isFamiliarValue(name: string): Value | null {
-        if (name === 'printf') {
-            return true;
-        }
-        return false;
-    }
-
-}
-
+import { Context } from "./context";
 
 
 const main = () => {
@@ -121,11 +54,22 @@ const main = () => {
     };
     const parseDeclarationTypeWithName = (token: Token, gen: Lexer): [Token, Value] => {
         const [next_token, type] = parseDeclarationType(token, gen);
-        if (next_token.type !== TokenType.NAME || context.isFamiliarValue(next_token.text)) {
+        if (next_token.type !== TokenType.NAME || context.isFamiliarValueName(next_token.text)) {
             throwError(new ParserError(gen, `Token type ${TokenType[next_token.type]}`));
         }
         return [gen.next_token_or_throw(), new Value(next_token.text, type)];
     }
+
+    const parseFunctionCall = (fun_name: string, fun_type: FunctionType, gen: Lexer) => {
+        if (lexer.next_token_or_throw().type !== TokenType.O_PAREN) {
+            throwError(new ParserError(lexer, "Not function call"));
+        }
+
+        let asm = '';
+
+
+
+    };
 
     while (token = lexer.next_token()) {
         console.log(`${i++}-th token: ${toString(token)}\n`);
@@ -146,7 +90,7 @@ const main = () => {
         let obj: Value;
 
 
-        if (token.type === TokenType.NAME && !context.isFamiliarNameInScope(token.text)) {
+        if (token.type === TokenType.NAME && !context.isFamiliarValueName(token.text)) {
             const name = token.text;
             token = lexer.next_token_or_throw();
             if (token.type === TokenType.O_PAREN) {
@@ -181,6 +125,7 @@ const main = () => {
                         `;
 
                 token = lexer.next_token_or_throw();
+                let value: Value | null;
                 if (token.type === TokenType.O_CURL) {
                     context.pushScope();
                     while ((token = lexer.next_token_or_throw()).type !== TokenType.C_CURL) {
@@ -189,7 +134,16 @@ const main = () => {
                                 parseDeclarationTypeWithName(token, lexer);
                                 TODO();
                             }
-                            else if (context.isFamiliarNameInScope(token.text)) {
+                            else if (!!(value = context.isFamiliarValueName(token.text))) {
+
+                                if (value.valueType instanceof FunctionType) {
+                                    const fun_type: FunctionType = value.valueType;
+
+
+
+
+                                }
+
 
                             }
                         }

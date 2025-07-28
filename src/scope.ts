@@ -1,5 +1,4 @@
-import { Value, ValueType } from "./value_types";
-
+import { FunctionType, Value, ValueType } from "./value_types";
 
 
 
