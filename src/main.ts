@@ -8,10 +8,16 @@ import { Lexer, Token, toString } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 import { Context } from "./context";
 
+class Asm {
+    asm: string = '';
+    add(asm: string): void {
+        this.asm += asm;
+    }
+}
 
 const main = () => {
 
-    let asm: string = "";
+    let asm = new Asm();
     const text = readFileSync("./example/main.c").toString();
 
     const lexer = new Lexer(text);
@@ -60,15 +66,17 @@ const main = () => {
         return [gen.next_token_or_throw(), new Value(next_token.text, type)];
     }
 
-    const parseFunctionCall = (fun_name: string, fun_type: FunctionType, gen: Lexer) => {
+    const genAsmOfFunctionCall = (fun_name: string, fun_type: FunctionType, gen: Lexer) => {
         if (lexer.next_token_or_throw().type !== TokenType.O_PAREN) {
             throwError(new ParserError(lexer, "Not function call"));
         }
-
-        let asm = '';
-
-
-
+        let token;
+        let value;
+        while ((token = lexer.next_token_or_throw()).type !== TokenType.C_PAREN) {
+            if (token.type === TokenType.NAME && (value = context.isFamiliarValueNameOrThrow(token.text))) {
+                asm.add(`movl ${value.getAddress()}(%rsp), %rcx`);
+            }
+        }
     };
 
     while (token = lexer.next_token()) {
@@ -116,13 +124,13 @@ const main = () => {
                 const new_fun = new Value(name, decl_function);
                 context.addScopeValue(new_fun);
 
-                asm += `.def	${new_fun.name};
+                asm.add(`.def	${new_fun.name};
                         .endef
                         .globl	${new_fun.name}
                         ${new_fun.name}:
                         .seh_proc ${new_fun.name}
                         subq	$40, %rsp
-                        `;
+                        `);
 
                 token = lexer.next_token_or_throw();
                 let value: Value | null;
@@ -135,16 +143,21 @@ const main = () => {
                                 TODO();
                             }
                             else if (!!(value = context.isFamiliarValueName(token.text))) {
-
                                 if (value.valueType instanceof FunctionType) {
                                     const fun_type: FunctionType = value.valueType;
 
+                                    if ((token = lexer.next_token_or_throw()).type === TokenType.O_PAREN) {
+
+                                        while ((token = lexer.next_token_or_throw()).type !== TokenType.C_PAREN) {
 
 
+                                        }
 
+                                    }
                                 }
 
-
+                            } else {
+                                throwError(new ParserError(lexer, `Unknown value [${token.text}}]`));
                             }
                         }
                     }

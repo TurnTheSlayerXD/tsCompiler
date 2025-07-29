@@ -201,4 +201,8 @@ export class Value {
     public toString = (): string => {
         return `Name: [${this.name}] Type: [${this.valueType.toString()}]`
     }
+
+    public getAddress(): number {
+        return 0;
+    }
 }

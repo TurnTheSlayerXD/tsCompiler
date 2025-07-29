@@ -333,7 +333,6 @@ class ArrayLexer extends Lexer {
     iter: number = 0;
     constructor(private tokens: Token[]) {
         super('');
-
     }
 
     override next_token_or_throw(): Token {
@@ -343,6 +342,4 @@ class ArrayLexer extends Lexer {
     override next_token(): Token | null {
         return this.tokens[this.iter++] ?? null;
     }
-
-
 }

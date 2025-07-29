@@ -1,4 +1,4 @@
-import { ParserError, TODO } from "./helper";
+import { LexerError, ParserError, throwError, TODO } from "./helper";
 import { Lexer } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 
@@ -60,22 +60,13 @@ export class Context {
     }
 
     isFamiliarValueName(name: string): Value | null {
-        if (name === 'GetStdHandle') {
-            return new Value('*__imp_GetStdHandle', FunctionType.getInstance(PtrType.getInstance(VoidType.getInstance()),
-                []));
-        }
-        else if (name === 'WriteConsole') {
-            return new Value('*__imp_WriteConsoleA', FunctionType.getInstance(
-                IntType.getInstance(),
-                [
-                    PtrType.getInstance(VoidType.getInstance()),
-                    PtrType.getInstance(VoidType.getInstance()),
-                    IntType.getInstance(),
-                    PtrType.getInstance(IntType.getInstance()),
-                    PtrType.getInstance(VoidType.getInstance()),
-                ]));
+        if (name === 'print') {
+            return new Value('print', FunctionType.getInstance(VoidType.getInstance(), [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]));
         }
         return null;
+    }
+    isFamiliarValueNameOrThrow(name: string): Value | null {
+        return this.isFamiliarValueName(name) || throwError(new ParserError(this.lexer, `No such value name ${name}`));
     }
 
 }
