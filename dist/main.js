@@ -1,335 +1,220 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const helper_1 = require("./helper");
 const fs_1 = require("fs");
-class Position {
-    row;
-    col;
-    count;
-    constructor(row, col, count) {
-        this.row = row;
-        this.col = col;
-        this.count = count;
+const token_type_1 = require("./token_type");
+const lexer_1 = require("./lexer");
+const value_types_1 = require("./value_types");
+const context_1 = require("./context");
+class RValueExpressionParser {
+    context;
+    tokens;
+    constructor(context, tokens) {
+        this.context = context;
+        this.tokens = tokens;
     }
-}
-function toString(obj) {
-    if (obj instanceof Position) {
-        return `${obj.row}:${obj.col}:${obj.count}`;
-    }
-    else if (obj instanceof Token) {
-        return `type: [${TokenType[obj.type]}] text: [${obj.text}] pos: [${toString(obj.pos)}]`;
-    }
-    const type = '';
-    console.log(`Can't convert object of type [${type}] to string`);
-    throw new Error(`Can't convert object of type [${type}] to string`);
-}
-function equal(lhs, rhs) {
-    return lhs.count === rhs.count && lhs.row === rhs.row && lhs.col === rhs.col;
-}
-function not_equal(lhs, rhs) {
-    return lhs.count !== rhs.count;
-}
-var TokenType;
-(function (TokenType) {
-    TokenType[TokenType["HASH"] = 0] = "HASH";
-    TokenType[TokenType["BUILTIN_TYPE"] = 1] = "BUILTIN_TYPE";
-    TokenType[TokenType["NAME"] = 2] = "NAME";
-    TokenType[TokenType["KEYWORD"] = 3] = "KEYWORD";
-    TokenType[TokenType["O_PAREN"] = 4] = "O_PAREN";
-    TokenType[TokenType["C_PAREN"] = 5] = "C_PAREN";
-    TokenType[TokenType["O_CURL"] = 6] = "O_CURL";
-    TokenType[TokenType["C_CURL"] = 7] = "C_CURL";
-    TokenType[TokenType["NUM_INT"] = 8] = "NUM_INT";
-    TokenType[TokenType["NUM_FLOAT"] = 9] = "NUM_FLOAT";
-    TokenType[TokenType["STRING_LITERAL"] = 10] = "STRING_LITERAL";
-    TokenType[TokenType["CHAR_LITERAL"] = 11] = "CHAR_LITERAL";
-    TokenType[TokenType["STRING_LITERAL_SQUARE"] = 12] = "STRING_LITERAL_SQUARE";
-    TokenType[TokenType["COMMA"] = 13] = "COMMA";
-    TokenType[TokenType["SEMICOLON"] = 14] = "SEMICOLON";
-    TokenType[TokenType["PREPROCESSOR"] = 15] = "PREPROCESSOR";
-    TokenType[TokenType["OP_PLUS"] = 16] = "OP_PLUS";
-    TokenType[TokenType["OP_MINUS"] = 17] = "OP_MINUS";
-    TokenType[TokenType["OP_ASTERISK"] = 18] = "OP_ASTERISK";
-    TokenType[TokenType["OP_DIVIDE"] = 19] = "OP_DIVIDE";
-    TokenType[TokenType["OP_PERCENT"] = 20] = "OP_PERCENT";
-    TokenType[TokenType["OP_DOT"] = 21] = "OP_DOT";
-    TokenType[TokenType["OP_ARROW"] = 22] = "OP_ARROW";
-    TokenType[TokenType["OP_COMP_EQUAL"] = 23] = "OP_COMP_EQUAL";
-    TokenType[TokenType["OP_COMP_LESS"] = 24] = "OP_COMP_LESS";
-    TokenType[TokenType["OP_COMP_GREATER"] = 25] = "OP_COMP_GREATER";
-    TokenType[TokenType["OP_COMP_GREATER_EQ"] = 26] = "OP_COMP_GREATER_EQ";
-    TokenType[TokenType["OP_COMP_LESS_EQ"] = 27] = "OP_COMP_LESS_EQ";
-    TokenType[TokenType["OP_ASSIGNMENT"] = 28] = "OP_ASSIGNMENT";
-    TokenType[TokenType["KWD_RETURN"] = 29] = "KWD_RETURN";
-    TokenType[TokenType["KWD_CONST"] = 30] = "KWD_CONST";
-    TokenType[TokenType["KWD_IF"] = 31] = "KWD_IF";
-    TokenType[TokenType["KWD_ELSE"] = 32] = "KWD_ELSE";
-})(TokenType || (TokenType = {}));
-class Token {
-    pos;
-    type;
-    text;
-    constructor(pos, text, type) {
-        this.pos = pos;
-        this.text = text;
-        this.type = type;
-    }
-}
-function TODO(msg) {
-    throw new Error(`TODO: ${msg}`);
-}
-function isspace(str) {
-    return str === ' ' || str === '\n';
-}
-class LexerError extends Error {
-    constructor(lexer, msg) {
-        super(`Lexer Error at ${toString(lexer.prev_cursor)}:\n${msg}\n`);
-    }
-}
-function throwError(error) {
-    throw error;
-}
-class Lexer {
-    text;
-    cursor = { row: 1, col: 0, count: 0 };
-    prev_cursor = { row: 1, col: 0, count: 0 };
-    last_token = null;
-    constructor(text) {
-        this.text = text;
-        this.clear_from_tabulations();
-    }
-    iseof(cursor) {
-        return cursor.count >= this.text.length;
-    }
-    iter_cursor(cursor, count) {
-        for (let i = 0; i < count; ++i) {
-            if (this.iseof(cursor)) {
-                break;
+    getMatchingRBracket(l_bracket_pos) {
+        let help = 0;
+        const types = this.tokens.map(t => t.type);
+        for (let i = l_bracket_pos + 1; i < types.length; ++i) {
+            if (types[i] === token_type_1.TokenType.O_PAREN) {
+                help += 1;
             }
-            if (this.text[this.cursor.count] === '\n') {
-                cursor.row++;
-                cursor.col = 0;
+            else if (types[i] === token_type_1.TokenType.C_PAREN) {
+                if (help === 0) {
+                    return i;
+                }
+                help -= 1;
+            }
+        }
+        (0, helper_1.throwError)(new helper_1.TokenParserError(this.tokens[l_bracket_pos], `Unclosed O_PAREN`));
+    }
+    parse() {
+        const { context } = this;
+        const tokens = this.tokens;
+        if (tokens.length >= 3 && tokens[0].type === token_type_1.TokenType.NAME && tokens[1].type === token_type_1.TokenType.O_PAREN) {
+            const c_parent_pos = this.getMatchingRBracket(1);
+            const fun_name = tokens[0].text;
+            const splitted = (0, helper_1.splitBy)(tokens.slice(2, c_parent_pos), t => t.type === token_type_1.TokenType.COMMA);
+            const params = splitted.map(s => new RValueExpressionParser(this.context, s).parse()
+                ?? (0, helper_1.throwError)(new helper_1.TokenParserError(tokens[0], "Void params are not allowed")));
+            const actual_type = value_types_1.FunctionType.getInstance(value_types_1.VoidType.getInstance(), params.map(p => p.valueType));
+            const fun_value = context.getValueWithTypeOrThrow(fun_name, actual_type);
+            if (fun_value.name === 'print') {
+                this.context.addAssembly(`
+                    	\rmovl  $4294967285, %ecx               # imm = 0xFFFFFFF5
+                    	\rcallq	*__imp_GetStdHandle(%rip)
+                    	\rmovq	%rax, ${context.pushStack(8)}(%rsp)
+                    	\rmovl	$0, ${context.pushStack(4)}(%rsp)
+                    	\rmovq	${context.stackPtr + 4}(%rsp), %rcx
+                    	\rleaq	${context.stackPtr}(%rsp), %r9
+                        `);
+                this.context.addAssembly(`
+                        \rleaq  ${params[0].getAddress()}(%rsp), %rdx
+                    `);
+                this.context.addAssembly(`
+                        \rmovl  ${params[1].getAddress()}(%rsp), %r8d
+                    `);
+                this.context.addAssembly(`
+                        \rcallq	 *__imp_WriteConsoleA(%rip)
+                    `);
+                return null;
             }
             else {
-                cursor.col++;
-            }
-            cursor.count++;
-        }
-    }
-    backward_iter_cursor(cursor) {
-        if (this.cursor.count - 1 < 0) {
-            throw new LexerError(this, 'Trying to backwar before ZEROR');
-        }
-        if (this.text[this.cursor.count - 1] === '\n') {
-            const index = this.text.substring(0, this.cursor.count - 1).lastIndexOf('\n');
-            cursor.row--;
-            cursor.col = cursor.count - index;
-        }
-        else {
-            cursor.col--;
-        }
-        cursor.count--;
-    }
-    clear_from_tabulations() {
-        this.text = this.text.replaceAll('\r', ' ');
-        this.text = this.text.replaceAll('\t', ' ');
-    }
-    ltrim(cursor) {
-        while (!this.iseof(cursor) && isspace(this.at(cursor))) {
-            this.iter_cursor(cursor, 1);
-        }
-    }
-    is_equal_to_expr(cursor, expr) {
-        return cursor.count + expr.length < this.text.length &&
-            this.text.substring(this.cursor.count, this.cursor.count + expr.length) === expr;
-    }
-    at(cursor) {
-        return this.iseof(this.cursor) ?
-            throwError(new LexerError(this, "UNCHECKED BOUNDARIES")) :
-            this.text[cursor.count];
-    }
-    iter_while_not_equal(cursor, symbols) {
-        if (typeof symbols === "string") {
-            while (!this.iseof(cursor) && this.at(cursor) !== symbols) {
-                this.iter_cursor(cursor, 1);
+                (0, helper_1.TODO)();
             }
         }
-        else if (Array.isArray(symbols)) {
-            while (!this.iseof(cursor) && !symbols.includes(this.at(cursor))) {
-                this.iter_cursor(cursor, 1);
-            }
+        else if (tokens.length === 1 && tokens[0].type === token_type_1.TokenType.NUM_INT) {
+            const new_value = new value_types_1.Value('_temporary', value_types_1.IntType.getInstance());
+            new_value.setValue(this.context, tokens[0].text);
+            return new_value;
         }
-    }
-    is_correct_preprocessor(directive) {
-        if (!["#include", "#define", "#if", "#else"].includes(directive)) {
-            throw new LexerError(this, `No such preprocessor directive: [${directive}]`);
+        else if (tokens.length === 1 && tokens[0].type === token_type_1.TokenType.STRING_LITERAL) {
+            const new_value = new value_types_1.Value('_temporary', value_types_1.PtrType.getInstance(value_types_1.CharType.getInstance()));
+            this.context.addStringLiteral(tokens[0].text);
+            new_value.setValue(this.context, tokens[0].text);
+            return new_value;
         }
-        return { pos: { ...this.cursor }, type: TokenType.PREPROCESSOR, text: directive };
-    }
-    substr(prev_cursor, cursor) {
-        return this.text.substring(prev_cursor.count, cursor.count);
-    }
-    next_token() {
-        this.ltrim(this.cursor);
-        if (this.cursor.count === this.prev_cursor.count && this.cursor.count !== 0) {
-            console.warn(`WARNING: spotted unknown sequnce: ${this.substr(this.prev_cursor, this.cursor)}\n`);
-            this.iter_cursor(this.cursor, 1);
-        }
-        this.prev_cursor = { ...this.cursor };
-        if (this.iseof(this.cursor)) {
-            return undefined;
-        }
-        if (this.at(this.cursor) === '#') {
-            this.iter_while_not_equal(this.cursor, ['\n', ' ']);
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `No such preprocessor directive: 
-                    ${this.text.substring(this.prev_cursor.count)}`);
-            }
-            const directive = this.text.substring(this.prev_cursor.count, this.cursor.count).trimEnd();
-            const token = this.is_correct_preprocessor(directive);
-            return token;
-        }
-        if (this.at(this.cursor) === '(') {
-            this.iter_cursor(this.cursor, 1);
-            return ({ pos: { ...this.prev_cursor }, text: '(', type: TokenType.O_PAREN });
-        }
-        if (this.at(this.cursor) === ')') {
-            this.iter_cursor(this.cursor, 1);
-            return ({ pos: { ...this.prev_cursor }, text: ')', type: TokenType.C_PAREN });
-        }
-        if (this.at(this.cursor) === '{') {
-            this.iter_cursor(this.cursor, 1);
-            return ({ pos: { ...this.prev_cursor }, text: '{', type: TokenType.O_CURL });
-        }
-        if (this.at(this.cursor) === '}') {
-            this.iter_cursor(this.cursor, 1);
-            return ({ pos: { ...this.prev_cursor }, text: '}', type: TokenType.C_CURL });
-        }
-        if (this.at(this.cursor) === '"') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `Unmatched quota ["]`);
-            }
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: this.text.substring(this.prev_cursor.count, this.cursor.count), type: TokenType.STRING_LITERAL };
-        }
-        if (this.at(this.cursor) === '\'') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
-            if (this.iseof(this.cursor)) {
-                throw new LexerError(this, `Unmatched quota [']`);
-            }
-            if (this.cursor.count - this.prev_cursor.count < 2) {
-                throw new LexerError(this, `Char Quotas cannot contain underline string length less than 1 [${this.text.substring(this.prev_cursor.count, this.cursor.count + 1)}]`);
-            }
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: this.text.substring(this.prev_cursor.count, this.cursor.count), type: TokenType.CHAR_LITERAL };
-        }
-        if (this.is_equal_to_expr(this.cursor, '->')) {
-            this.iter_cursor(this.cursor, 2);
-            return { pos: { ...this.prev_cursor }, text: '->', type: TokenType.OP_ARROW };
-        }
-        if (this.is_equal_to_expr(this.cursor, '==')) {
-            this.iter_cursor(this.cursor, 2);
-            return { pos: { ...this.prev_cursor }, text: '.', type: TokenType.OP_COMP_EQUAL };
-        }
-        if (this.is_equal_to_expr(this.cursor, '<=')) {
-            this.iter_cursor(this.cursor, 2);
-            return { pos: { ...this.prev_cursor }, text: '.', type: TokenType.OP_COMP_LESS_EQ };
-        }
-        if (this.is_equal_to_expr(this.cursor, '>=')) {
-            this.iter_cursor(this.cursor, 2);
-            return { pos: { ...this.prev_cursor }, text: '>=', type: TokenType.OP_COMP_GREATER_EQ };
-        }
-        if (this.at(this.cursor) === '+') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '+', type: TokenType.OP_PLUS };
-        }
-        if (this.at(this.cursor) === '-') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '-', type: TokenType.OP_MINUS };
-        }
-        if (this.at(this.cursor) === ';') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: ';', type: TokenType.SEMICOLON };
-        }
-        if (this.at(this.cursor) === '*') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '*', type: TokenType.OP_ASTERISK };
-        }
-        if (this.at(this.cursor) === '/') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '/', type: TokenType.OP_DIVIDE };
-        }
-        if (this.at(this.cursor) === '.') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '.', type: TokenType.OP_DOT };
-        }
-        if (this.at(this.cursor) === ',') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: ',', type: TokenType.COMMA };
-        }
-        if (this.at(this.cursor) === '<') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '<', type: TokenType.OP_COMP_LESS };
-        }
-        if (this.at(this.cursor) === '>') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '>', type: TokenType.OP_COMP_GREATER };
-        }
-        if (this.at(this.cursor) === '=') {
-            this.iter_cursor(this.cursor, 1);
-            return { pos: { ...this.prev_cursor }, text: '=', type: TokenType.OP_ASSIGNMENT };
-        }
-        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '(', ')', '{', '}', ';', '"', '\'', '=', '==', '<', '>', '->'];
-        const KEYWORDS = {
-            'return': TokenType.KWD_RETURN, 'const': TokenType.KWD_CONST,
-            'if': TokenType.KWD_IF,
-            'else': TokenType.KWD_ELSE,
-        };
-        this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
-        const text = this.text.substring(this.prev_cursor.count, this.cursor.count);
-        if (text.match(/[+-]?\d+/g) && !this.iseof(this.cursor) && this.at(this.cursor) === '.') {
-            this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
-            const float_text = this.substr(this.prev_cursor, this.cursor);
-            if (/[+-]?\d+(\.\d+)?/g.test(float_text)) {
-                return { pos: { ...this.prev_cursor }, text: float_text, type: TokenType.NUM_FLOAT };
-            }
-        }
-        if (text.match(/[+-]?\d+/g)) {
-            return { pos: { ...this.prev_cursor }, text, type: TokenType.NUM_INT };
-        }
-        if (text in KEYWORDS) {
-            return {
-                pos: { ...this.prev_cursor },
-                text,
-                type: KEYWORDS[text]
-            };
-        }
-        return { pos: { ...this.prev_cursor }, text, type: TokenType.NAME, };
+        (0, helper_1.TODO)();
     }
 }
-const main = (() => {
+class CurlExpressionParser {
+    context;
+    tokens;
+    constructor(context, tokens) {
+        this.context = context;
+        this.tokens = tokens;
+    }
+    parse() {
+        const tokens = this.tokens;
+        for (let i = 0; i < tokens.length; ++i) {
+            if (tokens[i].type === token_type_1.TokenType.NAME) {
+                const semi_index = tokens.slice(i + 1).findIndex(t => t.type === token_type_1.TokenType.SEMICOLON) + i + 1;
+                semi_index === -1 ? (0, helper_1.throwError)(new helper_1.TokenParserError(tokens[i], "No semicolon at the of the expression")) : undefined;
+                new RValueExpressionParser(this.context, tokens.slice(i, semi_index)).parse();
+                i = semi_index;
+            }
+            else {
+                (0, helper_1.TODO)();
+            }
+        }
+        return null;
+    }
+}
+const main = () => {
     const text = (0, fs_1.readFileSync)("./example/main.c").toString();
-    const lexer = new Lexer(text);
+    const lexer = new lexer_1.Lexer(text);
     let token;
     let prev;
-    let cur;
     let i = 0;
     const tokens = [];
-    while ((token = lexer.next_token()) !== undefined) {
-        if (token === undefined) {
-            break;
+    const context = new context_1.Context(lexer);
+    const parseDeclarationType = (token, gen) => {
+        let type;
+        let isConst = false;
+        while (token.type === token_type_1.TokenType.KWD_CONST) {
+            isConst = true;
+            token = gen.next_token_or_throw();
         }
-        console.log(`${i++}-th line: ${toString(token)}\n`);
-        let cur = toString(token);
+        if (!(type = context.isFamiliarTypename(token.text))) {
+            (0, helper_1.throwError)(new helper_1.LexerError(gen, `Unknown VALUE TYPE: [${token.text}]`));
+        }
+        while ((token = gen.next_token_or_throw()).type === token_type_1.TokenType.KWD_CONST) {
+            isConst = true;
+        }
+        type.is_const = isConst;
+        while (token.type === token_type_1.TokenType.OP_ASTERISK) {
+            type = value_types_1.PtrType.getInstance(type);
+            let next_token = gen.next_token_or_throw();
+            if (next_token.type === token_type_1.TokenType.KWD_CONST) {
+                type.is_const = true;
+                next_token = gen.next_token_or_throw();
+            }
+            token = next_token;
+        }
+        return [token, type];
+    };
+    const parseDeclarationTypeWithName = (token, gen) => {
+        const [next_token, type] = parseDeclarationType(token, gen);
+        if (next_token.type !== token_type_1.TokenType.NAME || context.isFamiliarValueName(next_token.text)) {
+            (0, helper_1.throwError)(new helper_1.ParserError(gen, `Token type ${token_type_1.TokenType[next_token.type]}`));
+        }
+        return [gen.next_token_or_throw(), new value_types_1.Value(next_token.text, type)];
+    };
+    while (token = lexer.next_token()) {
+        let cur = token.toString();
         tokens.push(token);
         if (cur === prev) {
-            // console.log(`cur = ${typeof cur}, prev = ${typeof prev}`);
-            throw new Error(String(`REPETITION: cur=[${cur}] prev=[${prev}])`));
+            throw new helper_1.LexerError(lexer, `REPETITION: cur=[${cur}] prev=[${prev}])`);
         }
         prev = cur;
+        if (token.type === token_type_1.TokenType.PREPROCESSOR) {
+            continue;
+        }
+        let decl_type;
+        [token, decl_type] = parseDeclarationType(token, lexer);
+        let obj;
+        if (token.type === token_type_1.TokenType.NAME && !context.isFamiliarValueName(token.text)) {
+            const name = token.text;
+            token = lexer.next_token_or_throw();
+            if (token.type === token_type_1.TokenType.O_PAREN) {
+                token = lexer.next_token_or_throw();
+                let val;
+                const fun_params = [];
+                while ([token, val] = parseDeclarationTypeWithName(token, lexer)) {
+                    // console.log(toString(token), val.toString());
+                    fun_params.push(val);
+                    if (token.type === token_type_1.TokenType.C_PAREN) {
+                        break;
+                    }
+                    if (token.type !== token_type_1.TokenType.COMMA) {
+                        (0, helper_1.throwError)(new helper_1.ParserError(lexer, `Unexpected token in function parameters ${token}`));
+                    }
+                    token = lexer.next_token_or_throw();
+                    if (token.type === token_type_1.TokenType.C_PAREN) {
+                        break;
+                    }
+                }
+                const decl_function = value_types_1.FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType));
+                const new_fun = new value_types_1.Value(name, decl_function);
+                context.addScopeValue(new_fun);
+                context.addAssembly(`\r.def	${new_fun.name};
+                                     \r.endef
+                                     \r.globl	${new_fun.name}
+                                     \r${new_fun.name}:
+                                     \r.seh_proc ${new_fun.name}
+                                     \rsubq	$${context.stackPtr}, %rsp
+                                     \r`);
+                token = lexer.next_token_or_throw();
+                if (token.type === token_type_1.TokenType.O_CURL) {
+                    const tokens = [];
+                    const error = new helper_1.TokenParserError(token, "Unmatched O_CURL");
+                    while (true) {
+                        token = lexer.next_token();
+                        if (!token) {
+                            (0, helper_1.throwError)(error);
+                        }
+                        if (token.type === token_type_1.TokenType.C_CURL) {
+                            break;
+                        }
+                        tokens.push(token);
+                    }
+                    new CurlExpressionParser(context, tokens).parse();
+                }
+                context.addAssembly(`\rxor %eax, %eax
+                                     \raddq	$${context.init_stack_offset}, %rsp
+	                                 \rretq
+	                                 \r.seh_endproc
+                                     \r`);
+            }
+        }
     }
-    console.log(tokens.map((t) => t.text).join(' @\n\r'));
-})();
+    // console.log(context.getAsm());
+    context.asmToFile('out.asm');
+};
+try {
+    main();
+}
+catch (err) {
+    console.error(err);
+}

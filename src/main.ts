@@ -1,4 +1,4 @@
-import { LexerError, ParserError, throwError, TODO, TokenParserError, splitBy } from "./helper";
+import { LexerError, ParserError, throwError, TODO, TokenParserError, splitBy, getMatchingBracket, iterUntilMatchingBracket } from "./helper";
 import { strict } from "assert";
 import { error } from "console";
 import { readFileSync } from "fs";
@@ -15,14 +15,12 @@ class RValueExpressionParser {
     constructor(public context: Context, public tokens: Token[]) {
     }
 
+
     parse(): Value | null {
         const { context } = this;
         const tokens = this.tokens;
         if (tokens.length >= 3 && tokens[0]!.type === TokenType.NAME && tokens[1]!.type === TokenType.O_PAREN) {
-            const c_parent_pos = tokens.findIndex(tok => tok.type === TokenType.C_PAREN);
-            if (c_parent_pos === -1) {
-                throwError(new TokenParserError(tokens[1]!, `Unclosed O_PAREN`));
-            }
+            const c_parent_pos = getMatchingBracket(tokens, 1, TokenType.O_PAREN, TokenType.C_PAREN);
             const fun_name = tokens[0]!.text;
             const splitted = splitBy(tokens.slice(2, c_parent_pos), t => t.type === TokenType.COMMA);
 
@@ -34,7 +32,7 @@ class RValueExpressionParser {
 
             if (fun_value.name === 'print') {
                 this.context.addAssembly(`
-                    	\rmovl  $4294967285, %ecx               # imm = 0xFFFFFFF5
+                    	\rmovl  $4294967285, %ecx
                     	\rcallq	*__imp_GetStdHandle(%rip)
                     	\rmovq	%rax, ${context.pushStack(8)}(%rsp)
                     	\rmovl	$0, ${context.pushStack(4)}(%rsp)
@@ -68,7 +66,7 @@ class RValueExpressionParser {
             return new_value;
         }
 
-        TODO();
+        TODO(`token type ${tokens}`);
     }
 
 }
@@ -202,18 +200,7 @@ const main = () => {
 
                 token = lexer.next_token_or_throw();
                 if (token.type === TokenType.O_CURL) {
-                    const tokens: Token[] = [];
-                    const error = new TokenParserError(token, "Unmatched O_CURL");
-                    while (true) {
-                        token = lexer.next_token();
-                        if (!token) {
-                            throwError(error);
-                        }
-                        if (token.type === TokenType.C_CURL) {
-                            break;
-                        }
-                        tokens.push(token);
-                    }
+                    const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
                     new CurlExpressionParser(context, tokens).parse();
                 }
 
@@ -226,10 +213,7 @@ const main = () => {
         }
     }
     // console.log(context.getAsm());
-
     context.asmToFile('out.asm');
-    // console.log(tokens.map((t) => t.text).join(' @\n\r'));
-
 };
 
 
@@ -238,3 +222,4 @@ try {
 } catch (err: any) {
     console.error(err);
 }
+

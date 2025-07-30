@@ -1,7 +1,5 @@
 #include <stdio.h>
-#include <Windows.h>
-
-int main(int argc, char **argv)
+int main(int argc, char argv)
 {
-    print("hello, TS COMPILER", 18);
+    print("hello, TS COMPILER", 15);
 }

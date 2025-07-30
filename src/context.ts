@@ -37,6 +37,7 @@ export class Context {
     }
 
     asmToFile(filename: string) {
+        this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
         fs.writeFileSync(filename, this.asm);
     }
 

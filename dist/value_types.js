@@ -1,51 +1,35 @@
-import { Context } from './context';
-import { throwError, TODO } from './helper';
-
-export interface ValueType {
-    is_const: boolean;
-    canAdd(value: ValueType): string;
-    canSubtract(value: ValueType): string;
-    canAssignTo(value: ValueType): string;
-
-    toString: () => string;
-    isSameType(type: ValueType): boolean;
-    size(): number;
-    asm_push_to_stack(context: Context, assigned_value: string | null): number;
-}
-
-export class IntType implements ValueType {
-
-    static instance: IntType | null = null;
-    private constructor() {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Value = exports.FunctionType = exports.PtrType = exports.VoidType = exports.CharType = exports.IntType = void 0;
+const helper_1 = require("./helper");
+class IntType {
+    static instance = null;
+    constructor() {
     }
-    isSameType(type: ValueType): boolean {
+    isSameType(type) {
         return type instanceof IntType;
     }
-
-    static getInstance(): IntType {
+    static getInstance() {
         if (!this.instance) {
             this.instance = new IntType();
         }
         return this.instance;
     }
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
+    is_const = false;
+    canAdd(value) {
         throw new Error("Method not implemented.");
     }
-    canSubtract(value: ValueType): string {
+    canSubtract(value) {
         throw new Error("Method not implemented.");
     }
-    canAssignTo(value: ValueType): string {
+    canAssignTo(value) {
         throw new Error("Method not implemented.");
     }
-
-    public toString = (): string => {
+    toString = () => {
         return this.is_const ? "const int" : "int";
-    }
-    size(): number { return 4; }
-
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
+    };
+    size() { return 4; }
+    asm_push_to_stack(context, assigned_value) {
         context.pushStack(this.size());
         context.addAssembly(`
             \rmovl $${assigned_value}, ${context.stackPtr}(%rsp)
@@ -53,97 +37,86 @@ export class IntType implements ValueType {
         return context.stackPtr;
     }
 }
-
-export class CharType implements ValueType {
-
-    static instance: CharType | null = null;
-    private constructor() {
+exports.IntType = IntType;
+class CharType {
+    static instance = null;
+    constructor() {
     }
-
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
+    asm_push_to_stack(context, assigned_value) {
         context.pushStack(this.size());
         context.addAssembly(`
             \rmovb $${assigned_value} ${context.stackPtr}(%rsp)
             `);
         return context.stackPtr;
     }
-
-    static getInstance(): CharType {
+    static getInstance() {
         if (!this.instance) {
             this.instance = new CharType();
         }
         return this.instance;
     }
-    isSameType(type: ValueType): boolean {
+    isSameType(type) {
         return type instanceof CharType;
     }
-
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
+    is_const = false;
+    canAdd(value) {
         throw new Error("Method not implemented.");
     }
-    canSubtract(value: ValueType): string {
+    canSubtract(value) {
         throw new Error("Method not implemented.");
     }
-    canAssignTo(value: ValueType): string {
+    canAssignTo(value) {
         throw new Error("Method not implemented.");
     }
-
-    public toString = (): string => {
+    toString = () => {
         return this.is_const ? "const char" : "char";
-    }
-
-    size(): number { return 1; }
+    };
+    size() { return 1; }
 }
-
-
-export class VoidType implements ValueType {
-    static instance: VoidType | null = null;
-    private constructor() {
+exports.CharType = CharType;
+class VoidType {
+    static instance = null;
+    constructor() {
     }
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
+    asm_push_to_stack(context, assigned_value) {
         context.pushStack(this.size());
         context.addAssembly(`
             \rmovb $${assigned_value} ${context.stackPtr}(%rsp)
             `);
         return context.stackPtr;
     }
-    static getInstance(): VoidType {
+    static getInstance() {
         if (!this.instance) {
             this.instance = new VoidType();
         }
         return this.instance;
     }
-
-    isSameType(type: ValueType): boolean {
+    isSameType(type) {
         return type instanceof VoidType;
     }
-    is_const: boolean = false;
-
-
-    canAdd(value: ValueType): string {
+    is_const = false;
+    canAdd(value) {
         throw new Error("Method not implemented.");
     }
-    canSubtract(value: ValueType): string {
+    canSubtract(value) {
         throw new Error("Method not implemented.");
     }
-    canAssignTo(value: ValueType): string {
+    canAssignTo(value) {
         throw new Error("Method not implemented.");
     }
-
-    public toString = (): string => {
+    toString = () => {
         return "void";
-    }
-
-    size(): number { return 1; }
+    };
+    size() { return 1; }
 }
-
-export class PtrType implements ValueType {
-    private static instances: PtrType[] = [];
-
-    private constructor(public ptrTo: ValueType) { }
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
+exports.VoidType = VoidType;
+class PtrType {
+    ptrTo;
+    static instances = [];
+    constructor(ptrTo) {
+        this.ptrTo = ptrTo;
+    }
+    asm_push_to_stack(context, assigned_value) {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!assigned_value) {
             for (let i = assigned_value.length - 1; i > -1; --i) {
                 context.pushStack(CharType.getInstance().size());
@@ -151,16 +124,11 @@ export class PtrType implements ValueType {
                     \rmovb $${assigned_value.charCodeAt(i)}, ${context.stackPtr}(%rsp)
                     `);
             }
-            context.pushStack(CharType.getInstance().size());
-            context.addAssembly(`
-                    \rmovb $${'\0'.charCodeAt(0)}, ${context.stackPtr}(%rsp)
-                    `);
             return context.stackPtr;
         }
-        TODO();
+        (0, helper_1.TODO)();
     }
-
-    static getInstance(ptrTo: ValueType): PtrType {
+    static getInstance(ptrTo) {
         const new_inst = new PtrType(ptrTo);
         const ret = this.instances.find(tp => tp.isSameType(new_inst));
         if (!ret) {
@@ -168,49 +136,48 @@ export class PtrType implements ValueType {
         }
         return new_inst;
     }
-    isSameType(type: ValueType): boolean {
+    isSameType(type) {
         if (!(type instanceof PtrType)) {
             return false;
         }
         return this.ptrTo.isSameType(type.ptrTo);
     }
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
+    is_const = false;
+    canAdd(value) {
         throw new Error("Method not implemented.");
     }
-    canSubtract(value: ValueType): string {
+    canSubtract(value) {
         throw new Error("Method not implemented.");
     }
-    canAssignTo(value: ValueType): string {
+    canAssignTo(value) {
         throw new Error("Method not implemented.");
     }
-
-    public toString = (): string => {
+    toString = () => {
         return this.is_const ? `${this.ptrTo.toString()} * const` : `${this.ptrTo.toString()} *`;
-    }
-
-    size(): number { return 8; }
+    };
+    size() { return 8; }
 }
-
-export class FunctionType implements ValueType {
-
-    private static instances: FunctionType[] = [];
-
-    private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
+exports.PtrType = PtrType;
+class FunctionType {
+    returnType;
+    paramTypes;
+    static instances = [];
+    constructor(returnType, paramTypes) {
+        this.returnType = returnType;
+        this.paramTypes = paramTypes;
+    }
+    asm_push_to_stack(context, assigned_value) {
         throw new Error('Method not implemented.');
     }
-
-    static getInstance(returnType: ValueType, paramTypes: ValueType[]): FunctionType {
+    static getInstance(returnType, paramTypes) {
         const new_inst = new FunctionType(returnType, paramTypes);
         const ret = this.instances.find(tp => tp.isSameType(new_inst));
         if (!ret) {
             this.instances.push(new_inst);
         }
-        return this.instances.find(tp => tp.isSameType(new_inst)) ?? throwError(new Error('wtf'));
+        return this.instances.find(tp => tp.isSameType(new_inst)) ?? (0, helper_1.throwError)(new Error('wtf'));
     }
-    isSameType(rhs: ValueType): boolean {
+    isSameType(rhs) {
         if (!(rhs instanceof FunctionType)) {
             return false;
         }
@@ -221,50 +188,46 @@ export class FunctionType implements ValueType {
             return false;
         }
         for (let i = 0; i < this.paramTypes.length; ++i) {
-            if (!(this.paramTypes[i]!.isSameType(rhs.paramTypes[i]!))) {
+            if (!(this.paramTypes[i].isSameType(rhs.paramTypes[i]))) {
                 return false;
             }
         }
         return true;
     }
-
-
-    is_const: boolean = false;
-    canAdd(value: ValueType): string {
+    is_const = false;
+    canAdd(value) {
         throw new Error("Method not implemented.");
     }
-    canSubtract(value: ValueType): string {
+    canSubtract(value) {
         throw new Error("Method not implemented.");
     }
-    canAssignTo(value: ValueType): string {
+    canAssignTo(value) {
         throw new Error("Method not implemented.");
     }
-
-    public toString = (): string => {
+    toString = () => {
         return `${this.returnType.toString()} (${this.paramTypes.map((p) => p.toString()).join(', ')})`;
-    }
-    size(): number { return 8; }
+    };
+    size() { return 8; }
 }
-
-
-export class Value {
-    address: number | null = null;
-
-    constructor(public name: string, public valueType: ValueType) { }
-
-    public toString = (): string => {
-        return `Name: [${this.name}] Type: [${this.valueType.toString()}]`
+exports.FunctionType = FunctionType;
+class Value {
+    name;
+    valueType;
+    address = null;
+    constructor(name, valueType) {
+        this.name = name;
+        this.valueType = valueType;
     }
-
-    setValue(context: Context, assigned_value: string) {
+    toString = () => {
+        return `Name: [${this.name}] Type: [${this.valueType.toString()}]`;
+    };
+    setValue(context, assigned_value) {
         this.address = this.valueType.asm_push_to_stack(context, assigned_value);
     }
-
-    public getAddress(): number {
+    getAddress() {
         if (!this.address)
             throw new Error("Accessed before assigned");
         return this.address;
     }
-
-
 }
+exports.Value = Value;
