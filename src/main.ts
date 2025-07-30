@@ -1,4 +1,4 @@
-import { LexerError, ParserError, throwError, TODO } from "./helper";
+import { LexerError, ParserError, throwError, TODO, TokenParserError } from "./helper";
 import { strict } from "assert";
 import { error } from "console";
 import { readFileSync } from "fs";
@@ -7,6 +7,57 @@ import { TokenType } from "./token_type";
 import { Lexer, Token, toString } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 import { Context } from "./context";
+
+
+function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[][] {
+    const arrs: T[][] = [];
+    let prev_i = 0;
+    for (let i = 0; i < arr.length; ++i) {
+        if (cbk(arr[i]!) && i - prev_i > 0) {
+            arrs.push(arr.slice(prev_i, i));
+            prev_i = i + 1;
+        }
+    }
+    return arrs;
+}
+
+
+class SemicolonExpressionParser {
+
+
+    constructor(public context: Context) {
+    }
+
+
+    parse(tokens: Token[]): Value | null {
+
+        if (tokens.length >= 3 && tokens[0]!.type === TokenType.NAME && tokens[1]!.type === TokenType.O_PAREN) {
+            const c_parent_pos = tokens.findIndex(tok => tok.type === TokenType.C_PAREN);
+            if (c_parent_pos === -1) {
+                throwError(new TokenParserError(tokens[1]!, `Unclosed O_PAREN`));
+            }
+            const fun_name = tokens[0]!.text;
+            const splitted = splitBy(tokens.slice(2, c_parent_pos), t => t.type === TokenType.COMMA);
+            const params = splitted.map(s => this.parse(s)
+                ?? throwError(new TokenParserError(tokens[0]!, "Void params are not allowed")));
+            const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));
+            const fun_value = this.context.getValueWithTypeOrThrow(fun_name, actual_type);
+
+            if (fun_value.name === 'print') {
+                this.context.addAssembly(`leaq ${params[0]!.getAddress()}(%rsp), %rdx`);
+                this.context.addAssembly(`movl ${params[1]!.getAddress()}(%rsp), %r8d`);
+                return null;
+            } else {
+                TODO();
+            }
+        }
+
+
+        TODO();
+    }
+
+}
+
 
 class Asm {
     asm: string = '';
@@ -66,6 +117,7 @@ const main = () => {
         return [gen.next_token_or_throw(), new Value(next_token.text, type)];
     }
 
+
     const genAsmOfFunctionCall = (fun_name: string, fun_type: FunctionType, gen: Lexer) => {
         if (lexer.next_token_or_throw().type !== TokenType.O_PAREN) {
             throwError(new ParserError(lexer, "Not function call"));
@@ -76,6 +128,7 @@ const main = () => {
             if (token.type === TokenType.NAME && (value = context.isFamiliarValueNameOrThrow(token.text))) {
                 asm.add(`movl ${value.getAddress()}(%rsp), %rcx`);
             }
+            else if ()
         }
     };
 

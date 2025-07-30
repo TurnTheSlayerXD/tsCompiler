@@ -1,4 +1,4 @@
-import { Lexer, toString } from "./lexer";
+import { Lexer, Token, toString } from "./lexer";
 
 export function throwError(error: any | undefined = undefined): never {
     if (error instanceof Error) {
@@ -21,6 +21,12 @@ export class LexerError extends Error {
 export class ParserError extends Error {
     constructor(lexer: Lexer, msg: string) {
         super(`Parser Error at ${toString(lexer.prev_cursor)}\n${msg}\n`);
+    }
+}
+
+export class TokenParserError extends Error {
+    constructor(token: Token, msg: string) {
+        super(`Token Parser Error at ${token.pos}\n${msg}\n`);
     }
 }
 

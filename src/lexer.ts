@@ -6,6 +6,10 @@ export class Position {
     constructor(public row: number, public col: number, public count: number) {
         this.instance_type = 'position';
     }
+
+    toString = (): string => {
+        return `${this.row}:${this.col}:${this.count}`;
+    }
 }
 
 export function toString(obj: Position | Token): string {
@@ -57,6 +61,10 @@ export class Token {
 
     set text(text: string) {
         this._text = text;
+    }
+
+    toString = (): string => {
+        return ` [${TokenType[this.type]}]  [${this.type === TokenType.NAME ? this.text : ''}]  [${this.pos}]`;
     }
 }
 

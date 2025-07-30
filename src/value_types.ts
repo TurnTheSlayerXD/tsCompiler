@@ -11,6 +11,7 @@ export interface ValueType {
 
     toString: () => string;
     isSameType(type: ValueType): boolean;
+    size(): number;
 }
 
 export class IntType implements ValueType {
@@ -21,6 +22,7 @@ export class IntType implements ValueType {
     isSameType(type: ValueType): boolean {
         return type === this;
     }
+
     static getInstance(): IntType {
         if (!this.instance) {
             this.instance = new IntType();
@@ -42,6 +44,7 @@ export class IntType implements ValueType {
     public toString = (): string => {
         return this.is_const ? "const int" : "int";
     }
+    size(): number { return 4; }
 
 }
 export class CharType implements ValueType {
@@ -74,6 +77,9 @@ export class CharType implements ValueType {
     public toString = (): string => {
         return this.is_const ? "const char" : "char";
     }
+
+    size(): number { return 1; }
+
 }
 
 
@@ -107,6 +113,8 @@ export class VoidType implements ValueType {
     public toString = (): string => {
         return "void";
     }
+
+    size(): number { return 1; }
 }
 
 export class PtrType implements ValueType {
@@ -143,6 +151,8 @@ export class PtrType implements ValueType {
     public toString = (): string => {
         return this.is_const ? `${this.ptrTo.toString()} * const` : `${this.ptrTo.toString()} *`;
     }
+
+    size(): number { return 8; }
 }
 
 export class FunctionType implements ValueType {
@@ -192,6 +202,7 @@ export class FunctionType implements ValueType {
     public toString = (): string => {
         return `${this.returnType.toString()} (${this.paramTypes.map((p) => p.toString()).join(', ')})`;
     }
+    size(): number { return 8; }
 }
 
 

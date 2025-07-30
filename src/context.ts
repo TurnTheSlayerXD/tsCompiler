@@ -12,7 +12,7 @@ export class Context {
     private scopeValues: (Value[])[] = [[],];
     private scopeTypes: (ValueType[])[] = [[],];
     private literals: string[] = [];
-
+    private asm: string = '';
     public stackPtr: number = 100;
 
     constructor(public lexer: Lexer) { }
@@ -48,6 +48,10 @@ export class Context {
         TODO();
     }
 
+    addAssembly(asm: string) {
+        this.asm += asm;
+    }
+
     addScopeValue(value: Value) {
         this.scopeValues.at(-1)!.push(value);
     }
@@ -65,10 +69,15 @@ export class Context {
         }
         return null;
     }
-    isFamiliarValueNameOrThrow(name: string): Value | null {
+
+    isFamiliarValueNameOrThrow(name: string): Value {
         return this.isFamiliarValueName(name) || throwError(new ParserError(this.lexer, `No such value name ${name}`));
     }
 
+    getValueWithTypeOrThrow(name: string, type: ValueType): Value {
+        const value = this.isFamiliarValueNameOrThrow(name);
+        return value.valueType.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected${type}, found ${value.valueType}`));
+    }
 }
 
 
