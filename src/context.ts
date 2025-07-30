@@ -1,7 +1,7 @@
 import { LexerError, ParserError, throwError, TODO } from "./helper";
 import { Lexer } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
-
+import * as fs from 'fs';
 export class Context {
 
     BUILT_IN_TYPES = {
@@ -13,10 +13,32 @@ export class Context {
     private scopeTypes: (ValueType[])[] = [[],];
     private literals: string[] = [];
     private asm: string = '';
+
+
     public stackPtr: number = 100;
+
+    public init_stack_offset = this.stackPtr;
 
     constructor(public lexer: Lexer) { }
 
+
+    pushStack(size: number): number {
+        this.stackPtr -= size;
+        return this.stackPtr;
+    }
+
+    getLiteralsAsm() {
+        return this.literals.map((l, index) => `"_${index}_literal":
+                                            .asciz: "${l}"\n`).join('\n');
+    }
+
+    getAsm(): string {
+        return this.asm;
+    }
+
+    asmToFile(filename: string) {
+        fs.writeFileSync(filename, this.asm);
+    }
 
     isFamiliarTypename(typename: string): ValueType | null {
         switch (typename) {
@@ -56,16 +78,17 @@ export class Context {
         this.scopeValues.at(-1)!.push(value);
     }
 
-
-    addStringLiteral(literal: string) {
+    addStringLiteral(literal: string): string {
         if (!this.literals.includes(literal)) {
             this.literals.push(literal);
         }
+        return `"_${this.literals.indexOf(literal)}_literal"`;
     }
 
     isFamiliarValueName(name: string): Value | null {
         if (name === 'print') {
-            return new Value('print', FunctionType.getInstance(VoidType.getInstance(), [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]));
+            return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
+                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]));
         }
         return null;
     }
@@ -76,7 +99,9 @@ export class Context {
 
     getValueWithTypeOrThrow(name: string, type: ValueType): Value {
         const value = this.isFamiliarValueNameOrThrow(name);
-        return value.valueType.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected${type}, found ${value.valueType}`));
+        const expected = value.valueType;
+        const found = type;
+        return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found}`));
     }
 }
 

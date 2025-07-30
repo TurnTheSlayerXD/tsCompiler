@@ -1,36 +1,23 @@
-import { LexerError, ParserError, throwError, TODO, TokenParserError } from "./helper";
+import { LexerError, ParserError, throwError, TODO, TokenParserError, splitBy } from "./helper";
 import { strict } from "assert";
 import { error } from "console";
 import { readFileSync } from "fs";
 import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
-import { Lexer, Token, toString } from "./lexer"
+import { Lexer, Token } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 import { Context } from "./context";
 
 
-function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[][] {
-    const arrs: T[][] = [];
-    let prev_i = 0;
-    for (let i = 0; i < arr.length; ++i) {
-        if (cbk(arr[i]!) && i - prev_i > 0) {
-            arrs.push(arr.slice(prev_i, i));
-            prev_i = i + 1;
-        }
-    }
-    return arrs;
-}
 
+class RValueExpressionParser {
 
-class SemicolonExpressionParser {
-
-
-    constructor(public context: Context) {
+    constructor(public context: Context, public tokens: Token[]) {
     }
 
-
-    parse(tokens: Token[]): Value | null {
-
+    parse(): Value | null {
+        const { context } = this;
+        const tokens = this.tokens;
         if (tokens.length >= 3 && tokens[0]!.type === TokenType.NAME && tokens[1]!.type === TokenType.O_PAREN) {
             const c_parent_pos = tokens.findIndex(tok => tok.type === TokenType.C_PAREN);
             if (c_parent_pos === -1) {
@@ -38,37 +25,80 @@ class SemicolonExpressionParser {
             }
             const fun_name = tokens[0]!.text;
             const splitted = splitBy(tokens.slice(2, c_parent_pos), t => t.type === TokenType.COMMA);
-            const params = splitted.map(s => this.parse(s)
+
+            const params = splitted.map(s => new RValueExpressionParser(this.context, s).parse()
                 ?? throwError(new TokenParserError(tokens[0]!, "Void params are not allowed")));
+
             const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));
-            const fun_value = this.context.getValueWithTypeOrThrow(fun_name, actual_type);
+            const fun_value = context.getValueWithTypeOrThrow(fun_name, actual_type);
 
             if (fun_value.name === 'print') {
-                this.context.addAssembly(`leaq ${params[0]!.getAddress()}(%rsp), %rdx`);
-                this.context.addAssembly(`movl ${params[1]!.getAddress()}(%rsp), %r8d`);
+                this.context.addAssembly(`
+                    	\rmovl  $4294967285, %ecx               # imm = 0xFFFFFFF5
+                    	\rcallq	*__imp_GetStdHandle(%rip)
+                    	\rmovq	%rax, ${context.pushStack(8)}(%rsp)
+                    	\rmovl	$0, ${context.pushStack(4)}(%rsp)
+                    	\rmovq	${context.stackPtr + 4}(%rsp), %rcx
+                    	\rleaq	${context.stackPtr}(%rsp), %r9
+                        `);
+
+                this.context.addAssembly(`
+                        \rleaq  ${params[0]!.getAddress()}(%rsp), %rdx
+                    `);
+                this.context.addAssembly(`
+                        \rmovl  ${params[1]!.getAddress()}(%rsp), %r8d
+                    `);
+                this.context.addAssembly(`
+                        \rcallq	 *__imp_WriteConsoleA(%rip)
+                    `);
                 return null;
             } else {
                 TODO();
             }
         }
-
+        else if (tokens.length === 1 && tokens[0]!.type === TokenType.NUM_INT) {
+            const new_value = new Value('_temporary', IntType.getInstance());
+            new_value.setValue(this.context, tokens[0]!.text);
+            return new_value;
+        }
+        else if (tokens.length === 1 && tokens[0]!.type === TokenType.STRING_LITERAL) {
+            const new_value = new Value('_temporary', PtrType.getInstance(CharType.getInstance()));
+            this.context.addStringLiteral(tokens[0]!.text);
+            new_value.setValue(this.context, tokens[0]!.text);
+            return new_value;
+        }
 
         TODO();
     }
 
 }
 
+class CurlExpressionParser {
 
-class Asm {
-    asm: string = '';
-    add(asm: string): void {
-        this.asm += asm;
+    constructor(public context: Context, public tokens: Token[]) {
     }
+
+    parse(): Value | null {
+        const tokens = this.tokens;
+        for (let i = 0; i < tokens.length; ++i) {
+            if (tokens[i]!.type === TokenType.NAME) {
+                const semi_index = tokens.slice(i + 1).findIndex(t => t.type === TokenType.SEMICOLON) + i + 1;
+                semi_index === -1 ? throwError(new TokenParserError(tokens[i]!, "No semicolon at the of the expression")) : undefined;
+                new RValueExpressionParser(this.context, tokens.slice(i, semi_index)).parse();
+                i = semi_index;
+            }
+            else {
+                TODO();
+            }
+        }
+        return null;
+    }
+
 }
 
-const main = () => {
 
-    let asm = new Asm();
+
+const main = () => {
     const text = readFileSync("./example/main.c").toString();
 
     const lexer = new Lexer(text);
@@ -118,23 +148,8 @@ const main = () => {
     }
 
 
-    const genAsmOfFunctionCall = (fun_name: string, fun_type: FunctionType, gen: Lexer) => {
-        if (lexer.next_token_or_throw().type !== TokenType.O_PAREN) {
-            throwError(new ParserError(lexer, "Not function call"));
-        }
-        let token;
-        let value;
-        while ((token = lexer.next_token_or_throw()).type !== TokenType.C_PAREN) {
-            if (token.type === TokenType.NAME && (value = context.isFamiliarValueNameOrThrow(token.text))) {
-                asm.add(`movl ${value.getAddress()}(%rsp), %rcx`);
-            }
-            else if ()
-        }
-    };
-
     while (token = lexer.next_token()) {
-        console.log(`${i++}-th token: ${toString(token)}\n`);
-        let cur = toString(token);
+        let cur = token.toString();
         tokens.push(token);
         if (cur === prev) {
             throw new LexerError(lexer, `REPETITION: cur=[${cur}] prev=[${prev}])`);
@@ -165,7 +180,7 @@ const main = () => {
                         break;
                     }
                     if (token.type !== TokenType.COMMA) {
-                        throwError(new ParserError(lexer, `Unexpected token in function parameters ${toString(token)}`));
+                        throwError(new ParserError(lexer, `Unexpected token in function parameters ${token}`));
                     }
                     token = lexer.next_token_or_throw();
                     if (token.type === TokenType.C_PAREN) {
@@ -173,55 +188,46 @@ const main = () => {
                     }
                 }
                 const decl_function = FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType));
-                console.log(decl_function.toString());
                 const new_fun = new Value(name, decl_function);
                 context.addScopeValue(new_fun);
 
-                asm.add(`.def	${new_fun.name};
-                        .endef
-                        .globl	${new_fun.name}
-                        ${new_fun.name}:
-                        .seh_proc ${new_fun.name}
-                        subq	$40, %rsp
-                        `);
+
+                context.addAssembly(`\r.def	${new_fun.name};
+                                     \r.endef
+                                     \r.globl	${new_fun.name}
+                                     \r${new_fun.name}:
+                                     \r.seh_proc ${new_fun.name}
+                                     \rsubq	$${context.stackPtr}, %rsp
+                                     \r`);
 
                 token = lexer.next_token_or_throw();
-                let value: Value | null;
                 if (token.type === TokenType.O_CURL) {
-                    context.pushScope();
-                    while ((token = lexer.next_token_or_throw()).type !== TokenType.C_CURL) {
-                        if (token.type === TokenType.NAME) {
-                            if (context.isFamiliarTypename(token.text)) {
-                                parseDeclarationTypeWithName(token, lexer);
-                                TODO();
-                            }
-                            else if (!!(value = context.isFamiliarValueName(token.text))) {
-                                if (value.valueType instanceof FunctionType) {
-                                    const fun_type: FunctionType = value.valueType;
-
-                                    if ((token = lexer.next_token_or_throw()).type === TokenType.O_PAREN) {
-
-                                        while ((token = lexer.next_token_or_throw()).type !== TokenType.C_PAREN) {
-
-
-                                        }
-
-                                    }
-                                }
-
-                            } else {
-                                throwError(new ParserError(lexer, `Unknown value [${token.text}}]`));
-                            }
+                    const tokens: Token[] = [];
+                    const error = new TokenParserError(token, "Unmatched O_CURL");
+                    while (true) {
+                        token = lexer.next_token();
+                        if (!token) {
+                            throwError(error);
                         }
+                        if (token.type === TokenType.C_CURL) {
+                            break;
+                        }
+                        tokens.push(token);
                     }
+                    new CurlExpressionParser(context, tokens).parse();
                 }
 
+                context.addAssembly(`\rxor %eax, %eax
+                                     \raddq	$${context.init_stack_offset}, %rsp
+	                                 \rretq
+	                                 \r.seh_endproc
+                                     \r`);
             }
         }
-
-
-
     }
+    // console.log(context.getAsm());
+
+    context.asmToFile('out.asm');
     // console.log(tokens.map((t) => t.text).join(' @\n\r'));
 
 };

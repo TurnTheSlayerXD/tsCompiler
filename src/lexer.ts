@@ -12,19 +12,6 @@ export class Position {
     }
 }
 
-export function toString(obj: Position | Token): string {
-    if (obj.instance_type === 'position') {
-        return `${(obj as Position).row}:${(obj as Position).col}:${(obj as Position).count}`;
-    }
-    else if (obj.instance_type === 'token') {
-        const tok = (obj as Token);
-        return ` [${TokenType[(obj as Token).type]}]  [${tok.type === TokenType.NAME ? tok.text : ''}]  [${toString((obj as Token).pos)}]`;
-    }
-    const type = obj.instance_type;
-    console.log(JSON.stringify(obj));
-    throw new Error(`Can't convert object of type [${type}] to string`);
-}
-
 function equal(lhs: Position, rhs: Position): boolean {
     return lhs.count === rhs.count && lhs.row === rhs.row && lhs.col === rhs.col;
 }
@@ -53,7 +40,10 @@ export class Token {
     }
 
     get text(): string {
-        if (this.type !== TokenType.NAME) {
+        if (this.type !== TokenType.NAME
+            && this.type !== TokenType.STRING_LITERAL
+            && this.type !== TokenType.NUM_INT
+            && this.type !== TokenType.NUM_FLOAT) {
             throw new TokenAccessException(this);
         }
         return this._text;
@@ -64,7 +54,7 @@ export class Token {
     }
 
     toString = (): string => {
-        return ` [${TokenType[this.type]}]  [${this.type === TokenType.NAME ? this.text : ''}]  [${this.pos}]`;
+        return `[${TokenType[this.type]}]  [${this.type === TokenType.NAME ? this.text : ''}]  [${this.pos}]\n`;
     }
 }
 
@@ -210,7 +200,7 @@ export class Lexer {
                 throw new LexerError(this, `Unmatched quota ["]`);
             }
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count, this.cursor.count), TokenType.STRING_LITERAL);
+            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count + 1, this.cursor.count - 1), TokenType.STRING_LITERAL);
         }
         if (this.at(this.cursor) === '\'') {
             this.iter_cursor(this.cursor, 1);
