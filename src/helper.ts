@@ -1,4 +1,4 @@
-import { Lexer, Token } from "./lexer";
+import { Lexer, Position, Token } from "./lexer";
 import { TokenType } from "./token_type";
 
 export function throwError(error: any | undefined = undefined): never {
@@ -29,6 +29,12 @@ export class TokenParserError extends Error {
     constructor(token: Token, msg: string) {
         super(`Token Parser Error at ${token.pos}\n${msg}\n`);
     }
+}
+
+export class TypeError extends Error {
+     constructor(pos: Position, msg: string) {
+        super(`Type Error at ${pos}\n${msg}\n`);
+    }  
 }
 
 export function TODO(arg: string = ''): never {
@@ -91,3 +97,5 @@ export function iterUntilMatchingBracket<T extends TokenType>(lexer: Lexer, init
     }
     throwError(error);
 }
+
+

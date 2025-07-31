@@ -7,69 +7,8 @@ import { TokenType } from "./token_type";
 import { Lexer, Token } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 import { Context } from "./context";
+import { RValueExpressionParser } from "./rvalue_expression_parser";
 
-
-
-class RValueExpressionParser {
-
-    constructor(public context: Context, public tokens: Token[]) {
-    }
-
-
-    parse(): Value | null {
-        const { context } = this;
-        const tokens = this.tokens;
-        if (tokens.length >= 3 && tokens[0]!.type === TokenType.NAME && tokens[1]!.type === TokenType.O_PAREN) {
-            const c_parent_pos = getMatchingBracket(tokens, 1, TokenType.O_PAREN, TokenType.C_PAREN);
-            const fun_name = tokens[0]!.text;
-            const splitted = splitBy(tokens.slice(2, c_parent_pos), t => t.type === TokenType.COMMA);
-
-            const params = splitted.map(s => new RValueExpressionParser(this.context, s).parse()
-                ?? throwError(new TokenParserError(tokens[0]!, "Void params are not allowed")));
-
-            const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));
-            const fun_value = context.getValueWithTypeOrThrow(fun_name, actual_type);
-
-            if (fun_value.name === 'print') {
-                this.context.addAssembly(`
-                    	\rmovl  $4294967285, %ecx
-                    	\rcallq	*__imp_GetStdHandle(%rip)
-                    	\rmovq	%rax, ${context.pushStack(8)}(%rsp)
-                    	\rmovl	$0, ${context.pushStack(4)}(%rsp)
-                    	\rmovq	${context.stackPtr + 4}(%rsp), %rcx
-                    	\rleaq	${context.stackPtr}(%rsp), %r9
-                        `);
-
-                this.context.addAssembly(`
-                        \rleaq  ${params[0]!.getAddress()}(%rsp), %rdx
-                    `);
-                this.context.addAssembly(`
-                        \rmovl  ${params[1]!.getAddress()}(%rsp), %r8d
-                    `);
-                this.context.addAssembly(`
-                        \rcallq	 *__imp_WriteConsoleA(%rip)
-                    `);
-                return null;
-            } else {
-                TODO();
-            }
-        }
-        else if (tokens.length === 1 && tokens[0]!.type === TokenType.NUM_INT) {
-            const new_value = new Value('_temporary', IntType.getInstance());
-            new_value.setValue(this.context, tokens[0]!.text);
-            return new_value;
-        }
-        else if (tokens.length === 1 && tokens[0]!.type === TokenType.STRING_LITERAL) {
-            const new_value = new Value('_temporary', PtrType.getInstance(CharType.getInstance()));
-            this.context.addStringLiteral(tokens[0]!.text);
-            new_value.setValue(this.context, tokens[0]!.text);
-            return new_value;
-        }
-
-        TODO(`token type ${tokens}`);
-    }
-
-}
 
 class CurlExpressionParser {
 
@@ -93,7 +32,6 @@ class CurlExpressionParser {
     }
 
 }
-
 
 
 const main = () => {
@@ -142,7 +80,7 @@ const main = () => {
         if (next_token.type !== TokenType.NAME || context.isFamiliarValueName(next_token.text)) {
             throwError(new ParserError(gen, `Token type ${TokenType[next_token.type]}`));
         }
-        return [gen.next_token_or_throw(), new Value(next_token.text, type)];
+        return [gen.next_token_or_throw(), new Value(next_token.text, type, next_token.pos)];
     }
 
 
@@ -165,6 +103,7 @@ const main = () => {
 
 
         if (token.type === TokenType.NAME && !context.isFamiliarValueName(token.text)) {
+            const first_token = token;
             const name = token.text;
             token = lexer.next_token_or_throw();
             if (token.type === TokenType.O_PAREN) {
@@ -185,8 +124,7 @@ const main = () => {
                         break;
                     }
                 }
-                const decl_function = FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType));
-                const new_fun = new Value(name, decl_function);
+                const new_fun = new Value(name, FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType)), first_token.pos);
                 context.addScopeValue(new_fun);
 
 

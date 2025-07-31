@@ -233,7 +233,14 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '>=', TokenType.OP_COMP_GREATER_EQ);
         }
-
+        if (this.is_equal_to_expr(this.cursor, '&&')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '&&', TokenType.OP_AND);
+        }
+        if (this.is_equal_to_expr(this.cursor, '||')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '||', TokenType.OP_OR);
+        }
 
         if (this.at(this.cursor) === '+') {
             this.iter_cursor(this.cursor, 1);
@@ -276,8 +283,12 @@ export class Lexer {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT);
         }
+        if (this.at(this.cursor) === '&') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '&', TokenType.OP_AMPERSAND);
+        }
 
-        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '->'];
+        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
 
         this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
 
@@ -298,7 +309,6 @@ export class Lexer {
 
         type Keyword = {
             'return': TokenType,
-            // 'const': TokenType,
             'if': TokenType,
             'else': TokenType,
             'for': TokenType,

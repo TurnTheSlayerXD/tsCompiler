@@ -1,5 +1,5 @@
 import { LexerError, ParserError, throwError, TODO } from "./helper";
-import { Lexer } from "./lexer";
+import { Lexer, Position } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
 export class Context {
@@ -89,7 +89,7 @@ export class Context {
     isFamiliarValueName(name: string): Value | null {
         if (name === 'print') {
             return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
-                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]));
+                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0));
         }
         return null;
     }
