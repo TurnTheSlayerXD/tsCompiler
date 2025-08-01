@@ -8,13 +8,13 @@ export interface ValueType {
     isSameType(type: ValueType): boolean;
     size(): number;
 
-    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value;
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value;
     asm_copy(context: Context, src: Value, dst_self: Value): void;
 
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value;
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value;
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value;
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value;
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value;
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value;
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value;
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value;
 }
 
 export class IntType implements ValueType {
@@ -22,10 +22,10 @@ export class IntType implements ValueType {
     static instance: IntType | null = null;
     private constructor() {
     }
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
         context.addAssembly(`
             \rmovl ${self.address}(%rsp), %edx
@@ -34,10 +34,10 @@ export class IntType implements ValueType {
             `);
         return new Value('_temp', this, self.pos, context.stackPtr);
     }
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -58,7 +58,7 @@ export class IntType implements ValueType {
     }
     size(): number { return 4; }
 
-    asm_create_from_literal(context: Context, name: string = '_temp', literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string = '_temp', literal: string | null, pos: Position): Value {
         const val = new Value(name, this, pos);
         context.pushStack(this.size());
         context.addAssembly(`
@@ -98,7 +98,7 @@ export class CharType implements ValueType {
     static instance: CharType | null = null;
     private constructor() {
     }
-    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         context.pushStack(this.size());
         context.addAssembly(`
             \rmovb $${literal ?? 0} ${context.stackPtr}(%rsp)
@@ -126,16 +126,16 @@ export class CharType implements ValueType {
             `);
     }
 
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -167,22 +167,22 @@ export class VoidType implements ValueType {
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
     static getInstance(): VoidType {
@@ -209,7 +209,7 @@ export class PtrType implements ValueType {
 
     private constructor(public ptrTo: ValueType) { }
 
-    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
             for (let i = literal.length - 1; i > -1; --i) {
                 context.pushStack(CharType.getInstance().size());
@@ -248,16 +248,16 @@ export class PtrType implements ValueType {
             `);
     }
 
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -293,22 +293,22 @@ export class FunctionType implements ValueType {
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
     static getInstance(returnType: ValueType, paramTypes: ValueType[]): FunctionType {

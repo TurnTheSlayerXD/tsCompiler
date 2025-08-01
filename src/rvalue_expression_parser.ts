@@ -117,7 +117,7 @@ export class SemicolonExprParser {
                     if (!!l_value) {
                         throwError(new RulesError(token.pos, `Reassignment of Variable with name ${name}`))
                     }
-                    l_value = valueType!.asm_create_from_literal(context, name, null, tokens[op_index - 1]!.pos);
+                    l_value = valueType!.asm_from_literal(context, name, null, tokens[op_index - 1]!.pos);
                 }
                 else {
                     if (!l_value) {
@@ -133,18 +133,18 @@ export class SemicolonExprParser {
                 let left: Value, right: Value;
                 if (op_index - 1 < 0) {
                     right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                    left = right.valueType.asm_create_from_literal(context, '_temp', '0', token.pos);
+                    left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
                 }
                 else {
                     left = new SemicolonExprParser(context, tokens.slice(0, op_index - 1)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                     right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                 }
-                return token.type === TokenType.OP_PLUS ? left.valueType.asm_create_from_plus(context, left, right) : left.valueType.asm_create_from_minus(context, left, right);
+                return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
             }
             if (token.type === TokenType.OP_MULTIPLY || token.type === TokenType.OP_DIVIDE) {
                 const left = new SemicolonExprParser(context, tokens.slice(0, op_index - 1)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                 const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_create_from_divide(context, left, right) : left.valueType.asm_create_from_multiply(context, left, right);
+                return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
             }
             if (token.type === TokenType.OP_DEREFERENCE || token.type === TokenType.OP_REFERENCE) {
                 TODO('REFERENCE-DEREFERENCE');
@@ -190,12 +190,12 @@ export class SemicolonExprParser {
             }
         }
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NUM_INT) {
-            const new_value = IntType.getInstance().asm_create_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
+            const new_value = IntType.getInstance().asm_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
             return new_value;
         }
         if (tokens.length === 1 && tokens[0]!.type === TokenType.STRING_LITERAL) {
             this.context.addStringLiteral(tokens[0]!.text);
-            const new_value = PtrType.getInstance(CharType.getInstance()).asm_create_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
+            const new_value = PtrType.getInstance(CharType.getInstance()).asm_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
             return new_value;
         }
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
@@ -207,7 +207,7 @@ export class SemicolonExprParser {
             if (!!context.getValueByName(tokens[1]!.text)) {
                 throwError(new TokenParserError(tokens[1]!, `Variable with name [${tokens[1]!.text}] already exists`));
             }
-            const new_value = valueType!.asm_create_from_literal(context, tokens[1]!.text, null, tokens[1]!.pos);
+            const new_value = valueType!.asm_from_literal(context, tokens[1]!.text, null, tokens[1]!.pos);
             context.addScopeValue(new_value);
             return new_value;
         }
