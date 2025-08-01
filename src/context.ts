@@ -104,6 +104,10 @@ export class Context {
         const found = type;
         return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found}`));
     }
+
+    getValueByName(name: string): Value | null {
+        return this.scopeValues.at(-1)!.find(val => val.name === name) ?? null;
+    }
 }
 
 

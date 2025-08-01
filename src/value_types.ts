@@ -1,5 +1,5 @@
 import { Context } from './context';
-import { ParserError, throwError, TODO, TypeError } from './helper';
+import { ParserError, throwError, TODO, TypeError, UNREACHABLE } from './helper';
 import { Position } from './lexer';
 
 export interface ValueType {
@@ -8,12 +8,13 @@ export interface ValueType {
     isSameType(type: ValueType): boolean;
     size(): number;
 
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number;
-    asm_assign_from_variable(context: Context, assigned_value: Value): number;
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number;
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number;
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number;
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number;
+    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value;
+    asm_copy(context: Context, src: Value, dst_self: Value): void;
+
+    asm_create_from_plus(context: Context, rhs: Value): Value;
+    asm_create_from_minus(context: Context, rhs: Value): Value;
+    asm_create_from_multiply(context: Context, rhs: Value): Value;
+    asm_create_from_divide(context: Context, rhs: Value): Value;
 }
 
 export class IntType implements ValueType {
@@ -21,18 +22,19 @@ export class IntType implements ValueType {
     static instance: IntType | null = null;
     private constructor() {
     }
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_plus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_minus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_multiply(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_divide(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
+
     isSameType(type: ValueType): boolean {
         return type instanceof IntType;
     }
@@ -45,38 +47,42 @@ export class IntType implements ValueType {
     }
 
     is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-
     public toString = (): string => {
         return this.is_const ? "const int" : "int";
     }
     size(): number { return 4; }
 
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number {
+    asm_create_from_literal(context: Context, name: string = '_temp', literal: string | null, pos: Position): Value {
+        const val = new Value(name, this, pos);
         context.pushStack(this.size());
         context.addAssembly(`
-            \rmovl $${assigned_value ?? 0}, ${context.stackPtr}(%rsp)
+            \rmovl $${literal ?? 0}, ${context.stackPtr}(%rsp)
             `);
-        return context.stackPtr;
+        return val;
     }
-    asm_assign_from_variable(context: Context, assigned_value: Value): number {
+    asm_create_from_variable(context: Context, name: string = '_temp', assigned_value: Value, pos: Position): Value {
+        const val = new Value(name, this, pos);
         if (!this.isSameType(assigned_value.valueType)) {
             throwError(new TypeError(assigned_value.pos, `Can't convert ${assigned_value.valueType} to ${this.toString()}`));
         }
         context.addAssembly(`
-            \rmovl ${assigned_value.getAddress()}(%rsp), %edx
+            \rmovl ${assigned_value.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return context.stackPtr;
+        return val;
     }
+
+    asm_copy(context: Context, src: Value, dst_self: Value): void {
+        dst_self.valueType.isSameType(this) || UNREACHABLE();
+        if (!this.isSameType(src.valueType)) {
+            throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
+        }
+        context.addAssembly(`
+            \rmovl ${src.address}(%rsp), %edx
+            \rmovl %edx, ${dst_self.address}(%rsp)
+            `);
+    }
+
 }
 
 export class CharType implements ValueType {
@@ -84,37 +90,46 @@ export class CharType implements ValueType {
     static instance: CharType | null = null;
     private constructor() {
     }
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_variable(context: Context, assigned_value: Value): number {
-        if (!this.isSameType(assigned_value.valueType)) {
-            throwError(new TypeError(assigned_value.pos, `Can't convert ${assigned_value.valueType} to ${this.toString()}`));
-        }
-        context.addAssembly(`
-            \rmovb ${assigned_value.getAddress()}(%rsp), %dh
-            \rmovl %dh, ${context.pushStack(this.size())}(%rsp)
-            `);
-        return context.stackPtr;
-    }
-
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number {
+    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         context.pushStack(this.size());
         context.addAssembly(`
-            \rmovb $${assigned_value ?? 0} ${context.stackPtr}(%rsp)
+            \rmovb $${literal ?? 0} ${context.stackPtr}(%rsp)
             `);
-        return context.stackPtr;
+        return new Value(name, this, pos);
+    }
+    asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
+        if (!this.isSameType(value.valueType)) {
+            throwError(new TypeError(value.pos, `Can't convert ${value.valueType} to ${this.toString()}`));
+        }
+        context.addAssembly(`
+            \rmovb ${value.address}(%rsp), %dh
+            \rmovb %dh, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value(name, this, pos);
+    }
+    asm_copy(context: Context, src: Value, dst_self: Value): void {
+        dst_self.valueType.isSameType(this) || UNREACHABLE();
+        if (!this.isSameType(src.valueType)) {
+            throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
+        }
+        context.addAssembly(`
+            \rmovb ${src.address}(%rsp), %dh
+            \rmovb %dh, ${dst_self.address}(%rsp)
+            `);
     }
 
+    asm_create_from_plus(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_minus(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_multiply(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_divide(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
 
     static getInstance(): CharType {
         if (!this.instance) {
@@ -128,15 +143,6 @@ export class CharType implements ValueType {
 
 
     is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
 
     public toString = (): string => {
         return this.is_const ? "const char" : "char";
@@ -150,30 +156,26 @@ export class VoidType implements ValueType {
     static instance: VoidType | null = null;
     private constructor() {
     }
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+    asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_plus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number {
+    asm_create_from_minus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_variable(context: Context, assigned_value: Value): number {
+    asm_create_from_multiply(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_push_to_stack(context: Context, assigned_value: string | null): number {
-        context.pushStack(this.size());
-        context.addAssembly(`
-            \rmovb $${assigned_value} ${context.stackPtr}(%rsp)
-            `);
-        return context.stackPtr;
+    asm_create_from_divide(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
     }
     static getInstance(): VoidType {
         if (!this.instance) {
@@ -187,17 +189,6 @@ export class VoidType implements ValueType {
     }
     is_const: boolean = false;
 
-
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-
     public toString = (): string => {
         return "void";
     }
@@ -209,43 +200,57 @@ export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 
     private constructor(public ptrTo: ValueType) { }
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
-        throw new Error('Method not implemented.');
-    }
-    asm_assign_from_variable(context: Context, assigned_value: Value): number {
-        if (!this.isSameType(assigned_value.valueType)) {
-            throwError(new TypeError(assigned_value.pos, "Cannot assign int from nonint"));
-        }
-        context.addAssembly(`
-            \rmovq ${assigned_value.getAddress()}(%rsp), %rdx
-            \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
-            `);
-        return context.stackPtr;
-    }
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number {
-        if (this.ptrTo.isSameType(CharType.getInstance()) && !!assigned_value) {
-            for (let i = assigned_value.length - 1; i > -1; --i) {
+
+    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+        if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
+            for (let i = literal.length - 1; i > -1; --i) {
                 context.pushStack(CharType.getInstance().size());
                 context.addAssembly(`
-                    \rmovb $${assigned_value.charCodeAt(i)}, ${context.stackPtr}(%rsp)
+                    \rmovb $${literal.charCodeAt(i)}, ${context.stackPtr}(%rsp)
                     `);
             }
             context.pushStack(CharType.getInstance().size());
             context.addAssembly(`
                     \rmovb $${'\0'.charCodeAt(0)}, ${context.stackPtr}(%rsp)
                     `);
-            return context.stackPtr;
+            return new Value(name, this, pos);
         }
-        return 0;
+
+        TODO();
+    }
+    asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
+        if (!this.isSameType(value.valueType)) {
+            throwError(new TypeError(value.pos, "Cannot assign int from nonint"));
+        }
+        context.addAssembly(`
+            \rmovq ${value.address}(%rsp), %rdx
+            \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value(name, this, pos);
+    }
+
+    asm_copy(context: Context, src: Value, dst_self: Value): void {
+        dst_self.valueType.isSameType(this) || UNREACHABLE();
+        if (!this.isSameType(src.valueType)) {
+            throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
+        }
+        context.addAssembly(`
+            \rmovq ${src.address}(%rsp), %rdx
+            \rmovq %rdx, ${dst_self.address}(%rsp)
+            `);
+    }
+
+    asm_create_from_plus(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_minus(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_multiply(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_create_from_divide(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
     }
 
     static getInstance(ptrTo: ValueType): PtrType {
@@ -264,15 +269,6 @@ export class PtrType implements ValueType {
     }
 
     is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
 
     public toString = (): string => {
         return this.is_const ? `${this.ptrTo.toString()} * const` : `${this.ptrTo.toString()} *`;
@@ -286,25 +282,27 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
-    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+    asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+    asm_create_from_plus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_variable(context: Context, assigned_value: Value): number {
+    asm_create_from_minus(context: Context, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_assign_from_literal(context: Context, assigned_value: string | null): number {
-        TODO();
+    asm_create_from_multiply(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
     }
-
+    asm_create_from_divide(context: Context, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
     static getInstance(returnType: ValueType, paramTypes: ValueType[]): FunctionType {
         const new_inst = new FunctionType(returnType, paramTypes);
         const ret = this.instances.find(tp => tp.isSameType(new_inst));
@@ -333,16 +331,6 @@ export class FunctionType implements ValueType {
 
 
     is_const: boolean = false;
-    canAdd(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canSubtract(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-    canAssignTo(value: ValueType): string {
-        throw new Error("Method not implemented.");
-    }
-
     public toString = (): string => {
         return `${this.returnType.toString()} (${this.paramTypes.map((p) => p.toString()).join(', ')})`;
     }

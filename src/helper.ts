@@ -32,15 +32,26 @@ export class TokenParserError extends Error {
 }
 
 export class TypeError extends Error {
-     constructor(pos: Position, msg: string) {
+    constructor(pos: Position, msg: string) {
         super(`Type Error at ${pos}\n${msg}\n`);
-    }  
+    }
 }
+
+export class RulesError extends Error {
+    constructor(pos: Position, msg: string) {
+        super(`Rule Error at ${pos}\n${msg}\n`);
+    }
+}
+
+
 
 export function TODO(arg: string = ''): never {
     throw new Error(`NOT IMPLEMENTED ${arg}`);
 }
 
+export function UNREACHABLE(arg: string = ''): never {
+    throw new Error(`UNREACHABLE ${arg}`);
+}
 
 export function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[][] {
     const arrs: T[][] = [];

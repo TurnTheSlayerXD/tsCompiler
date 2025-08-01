@@ -7,7 +7,7 @@ import { TokenType } from "./token_type";
 import { Lexer, Token } from "./lexer"
 import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
 import { Context } from "./context";
-import { RValueExpressionParser } from "./rvalue_expression_parser";
+import { SemicolonExprParser } from "./rvalue_expression_parser";
 
 
 class CurlExpressionParser {
