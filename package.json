@@ -4,6 +4,7 @@
   "main": "./src/main.ts",
   "scripts": {
     "test": "npx ts-node ./src/main.ts && clang ./out.asm -o out.exe && out.exe",
+    "ex": "clang -c ./example/main.asm -o ./example/main.o && clang ./example/main.o -o ./example/main.exe && start /min ./example/main.exe",
     "build": "npx tsc",
     "start": "npx ts-node .",
     "assembly": "clang -c ./example/main.s -o ./example/main.o && clang ./example/main.o -o ./example/main.exe && .\\example.\\main.exe"

@@ -136,13 +136,13 @@ export class SemicolonExprParser {
                     left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
                 }
                 else {
-                    left = new SemicolonExprParser(context, tokens.slice(0, op_index - 1)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
+                    left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                     right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                 }
                 return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
             }
             if (token.type === TokenType.OP_MULTIPLY || token.type === TokenType.OP_DIVIDE) {
-                const left = new SemicolonExprParser(context, tokens.slice(0, op_index - 1)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
+                const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                 const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
                 return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
             }

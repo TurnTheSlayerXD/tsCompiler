@@ -140,9 +140,10 @@ main:                                   # @main
 	.seh_endprologue
 	movq	%rdx, 16(%rsp)
 	movl	%ecx, 12(%rsp)
-	movl	$1472, 8(%rsp)                  # imm = 0x5C0
-	xorl	%eax, %eax
-	subl	8(%rsp), %eax
+	movl	$123, 8(%rsp)
+	movl	$3, %eax
+	cltd
+	idivl	8(%rsp)
 	movl	%eax, 4(%rsp)
 	xorl	%eax, %eax
 	addq	$24, %rsp

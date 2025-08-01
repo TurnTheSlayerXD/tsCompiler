@@ -23,7 +23,13 @@ export class IntType implements ValueType {
     private constructor() {
     }
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        self.valueType.isSameType(this) || UNREACHABLE();
+        context.addAssembly(`
+            \rmovl ${self.address}(%rsp), %edx
+            \raddl ${rhs.address}(%rsp), %edx
+            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -35,10 +41,22 @@ export class IntType implements ValueType {
         return new Value('_temp', this, self.pos, context.stackPtr);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        self.valueType.isSameType(this) || UNREACHABLE();
+        context.addAssembly(`
+            \rmovl ${self.address}(%rsp), %edx
+            \rimull ${rhs.address}(%rsp), %edx
+            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr);
     }
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        self.valueType.isSameType(this) || UNREACHABLE();
+        context.addAssembly(`
+            \rmovl ${self.address}(%rsp), %edx
+            \rmull ${rhs.address}(%rsp), %edx
+            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr);
     }
 
     isSameType(type: ValueType): boolean {
@@ -58,7 +76,7 @@ export class IntType implements ValueType {
     }
     size(): number { return 4; }
 
-    asm_from_literal(context: Context, name: string = '_temp', literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         const val = new Value(name, this, pos);
         context.pushStack(this.size());
         context.addAssembly(`
@@ -67,7 +85,7 @@ export class IntType implements ValueType {
         val.address = context.stackPtr;
         return val;
     }
-    asm_create_from_variable(context: Context, name: string = '_temp', assigned_value: Value, pos: Position): Value {
+    asm_create_from_variable(context: Context, name: string, assigned_value: Value, pos: Position): Value {
         const val = new Value(name, this, pos);
         if (!this.isSameType(assigned_value.valueType)) {
             throwError(new TypeError(assigned_value.pos, `Can't convert ${assigned_value.valueType} to ${this.toString()}`));
