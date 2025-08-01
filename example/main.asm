@@ -135,21 +135,17 @@ _vsnprintf:                             # @_vsnprintf
 main:                                   # @main
 .seh_proc main
 # %bb.0:
-	subq	$88, %rsp
-
-	movl	$4294967285, %ecx               # imm = 0xFFFFFFF5
-	callq	*__imp_GetStdHandle(%rip)
-	movq	%rax, 56(%rsp)
-	movl	$0, 52(%rsp)
-	leaq	"??_C@_0M@LACCCNMM@hello?5world?$AA@"(%rip), %rax
-	movq	%rax, 40(%rsp)
-	movq	40(%rsp), %rdx
-	movq	56(%rsp), %rcx
-	movl	$11, %r8d
-	leaq	52(%rsp), %r9
-	callq	*__imp_WriteConsoleA(%rip)
+	subq	$24, %rsp
+	.seh_stackalloc 24
+	.seh_endprologue
+	movq	%rdx, 16(%rsp)
+	movl	%ecx, 12(%rsp)
+	movl	$1472, 8(%rsp)                  # imm = 0x5C0
 	xorl	%eax, %eax
-	addq	$88, %rsp
+	subl	8(%rsp), %eax
+	movl	%eax, 4(%rsp)
+	xorl	%eax, %eax
+	addq	$24, %rsp
 	retq
 	.seh_endproc
                                         # -- End function
@@ -250,15 +246,7 @@ __local_stdio_printf_options:           # @__local_stdio_printf_options
 	leaq	__local_stdio_printf_options._OptionsStorage(%rip), %rax
 	retq
                                         # -- End function
-	.section	.rdata,"dr",discard,"??_C@_0M@LACCCNMM@hello?5world?$AA@"
-	.globl	"??_C@_0M@LACCCNMM@hello?5world?$AA@" # @"??_C@_0M@LACCCNMM@hello?5world?$AA@"
-"??_C@_0M@LACCCNMM@hello?5world?$AA@":
-	.asciz	"hello world"
-
 	.lcomm	__local_stdio_printf_options._OptionsStorage,8,8 # @__local_stdio_printf_options._OptionsStorage
-	.section	.drectve,"yni"
-	.ascii	" /DEFAULTLIB:uuid.lib"
-	.ascii	" /DEFAULTLIB:uuid.lib"
 	.addrsig
 	.addrsig_sym _vsnprintf
 	.addrsig_sym _vsprintf_l

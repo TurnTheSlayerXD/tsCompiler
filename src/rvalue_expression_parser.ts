@@ -16,17 +16,17 @@ export class RValueExpressionParser {
         if (type === TokenType.OP_PLUS || type === TokenType.OP_MINUS) {
             return 0;
         }
-        if (type === TokenType.OP_ASTERISK || type === TokenType.OP_DIVIDE || type === TokenType.OP_AMPERSAND) {
+        if (type === TokenType.OP_MULTIPLY || type === TokenType.OP_DIVIDE) {
             return 1;
         }
-        if (type === TokenType.OP_PERCENT) {
+        if (type === TokenType.OP_DEREFERENCE || type === TokenType.OP_REFERENCE) {
             return 2;
         }
         TODO("UNREACHABLE");
     }
 
 
-    static get_first_index_of_op_token(tokens: Token[]): number {
+    static get_index_of_op_token(tokens: Token[]): number {
         let paren_count = 0;
         const types = tokens.map(t => t.type);
         const indexes_by_priorities: number[] = [-1, -1, -1];
@@ -84,19 +84,20 @@ export class RValueExpressionParser {
         }
 
         let op_index;
-        if ((op_index = RValueExpressionParser.get_first_index_of_op_token(tokens)) && op_index !== -1) {
-
-            if (tokens[op_index]!.type === TokenType.OP_ASTERISK) {
-                if ((op_index - 1 > -1 && is_op_token_type(tokens[op_index - 1]!.type)) || op_index - 1 < 0) {
-                    // then asterics is dereference
+        if ((op_index = RValueExpressionParser.get_index_of_op_token(tokens)) && op_index !== -1) {
+            const token = tokens[op_index]!;
+            if (token.type === TokenType.OP_PLUS || token.type === TokenType.OP_MINUS) {
+                let left: Value, right: Value;
+                if (op_index - 1 < 0) {
+                    right = new RValueExpressionParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, "No argument for OP_PLUS"));
+                    left = new Value('_temp', right.valueType, token.pos);
+                    left.address = left.valueType.asm_assign_from_literal(context, '0');
                 }
                 else {
-                    can_
-                    // then asterics is multiply
+                    left = new RValueExpressionParser(context, tokens.slice(0, op_index - 1)).parse() ?? throwError(new TokenParserError(token, "No argument for OP_PLUS"));
+                    right = new RValueExpressionParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, "No argument for OP_PLUS"));
                 }
-
             }
-
         }
         if (tokens.length === ) {
 
@@ -123,10 +124,10 @@ export class RValueExpressionParser {
                         `);
 
                 this.context.addAssembly(`
-                        \rleaq  ${params[0]!.getAddress()}(%rsp), %rdx
+                        \rleaq  ${params[0]!.address}(%rsp), %rdx
                     `);
                 this.context.addAssembly(`
-                        \rmovl  ${params[1]!.getAddress()}(%rsp), %r8d
+                        \rmovl  ${params[1]!.address}(%rsp), %r8d
                     `);
                 this.context.addAssembly(`
                         \rcallq	 *__imp_WriteConsoleA(%rip)
@@ -138,13 +139,13 @@ export class RValueExpressionParser {
         }
         else if (tokens.length === 1 && tokens[0]!.type === TokenType.NUM_INT) {
             const new_value = new Value('_temporary', IntType.getInstance(), tokens[0]!.pos);
-            new_value.setValueFromLiteral(this.context, tokens[0]!.text);
+            new_value.address = new_value.valueType.asm_assign_from_literal(this.context, tokens[0]!.text);
             return new_value;
         }
         else if (tokens.length === 1 && tokens[0]!.type === TokenType.STRING_LITERAL) {
             const new_value = new Value('_temporary', PtrType.getInstance(CharType.getInstance()), tokens[0]!.pos);
             this.context.addStringLiteral(tokens[0]!.text);
-            new_value.setValueFromLiteral(this.context, tokens[0]!.text);
+            new_value.address = new_value.valueType.asm_assign_from_literal(this.context, tokens[0]!.text);
             return new_value;
         }
         else if (tokens.) {

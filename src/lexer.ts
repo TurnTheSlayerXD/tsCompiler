@@ -241,6 +241,14 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '||', TokenType.OP_OR);
         }
+        if (this.is_equal_to_expr(this.cursor, '++')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '++', TokenType.OP_INCREMENT);
+        }
+        if (this.is_equal_to_expr(this.cursor, '--')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '||', TokenType.OP_DECREMENT);
+        }
 
         if (this.at(this.cursor) === '+') {
             this.iter_cursor(this.cursor, 1);

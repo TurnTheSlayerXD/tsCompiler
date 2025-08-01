@@ -4,22 +4,34 @@ import { Position } from './lexer';
 
 export interface ValueType {
     is_const: boolean;
-    canAdd(value: ValueType): string;
-    canSubtract(value: ValueType): string;
-    canAssignTo(value: ValueType): string;
-
     toString: () => string;
     isSameType(type: ValueType): boolean;
     size(): number;
 
     asm_assign_from_literal(context: Context, assigned_value: string | null): number;
     asm_assign_from_variable(context: Context, assigned_value: Value): number;
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number;
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number;
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number;
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number;
 }
 
 export class IntType implements ValueType {
 
     static instance: IntType | null = null;
     private constructor() {
+    }
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
     }
     isSameType(type: ValueType): boolean {
         return type instanceof IntType;
@@ -71,6 +83,18 @@ export class CharType implements ValueType {
 
     static instance: CharType | null = null;
     private constructor() {
+    }
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
     }
     asm_assign_from_variable(context: Context, assigned_value: Value): number {
         if (!this.isSameType(assigned_value.valueType)) {
@@ -126,6 +150,18 @@ export class VoidType implements ValueType {
     static instance: VoidType | null = null;
     private constructor() {
     }
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
     asm_assign_from_literal(context: Context, assigned_value: string | null): number {
         throw new Error('Method not implemented.');
     }
@@ -173,6 +209,18 @@ export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 
     private constructor(public ptrTo: ValueType) { }
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
     asm_assign_from_variable(context: Context, assigned_value: Value): number {
         if (!this.isSameType(assigned_value.valueType)) {
             throwError(new TypeError(assigned_value.pos, "Cannot assign int from nonint"));
@@ -238,6 +286,18 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
+    asm_assign_from_plus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_minus(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_multiply(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_assign_from_divide(context: Context, lhs: Value, rhs: Value): number {
+        throw new Error('Method not implemented.');
+    }
     asm_assign_from_variable(context: Context, assigned_value: Value): number {
         throw new Error('Method not implemented.');
     }
@@ -291,7 +351,7 @@ export class FunctionType implements ValueType {
 
 
 export class Value {
-    private address: number | null = null;
+    public _address: number | null = null;
 
     constructor(public name: string, public valueType: ValueType, public pos: Position) { }
 
@@ -299,19 +359,11 @@ export class Value {
         return `Name: [${this.name}] Type: [${this.valueType.toString()}]`
     }
 
-    setValueFromLiteral(context: Context, assigned_value: string) {
-        this.address = this.valueType.asm_assign_from_literal(context, assigned_value);
+    get address(): number {
+        return this._address ?? throwError(new Error("Accessed before assigned"));
     }
 
-    setValueFromVariable(context: Context, assigned_value: Value) {
-        this.address = this.valueType.asm_assign_from_variable(context, assigned_value);
+    set address(address: number) {
+        this._address = address;
     }
-
-    public getAddress(): number {
-        if (!this.address)
-            throw new Error("Accessed before assigned");
-        return this.address;
-    }
-
-
 }

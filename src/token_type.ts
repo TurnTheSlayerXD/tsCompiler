@@ -46,6 +46,9 @@ export enum TokenType {
     OP_AND,
     OP_OR,
 
+    OP_DECREMENT,
+    OP_INCREMENT,
+
     OP_AMPERSAND,
     OP_REFERENCE,
     OP_LOGICAL_PLUS,
