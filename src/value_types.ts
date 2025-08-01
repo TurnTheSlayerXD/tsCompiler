@@ -11,10 +11,10 @@ export interface ValueType {
     asm_create_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value;
     asm_copy(context: Context, src: Value, dst_self: Value): void;
 
-    asm_create_from_plus(context: Context, rhs: Value): Value;
-    asm_create_from_minus(context: Context, rhs: Value): Value;
-    asm_create_from_multiply(context: Context, rhs: Value): Value;
-    asm_create_from_divide(context: Context, rhs: Value): Value;
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value;
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value;
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value;
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value;
 }
 
 export class IntType implements ValueType {
@@ -22,16 +22,22 @@ export class IntType implements ValueType {
     static instance: IntType | null = null;
     private constructor() {
     }
-    asm_create_from_plus(context: Context, rhs: Value): Value {
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, rhs: Value): Value {
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        context.addAssembly(`
+            \rmovl ${self.address}(%rsp), %edx
+            \rsubl ${rhs.address}(%rsp), %edx
+            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr);
+    }
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_create_from_divide(context: Context, rhs: Value): Value {
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -58,6 +64,7 @@ export class IntType implements ValueType {
         context.addAssembly(`
             \rmovl $${literal ?? 0}, ${context.stackPtr}(%rsp)
             `);
+        val.address = context.stackPtr;
         return val;
     }
     asm_create_from_variable(context: Context, name: string = '_temp', assigned_value: Value, pos: Position): Value {
@@ -69,6 +76,7 @@ export class IntType implements ValueType {
             \rmovl ${assigned_value.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
+        assigned_value.address = context.stackPtr;
         return val;
     }
 
@@ -95,7 +103,7 @@ export class CharType implements ValueType {
         context.addAssembly(`
             \rmovb $${literal ?? 0} ${context.stackPtr}(%rsp)
             `);
-        return new Value(name, this, pos);
+        return new Value(name, this, pos, context.stackPtr);
     }
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         if (!this.isSameType(value.valueType)) {
@@ -105,7 +113,7 @@ export class CharType implements ValueType {
             \rmovb ${value.address}(%rsp), %dh
             \rmovb %dh, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value(name, this, pos);
+        return new Value(name, this, pos, context.stackPtr);
     }
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         dst_self.valueType.isSameType(this) || UNREACHABLE();
@@ -118,16 +126,16 @@ export class CharType implements ValueType {
             `);
     }
 
-    asm_create_from_plus(context: Context, rhs: Value): Value {
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, rhs: Value): Value {
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, rhs: Value): Value {
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, rhs: Value): Value {
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -165,16 +173,16 @@ export class VoidType implements ValueType {
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_plus(context: Context, rhs: Value): Value {
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, rhs: Value): Value {
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, rhs: Value): Value {
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, rhs: Value): Value {
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
     static getInstance(): VoidType {
@@ -213,7 +221,7 @@ export class PtrType implements ValueType {
             context.addAssembly(`
                     \rmovb $${'\0'.charCodeAt(0)}, ${context.stackPtr}(%rsp)
                     `);
-            return new Value(name, this, pos);
+            return new Value(name, this, pos, context.stackPtr);
         }
 
         TODO();
@@ -226,7 +234,7 @@ export class PtrType implements ValueType {
             \rmovq ${value.address}(%rsp), %rdx
             \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value(name, this, pos);
+        return new Value(name, this, pos, context.stackPtr);
     }
 
     asm_copy(context: Context, src: Value, dst_self: Value): void {
@@ -240,16 +248,16 @@ export class PtrType implements ValueType {
             `);
     }
 
-    asm_create_from_plus(context: Context, rhs: Value): Value {
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, rhs: Value): Value {
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, rhs: Value): Value {
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, rhs: Value): Value {
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
 
@@ -291,16 +299,16 @@ export class FunctionType implements ValueType {
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_plus(context: Context, rhs: Value): Value {
+    asm_create_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_minus(context: Context, rhs: Value): Value {
+    asm_create_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_multiply(context: Context, rhs: Value): Value {
+    asm_create_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    asm_create_from_divide(context: Context, rhs: Value): Value {
+    asm_create_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
     static getInstance(returnType: ValueType, paramTypes: ValueType[]): FunctionType {
@@ -338,13 +346,16 @@ export class FunctionType implements ValueType {
 }
 
 
-export class Value {
-    public _address: number | null = null;
 
-    constructor(public name: string, public valueType: ValueType, public pos: Position) { }
+export class Value {
+    private _address: number | null = null;
+
+    constructor(public name: string, public valueType: ValueType, public pos: Position, address: number | null = null) {
+        this._address = address;
+    }
 
     public toString = (): string => {
-        return `Name: [${this.name}] Type: [${this.valueType.toString()}]`
+        return `Value {\n\rName: [${this.name}]\n\rType: [${this.valueType.toString()}]\n\rAddress: ${this.address}(%rsp)\n\r}`
     }
 
     get address(): number {

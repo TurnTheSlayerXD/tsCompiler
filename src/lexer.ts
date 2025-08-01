@@ -33,7 +33,7 @@ export class Token {
     instance_type?: string;
     pos: Position;
     type: TokenType;
-    _text: string;
+    private _text: string;
     constructor(pos: Position, text: string, type: TokenType) {
         this.pos = pos;
         this._text = text;

@@ -20,8 +20,11 @@ class CurlExpressionParser {
         for (let i = 0; i < tokens.length; ++i) {
             if (tokens[i]!.type === TokenType.NAME) {
                 const semi_index = tokens.slice(i + 1).findIndex(t => t.type === TokenType.SEMICOLON) + i + 1;
-                semi_index === -1 ? throwError(new TokenParserError(tokens[i]!, "No semicolon at the of the expression")) : undefined;
-                new RValueExpressionParser(this.context, tokens.slice(i, semi_index)).parse();
+                if (semi_index === -1) {
+                    throwError(new TokenParserError(tokens[i]!, "No semicolon at the of the expression"));
+                }
+                const tokens_till_semicolon = tokens.slice(i, semi_index);
+                new SemicolonExprParser(this.context, tokens_till_semicolon).parse();
                 i = semi_index;
             }
             else {

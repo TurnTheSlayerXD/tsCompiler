@@ -79,6 +79,7 @@ export const OP_TOKENS = [
 
 
     TokenType.OP_ASTERISK,
+    TokenType.OP_REFERENCE,
     TokenType.OP_DEREFERENCE,
     TokenType.OP_MULTIPLY,
 
