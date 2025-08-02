@@ -17,6 +17,7 @@ class CurlExpressionParser {
 
     parse(): Value | null {
         const tokens = this.tokens;
+        // console.log('CurlExpressionParser\n', `${tokens}`);
         for (let i = 0; i < tokens.length; ++i) {
             if (tokens[i]!.type === TokenType.NAME) {
                 const semi_index = tokens.slice(i + 1).findIndex(t => t.type === TokenType.SEMICOLON) + i + 1;
@@ -27,8 +28,11 @@ class CurlExpressionParser {
                 new SemicolonExprParser(this.context, tokens_till_semicolon).parse();
                 i = semi_index;
             }
+            else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
+                continue;
+            }
             else {
-                TODO();
+                TODO(`ITER = ${i}, ${tokens[i]}`);
             }
         }
         return null;

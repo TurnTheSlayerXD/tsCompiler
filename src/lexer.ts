@@ -132,19 +132,24 @@ export class Lexer {
             throwError(new LexerError(this, "UNCHECKED BOUNDARIES")) :
             this.text[cursor.count] as string;
     }
-
-    iter_while_not_equal(cursor: Position, symbols: string | string[]) {
-        if (typeof symbols === "string") {
-            while (!this.iseof(cursor) && this.at(cursor) !== symbols) {
-                this.iter_cursor(cursor, 1);
-            }
+    slice(cursor: Position, len: number): string {
+        if (len === 1) {
+            return this.at(cursor);
         }
-        else if (Array.isArray(symbols)) {
-            while (!this.iseof(cursor) && !symbols.includes(this.at(cursor))) {
-                this.iter_cursor(cursor, 1);
-            }
+        return this.text.slice(cursor.count, cursor.count + len < this.text.length ? cursor.count + len : this.text.length);
+    }
+
+    iter_while_not_equal_one(cursor: Position, str: string) {
+        while (!this.iseof(cursor) && this.slice(cursor, str.length) !== str) {
+            this.iter_cursor(cursor, 1);
         }
     }
+    iter_while_not_equal_arr(cursor: Position, strs: string[]) {
+        while (!this.iseof(cursor) && !strs.some((s) => this.slice(this.cursor, s.length) === s)) {
+            this.iter_cursor(cursor, 1);
+        }
+    }
+
 
 
     is_correct_preprocessor(directive: string): Token {
@@ -174,9 +179,17 @@ export class Lexer {
         if (this.iseof(this.cursor)) {
             return null;
         }
-
+        if (this.is_equal_to_expr(this.cursor, '//')) {
+            this.iter_while_not_equal_one(this.cursor, '\n');
+            return new Token(this.prev_cursor.clone(), '//', TokenType.PREPROCESSOR);
+        }
+        if (this.is_equal_to_expr(this.cursor, '/*')) {
+            this.iter_while_not_equal_one(this.cursor, '*/');
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '/**/', TokenType.PREPROCESSOR);
+        }
         if (this.at(this.cursor) === '#') {
-            this.iter_while_not_equal(this.cursor, ['\n']);
+            this.iter_while_not_equal_one(this.cursor, '\n');
             return new Token(this.prev_cursor.clone(), this.substr(this.prev_cursor, this.cursor), TokenType.PREPROCESSOR);
         }
         if (this.at(this.cursor) === '(') {
@@ -197,7 +210,7 @@ export class Lexer {
         }
         if (this.at(this.cursor) === '"') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
+            this.iter_while_not_equal_one(this.cursor, '"');
             if (this.iseof(this.cursor)) {
                 throw new LexerError(this, `Unmatched quota ["]`);
             }
@@ -206,7 +219,7 @@ export class Lexer {
         }
         if (this.at(this.cursor) === '\'') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
+            this.iter_while_not_equal_one(this.cursor, '"');
             if (this.iseof(this.cursor)) {
                 throw new LexerError(this, `Unmatched quota [']`);
             }
@@ -298,12 +311,12 @@ export class Lexer {
 
         const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
 
-        this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
+        this.iter_while_not_equal_arr(this.cursor, STOP_SYMBOLS);
 
         const text = this.text.substring(this.prev_cursor.count, this.cursor.count);
         if (text.match(/^[+-]?\d+$/g) && !this.iseof(this.cursor) && this.at(this.cursor) === '.') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
+            this.iter_while_not_equal_arr(this.cursor, STOP_SYMBOLS);
 
             const float_text = this.substr(this.prev_cursor, this.cursor);
             if (/^[+-]?\d+(\.\d+)?$/g.test(float_text)) {

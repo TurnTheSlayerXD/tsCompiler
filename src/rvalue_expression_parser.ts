@@ -40,14 +40,14 @@ export class SemicolonExprParser {
         let paren_count = 0;
         const types = tokens.map(t => t.type);
         const indexes_by_priorities: number[] = [-1, -1, -1, -1];
-        for (let i = tokens.length - 1; i > -1; --i) {
-            if (types[i] === TokenType.C_PAREN) {
+        for (let i = 0; i < tokens.length; ++i) {
+            if (types[i] === TokenType.O_PAREN) {
                 paren_count += 1;
             }
-            else if (types[i] === TokenType.O_PAREN) {
+            else if (types[i] === TokenType.C_PAREN) {
                 paren_count -= 1;
             }
-            else if (paren_count === 0 && OP_TOKENS.includes(types[i]!)) {
+            else if (paren_count === 0 && is_op_token_type(types[i]!)) {
                 indexes_by_priorities[this.getPriority(types[i]!)] = i;
             }
         }
@@ -95,8 +95,8 @@ export class SemicolonExprParser {
             return null;
         }
 
-        let op_index = SemicolonExprParser.get_index_of_op_token(tokens);
-        console.log(`OP INDEX = ${op_index}`);
+        const op_index = SemicolonExprParser.get_index_of_op_token(tokens);
+        // console.log(`OP INDEX = ${op_index}`);
         if (op_index !== -1) {
             const token = tokens[op_index]!;
             if (token.type === TokenType.OP_ASSIGNMENT) {
