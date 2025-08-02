@@ -2,6 +2,7 @@ import { LexerError, ParserError, throwError, TODO } from "./helper";
 import { Lexer, Position } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
+import { AddrType } from "./value_types"
 export class Context {
 
     BUILT_IN_TYPES = {
@@ -9,7 +10,7 @@ export class Context {
         char: CharType.constructor,
     };
 
-    private scopeValues: (Value[])[] = [[],];
+    public scopeValues: (Value[])[] = [[],];
     private scopeTypes: (ValueType[])[] = [[],];
     private literals: string[] = [];
     private asm: string = '';
@@ -41,7 +42,7 @@ export class Context {
         fs.writeFileSync(filename, this.asm);
     }
 
-    isFamiliarTypename(typename: string): ValueType | null {
+    hasTypename(typename: string): ValueType | null {
         switch (typename) {
             case 'int': return IntType.getInstance();
             case 'char': return CharType.getInstance();
@@ -50,7 +51,7 @@ export class Context {
         }
     }
 
-    isFamiliarTypenameOrThrow(typename: string): ValueType {
+    hasTypenameOrThrow(typename: string): ValueType {
         if (typename in this.BUILT_IN_TYPES) {
             return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
         }
@@ -76,6 +77,9 @@ export class Context {
     }
 
     addScopeValue(value: Value) {
+        if (this.scopeValues.at(-1)!.find(v => v.name === value.name)) {
+            throwError(new Error(`Pushing scope with existing name [${value.name}]`));
+        }
         this.scopeValues.at(-1)!.push(value);
     }
 
@@ -86,28 +90,33 @@ export class Context {
         return `"_${this.literals.indexOf(literal)}_literal"`;
     }
 
-    isFamiliarValueName(name: string): Value | null {
+    hasValue(name: string): Value | null {
         if (name === 'print') {
             return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
-                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0));
+                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
+        }
+        const { scopeValues } = this;
+        for (let i = scopeValues.length - 1; i > -1; --i) {
+            const val = scopeValues[i]!.find(val => val.name === name);
+            if (!!val) {
+                return val;
+            }
         }
         return null;
     }
 
-    isFamiliarValueNameOrThrow(name: string): Value {
-        return this.isFamiliarValueName(name) || throwError(new ParserError(this.lexer, `No such value name ${name}`));
+    hasValueOrThrow(name: string): Value {
+        return this.hasValue(name) || throwError(new ParserError(this.lexer, `No such value name ${name}`));
     }
 
     getValueWithTypeOrThrow(name: string, type: ValueType): Value {
-        const value = this.isFamiliarValueNameOrThrow(name);
+        const value = this.hasValueOrThrow(name);
         const expected = value.valueType;
         const found = type;
-        return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found}`));
+        return value;
+        // return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found}`));
     }
 
-    getValueByName(name: string): Value | null {
-        return this.scopeValues.at(-1)!.find(val => val.name === name) ?? null;
-    }
 }
 
 

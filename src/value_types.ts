@@ -22,6 +22,7 @@ export class IntType implements ValueType {
     static instance: IntType | null = null;
     private constructor() {
     }
+  
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
         context.addAssembly(`
@@ -29,7 +30,7 @@ export class IntType implements ValueType {
             \raddl ${rhs.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value('_temp', this, self.pos, context.stackPtr);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -38,7 +39,7 @@ export class IntType implements ValueType {
             \rsubl ${rhs.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value('_temp', this, self.pos, context.stackPtr);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -47,7 +48,7 @@ export class IntType implements ValueType {
             \rimull ${rhs.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value('_temp', this, self.pos, context.stackPtr);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -56,7 +57,7 @@ export class IntType implements ValueType {
             \rmull ${rhs.address}(%rsp), %edx
             \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value('_temp', this, self.pos, context.stackPtr);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
 
     isSameType(type: ValueType): boolean {
@@ -77,7 +78,7 @@ export class IntType implements ValueType {
     size(): number { return 4; }
 
     asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
-        const val = new Value(name, this, pos);
+        const val = new Value(name, this, pos, null, AddrType.Stack);
         context.pushStack(this.size());
         context.addAssembly(`
             \rmovl $${literal ?? 0}, ${context.stackPtr}(%rsp)
@@ -86,7 +87,7 @@ export class IntType implements ValueType {
         return val;
     }
     asm_create_from_variable(context: Context, name: string, assigned_value: Value, pos: Position): Value {
-        const val = new Value(name, this, pos);
+        const val = new Value(name, this, pos, null, AddrType.Stack);
         if (!this.isSameType(assigned_value.valueType)) {
             throwError(new TypeError(assigned_value.pos, `Can't convert ${assigned_value.valueType} to ${this.toString()}`));
         }
@@ -103,10 +104,20 @@ export class IntType implements ValueType {
         if (!this.isSameType(src.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
-        context.addAssembly(`
+
+        if (dst_self.addr_type === AddrType.Indirect) {
+            context.addAssembly(`
+                \rmovl ${src.address}(%rsp), %edx
+                \rmovq ${dst_self.address}(%rsp), %rax
+                \rmovl %edx, (%rax)
+            `);
+        }
+        else {
+            context.addAssembly(`
             \rmovl ${src.address}(%rsp), %edx
             \rmovl %edx, ${dst_self.address}(%rsp)
             `);
+        }
     }
 
 }
@@ -121,7 +132,7 @@ export class CharType implements ValueType {
         context.addAssembly(`
             \rmovb $${literal ?? 0} ${context.stackPtr}(%rsp)
             `);
-        return new Value(name, this, pos, context.stackPtr);
+        return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
     }
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
         if (!this.isSameType(value.valueType)) {
@@ -131,7 +142,7 @@ export class CharType implements ValueType {
             \rmovb ${value.address}(%rsp), %dh
             \rmovb %dh, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value(name, this, pos, context.stackPtr);
+        return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
     }
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         dst_self.valueType.isSameType(this) || UNREACHABLE();
@@ -143,7 +154,7 @@ export class CharType implements ValueType {
             \rmovb %dh, ${dst_self.address}(%rsp)
             `);
     }
-
+    
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
@@ -203,6 +214,10 @@ export class VoidType implements ValueType {
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
+    asm_load_to_address_in_rax(context: Context, self: Value, l_value: ValueType): Value {
+        throw new Error('Method not implemented.');
+    }
+
     static getInstance(): VoidType {
         if (!this.instance) {
             this.instance = new VoidType();
@@ -227,6 +242,40 @@ export class PtrType implements ValueType {
 
     private constructor(public ptrTo: ValueType) { }
 
+    asm_take_reference_from(context: Context, name: string, arg: Value): Value {
+        arg.valueType.isSameType(this.ptrTo) || UNREACHABLE();
+
+        if (arg.addr_type === AddrType.Indirect) {
+            context.addAssembly(`
+                \rmovq ${arg.address}(%rsp), %rax
+                \rleaq (%rax), %rdx
+                \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
+                `);
+        }
+        else {
+            context.addAssembly(`
+                    \rleaq ${arg.address}(%rsp), %rdx
+                    \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
+                    `);
+        }
+        const val = new Value(name, this, arg.pos, context.stackPtr, AddrType.TempStack);
+        val.indirect_count -= 1;
+        return val;
+    }
+
+    asm_dereference(context: Context, name: string, self: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        if (this.ptrTo instanceof PtrType) {
+            context.addAssembly(`
+            \rmovq ${self.address}(%rsp), %rax
+            \rmovq (%rax), %rdx
+            \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
+            `);
+        }
+        const val = new Value(name, this.ptrTo, self.pos, context.stackPtr, AddrType.Indirect);
+        return val;
+    }
+
     asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
             for (let i = literal.length - 1; i > -1; --i) {
@@ -239,9 +288,14 @@ export class PtrType implements ValueType {
             context.addAssembly(`
                     \rmovb $${'\0'.charCodeAt(0)}, ${context.stackPtr}(%rsp)
                     `);
-            return new Value(name, this, pos, context.stackPtr);
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
         }
-
+        if (literal === null) {
+            context.addAssembly(`
+                    \rmovq $0, ${context.pushStack(this.size())}(%rsp)
+                `);
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+        }
         TODO();
     }
     asm_create_from_variable(context: Context, name: string, value: Value, pos: Position): Value {
@@ -252,18 +306,24 @@ export class PtrType implements ValueType {
             \rmovq ${value.address}(%rsp), %rdx
             \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
             `);
-        return new Value(name, this, pos, context.stackPtr);
+        return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
     }
 
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         dst_self.valueType.isSameType(this) || UNREACHABLE();
-        if (!this.isSameType(src.valueType)) {
-            throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
+        this.isSameType(src.valueType) || throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
+        if (dst_self.addr_type === AddrType.Indirect) {
+            context.addAssembly(`
+                \rmovq ${dst_self.address}(%rsp), %rax
+                \rmovq ${src.address}(%rsp), (%rax)
+                `);
         }
-        context.addAssembly(`
+        else {
+            context.addAssembly(`
             \rmovq ${src.address}(%rsp), %rdx
             \rmovq %rdx, ${dst_self.address}(%rsp)
             `);
+        }
     }
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
@@ -308,6 +368,7 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
+    
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
@@ -364,12 +425,21 @@ export class FunctionType implements ValueType {
 }
 
 
+export enum AddrType {
+    TempStack,
+    Stack,
+    Indirect,
+    Register,
+}
+
 
 export class Value {
     private _address: number | null = null;
+    public indirect_count: number;
 
-    constructor(public name: string, public valueType: ValueType, public pos: Position, address: number | null = null) {
+    constructor(public name: string, public valueType: ValueType, public pos: Position, address: number | null = null, public addr_type: AddrType) {
         this._address = address;
+        this.indirect_count = 0;
     }
 
     public toString = (): string => {
@@ -377,7 +447,7 @@ export class Value {
     }
 
     get address(): number {
-        return this._address ?? throwError(new Error("Accessed before assigned"));
+        return this._address || throwError(new Error("Accessed before assigned"));
     }
 
     set address(address: number) {

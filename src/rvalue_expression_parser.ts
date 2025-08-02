@@ -2,7 +2,8 @@ import { Context } from "./context";
 import { getMatchingBracket, splitBy, throwError, TokenParserError, TODO, ParserError, RulesError } from "./helper";
 import { Position, Token } from "./lexer";
 import { is_op_token_type, OP_TOKENS, TokenType } from "./token_type";
-import { Value, FunctionType, VoidType, IntType, PtrType, CharType } from "./value_types";
+import { parse_type_from_tokens } from "./type_parsing";
+import { Value, FunctionType, VoidType, IntType, PtrType, CharType, ValueType, AddrType } from "./value_types";
 
 
 export class SemicolonExprParser {
@@ -16,7 +17,7 @@ export class SemicolonExprParser {
                 tokens = tokens.slice(1, tokens.length - 1);
             }
         }
-        SemicolonExprParser.replace_ambigous_token_types(this.tokens);
+        SemicolonExprParser.replace_ambigous_token_types(context, tokens);
         this.tokens = tokens;
     }
 
@@ -36,36 +37,53 @@ export class SemicolonExprParser {
         TODO("UNREACHABLE");
     }
 
-    static get_index_of_op_token(tokens: Token[]): number {
+
+
+    static get_index_of_types(tokens: Token[], target_types: TokenType[], forward: boolean): number {
         let paren_count = 0;
         const types = tokens.map(t => t.type);
-        const indexes_by_priorities: number[] = [-1, -1, -1, -1];
-        for (let i = 0; i < tokens.length; ++i) {
-            if (types[i] === TokenType.O_PAREN) {
-                paren_count += 1;
+        let index = -1;
+        if (forward) {
+            for (let i = 0; i < tokens.length; ++i) {
+                if (types[i] === TokenType.O_PAREN) {
+                    paren_count += 1;
+                }
+                else if (types[i] === TokenType.C_PAREN) {
+                    paren_count -= 1;
+                }
+                else if (paren_count === 0 && target_types.includes(types[i]!)) {
+                    index = i;
+                }
             }
-            else if (types[i] === TokenType.C_PAREN) {
-                paren_count -= 1;
-            }
-            else if (paren_count === 0 && is_op_token_type(types[i]!)) {
-                indexes_by_priorities[this.getPriority(types[i]!)] = i;
+        } else {
+            for (let i = tokens.length - 1; i > -1; --i) {
+                if (types[i] === TokenType.C_PAREN) {
+                    paren_count += 1;
+                }
+                else if (types[i] === TokenType.O_PAREN) {
+                    paren_count -= 1;
+                }
+                else if (paren_count === 0 && target_types.includes(types[i]!)) {
+                    index = i;
+                }
             }
         }
-        return indexes_by_priorities.find((ind) => ind !== -1) ?? -1;
+        return index;
     }
 
-    static replace_ambigous_token_types(tokens: Token[]) {
+    static replace_ambigous_token_types(context: Context, tokens: Token[]) {
         let paren_count = 0;
         for (let i = 0; i < tokens.length; ++i) {
-            if (tokens[i]!.type === TokenType.C_PAREN) {
+            if (tokens[i]!.type === TokenType.O_PAREN) {
                 paren_count += 1;
             }
-            else if (tokens[i]!.type === TokenType.O_PAREN) {
+            else if (tokens[i]!.type === TokenType.C_PAREN) {
                 paren_count -= 1;
             }
             else if (paren_count === 0) {
                 if (tokens[i]!.type === TokenType.OP_ASTERISK) {
-                    if ((i - 1 > -1 && is_op_token_type(tokens[i - 1]!.type)) || i - 1 < 0) {
+                    if ((i - 1 > -1 && (is_op_token_type(tokens[i - 1]!.type) || tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)))
+                        || i - 1 < 0) {
                         // then asterics is dereference
                         tokens[i]!.type = TokenType.OP_DEREFERENCE;
                     }
@@ -88,72 +106,91 @@ export class SemicolonExprParser {
         }
     }
 
-    parse(): Value | null {
-        let { context, tokens } = this;
+
+    parse_declaration(tokens: Token[]): Value {
+        const { context } = this;
+        let typename, l_value;
 
         if (tokens.length === 0) {
-            return null;
+            throwError(new Error('Expected lvalue expression'));
         }
+        if (tokens.at(-1)!.type !== TokenType.NAME) {
+            throwError(new Error('Expected variable name in lvalue expression'));
+        }
+        const value_name = tokens.at(-1)!.text;
+        if (tokens.length >= 2 && tokens[0]!.type === TokenType.NAME && !!(typename = context.hasTypename(tokens[0]!.text))) {
+            // then it is declaration of variable
+            if (!!context.hasValue(value_name)) {
+                throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));
+            }
+            const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
+            l_value = value_type.asm_from_literal(context, value_name, null, tokens.at(-1)!.pos);
+            context.addScopeValue(l_value);
+            return l_value;
+        }
+        TODO();
+    }
 
-        const op_index = SemicolonExprParser.get_index_of_op_token(tokens);
-        // console.log(`OP INDEX = ${op_index}`);
-        if (op_index !== -1) {
+    parse(): Value {
+        let { context, tokens } = this;
+        // console.log(`${tokens}
+        //     ____________\r`);
+
+
+        let op_index;
+
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_ASSIGNMENT,], true)) !== -1) {
             const token = tokens[op_index]!;
-            if (token.type === TokenType.OP_ASSIGNMENT) {
-                let valueType;
-                const name = op_index - 1 < 0 ? throwError(new TokenParserError(token, `No name in assignment`)) :
-                    tokens[op_index - 1]!.type !== TokenType.NAME ? throwError(new TokenParserError(token, `Can't be lvalue`)) :
-                        tokens[op_index - 1]!.text;
-                let l_value = context.getValueByName(name);
-                let is_declaration = false;
-                if (op_index - 2 > -1) {
-                    // then it should be declaration
-                    if (tokens[op_index - 2]!.type !== TokenType.NAME || !(valueType = context.isFamiliarTypename(tokens[op_index - 2]!.text))) {
-                        throwError(new TokenParserError(token, `No such type in assignment ${tokens[op_index - 2]!.text}`));
-                    }
-                    is_declaration = true;
-                }
-                if (is_declaration) {
-                    if (!!l_value) {
-                        throwError(new RulesError(token.pos, `Reassignment of Variable with name ${name}`))
-                    }
-                    l_value = valueType!.asm_from_literal(context, name, null, tokens[op_index - 1]!.pos);
-                }
-                else {
-                    if (!l_value) {
-                        throwError(new RulesError(tokens[op_index - 1]!.pos, `Referencing variable with name [${name}], but it does not exist`));
-                    }
-                }
-                context.addScopeValue(l_value);
-                const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, 'Nothing assigned in assignment'));
-                l_value.valueType.asm_copy(context, r_value, l_value);
-                return l_value;
+            if (op_index === 0) {
+                throwError(new TokenParserError(token, `Expected lvalue expression`));
             }
-            if (token.type === TokenType.OP_PLUS || token.type === TokenType.OP_MINUS) {
-                let left: Value, right: Value;
-                if (op_index - 1 < 0) {
-                    right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                    left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
-                }
-                else {
-                    left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                    right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                }
-                return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
-            }
-            if (token.type === TokenType.OP_MULTIPLY || token.type === TokenType.OP_DIVIDE) {
-                const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
-            }
-            if (token.type === TokenType.OP_DEREFERENCE || token.type === TokenType.OP_REFERENCE) {
-                TODO('REFERENCE-DEREFERENCE');
-                // const operand = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse() ?? throwError(new TokenParserError(token, `No argument for ${TokenType[token.type]}`));
-                // return token.type === TokenType.OP_DEREFERENCE ? operand.valueType.asm_dereference(context, right) : left.valueType.asm_create_from_multiply(context, right);
-            }
+            const l_value = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
+            const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
 
-            TODO();
+            // console.log(`Left = \n${l_value}`);
+            // console.log(`Right = \n${r_value}`);
+
+            l_value.valueType.asm_copy(context, r_value, l_value);
+            return l_value;
         }
+
+        if (tokens.length > 0 && tokens[0]!.type === TokenType.NAME && !!context.hasTypename(tokens[0]!.text)) {
+            return this.parse_declaration(tokens);
+        }
+
+        // console.log(`OP INDEX = ${op_index}`);
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_PLUS, TokenType.OP_MINUS], true)) !== -1) {
+            const token = tokens[op_index]!;
+            let left: Value, right: Value;
+            if (op_index - 1 < 0) {
+                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+                left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
+            }
+            else {
+                left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
+                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+            }
+            return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
+        }
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_MULTIPLY, TokenType.OP_DIVIDE], true)) !== -1) {
+            const token = tokens[op_index]!;
+            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
+            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+
+            return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
+        }
+
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE], false)) !== -1) {
+            const token = tokens[op_index]!;
+            const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+            if (token.type === TokenType.OP_DEREFERENCE) {
+                const ptr_type = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
+                return ptr_type.asm_dereference(context, '_temp', arg);
+            }
+            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
+        }
+
+
         if (tokens.length >= 3 && tokens[0]!.type === TokenType.NAME && tokens[1]!.type === TokenType.O_PAREN) {
             const c_parent_pos = getMatchingBracket(tokens, 1, TokenType.O_PAREN, TokenType.C_PAREN);
             const fun_name = tokens[0]!.text;
@@ -184,7 +221,7 @@ export class SemicolonExprParser {
                 this.context.addAssembly(`
                         \rcallq	 *__imp_WriteConsoleA(%rip)
                     `);
-                return null;
+                return new Value('_temp', VoidType.getInstance(), tokens[0]!.pos, null, AddrType.Indirect);
             } else {
                 TODO();
             }
@@ -199,19 +236,10 @@ export class SemicolonExprParser {
             return new_value;
         }
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
-            return this.context.getValueByName(tokens[0]!.text);
+            return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}]`));
         }
-        let valueType;
-        if (tokens.length === 2 && tokens[0]!.type == TokenType.NAME && tokens[1]!.type == TokenType.NAME
-            && (valueType = context.isFamiliarTypename(tokens[0]!.text))) {
-            if (!!context.getValueByName(tokens[1]!.text)) {
-                throwError(new TokenParserError(tokens[1]!, `Variable with name [${tokens[1]!.text}] already exists`));
-            }
-            const new_value = valueType!.asm_from_literal(context, tokens[1]!.text, null, tokens[1]!.pos);
-            context.addScopeValue(new_value);
-            return new_value;
-        }
-        TODO(`token type ${tokens}`);
+
+        TODO();
     }
 
 }

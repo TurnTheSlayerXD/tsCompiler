@@ -135,58 +135,15 @@ _vsnprintf:                             # @_vsnprintf
 main:                                   # @main
 .seh_proc main
 # %bb.0:
-	subq	$56, %rsp
-	.seh_stackalloc 56
+	subq	$16, %rsp
+	.seh_stackalloc 16
 	.seh_endprologue
-	movq	%rdx, 48(%rsp)
-	movl	%ecx, 44(%rsp)
-	movl	$123, 40(%rsp)
-	movl	$4, 36(%rsp)
-	movl	40(%rsp), %eax
-	imull	36(%rsp), %eax
-	movl	%eax, 32(%rsp)
-	movl	32(%rsp), %edx
-	leaq	"??_C@_02DPKJAMEF@?$CFd?$AA@"(%rip), %rcx
-	callq	printf
+	movq	%rdx, 8(%rsp)
+	movl	%ecx, 4(%rsp)
+	movl	$1, (%rsp)
+	movl	$3, 4(%rsp)
 	xorl	%eax, %eax
-	addq	$56, %rsp
-	retq
-	.seh_endproc
-                                        # -- End function
-	.def	printf;
-	.scl	2;
-	.type	32;
-	.endef
-	.section	.text,"xr",discard,printf
-	.globl	printf                          # -- Begin function printf
-	.p2align	4
-printf:                                 # @printf
-.seh_proc printf
-# %bb.0:
-	subq	$72, %rsp
-	.seh_stackalloc 72
-	.seh_endprologue
-	movq	%r9, 104(%rsp)
-	movq	%r8, 96(%rsp)
-	movq	%rdx, 88(%rsp)
-	movq	%rcx, 64(%rsp)
-	leaq	88(%rsp), %rax
-	movq	%rax, 48(%rsp)
-	movq	48(%rsp), %rax
-	movq	%rax, 40(%rsp)                  # 8-byte Spill
-	movq	64(%rsp), %rax
-	movq	%rax, 32(%rsp)                  # 8-byte Spill
-	movl	$1, %ecx
-	callq	__acrt_iob_func
-	movq	32(%rsp), %rdx                  # 8-byte Reload
-	movq	40(%rsp), %r9                   # 8-byte Reload
-	movq	%rax, %rcx
-	xorl	%eax, %eax
-	movl	%eax, %r8d
-	callq	_vfprintf_l
-	movl	%eax, 60(%rsp)
-	movl	60(%rsp), %eax
-	addq	$72, %rsp
+	addq	$16, %rsp
 	retq
 	.seh_endproc
                                         # -- End function
@@ -261,15 +218,15 @@ _vsnprintf_l:                           # @_vsnprintf_l
 	callq	__stdio_common_vsprintf
 	movl	%eax, 100(%rsp)
 	cmpl	$0, 100(%rsp)
-	jge	.LBB7_2
+	jge	.LBB6_2
 # %bb.1:
 	movl	$4294967295, %eax               # imm = 0xFFFFFFFF
 	movl	%eax, 52(%rsp)                  # 4-byte Spill
-	jmp	.LBB7_3
-.LBB7_2:
+	jmp	.LBB6_3
+.LBB6_2:
 	movl	100(%rsp), %eax
 	movl	%eax, 52(%rsp)                  # 4-byte Spill
-.LBB7_3:
+.LBB6_3:
 	movl	52(%rsp), %eax                  # 4-byte Reload
 	addq	$136, %rsp
 	retq
@@ -287,59 +244,11 @@ __local_stdio_printf_options:           # @__local_stdio_printf_options
 	leaq	__local_stdio_printf_options._OptionsStorage(%rip), %rax
 	retq
                                         # -- End function
-	.def	_vfprintf_l;
-	.scl	2;
-	.type	32;
-	.endef
-	.section	.text,"xr",discard,_vfprintf_l
-	.globl	_vfprintf_l                     # -- Begin function _vfprintf_l
-	.p2align	4
-_vfprintf_l:                            # @_vfprintf_l
-.seh_proc _vfprintf_l
-# %bb.0:
-	subq	$104, %rsp
-	.seh_stackalloc 104
-	.seh_endprologue
-	movq	%r9, 96(%rsp)
-	movq	%r8, 88(%rsp)
-	movq	%rdx, 80(%rsp)
-	movq	%rcx, 72(%rsp)
-	movq	96(%rsp), %rax
-	movq	%rax, 64(%rsp)                  # 8-byte Spill
-	movq	88(%rsp), %rax
-	movq	%rax, 56(%rsp)                  # 8-byte Spill
-	movq	80(%rsp), %rax
-	movq	%rax, 48(%rsp)                  # 8-byte Spill
-	movq	72(%rsp), %rax
-	movq	%rax, 40(%rsp)                  # 8-byte Spill
-	callq	__local_stdio_printf_options
-	movq	40(%rsp), %rdx                  # 8-byte Reload
-	movq	48(%rsp), %r8                   # 8-byte Reload
-	movq	56(%rsp), %r9                   # 8-byte Reload
-	movq	%rax, %rcx
-	movq	64(%rsp), %rax                  # 8-byte Reload
-	movq	(%rcx), %rcx
-	movq	%rax, 32(%rsp)
-	callq	__stdio_common_vfprintf
-	nop
-	addq	$104, %rsp
-	retq
-	.seh_endproc
-                                        # -- End function
-	.section	.rdata,"dr",discard,"??_C@_02DPKJAMEF@?$CFd?$AA@"
-	.globl	"??_C@_02DPKJAMEF@?$CFd?$AA@"   # @"??_C@_02DPKJAMEF@?$CFd?$AA@"
-"??_C@_02DPKJAMEF@?$CFd?$AA@":
-	.asciz	"%d"
-
 	.lcomm	__local_stdio_printf_options._OptionsStorage,8,8 # @__local_stdio_printf_options._OptionsStorage
 	.addrsig
 	.addrsig_sym _vsnprintf
-	.addrsig_sym printf
 	.addrsig_sym _vsprintf_l
 	.addrsig_sym _vsnprintf_l
 	.addrsig_sym __stdio_common_vsprintf
 	.addrsig_sym __local_stdio_printf_options
-	.addrsig_sym _vfprintf_l
-	.addrsig_sym __acrt_iob_func
-	.addrsig_sym __stdio_common_vfprintf
 	.addrsig_sym __local_stdio_printf_options._OptionsStorage

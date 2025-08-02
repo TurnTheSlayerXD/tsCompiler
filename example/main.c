@@ -1,9 +1,12 @@
 #include <stdio.h>
 int main(int argc, char **argv)
 {
-    int x;
-               x = 123;
-    int y =  4;
-    int z = -x * y + (6 + 43);
-    // printf("%d", z);
+    int x = 112312123123;
+
+    int *y = &x;
+
+    int **z = &y;
+    ***(&z) = 1;
+
+    print(x, 10);
 }

@@ -5,7 +5,7 @@ import { readFileSync } from "fs";
 import { CursorPos } from "readline";
 import { TokenType } from "./token_type";
 import { Lexer, Token } from "./lexer"
-import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType } from "./value_types";
+import { IntType, CharType, PtrType, Value, FunctionType, ValueType, VoidType, AddrType } from "./value_types";
 import { Context } from "./context";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 
@@ -18,23 +18,27 @@ class CurlExpressionParser {
     parse(): Value | null {
         const tokens = this.tokens;
         // console.log('CurlExpressionParser\n', `${tokens}`);
-        for (let i = 0; i < tokens.length; ++i) {
-            if (tokens[i]!.type === TokenType.NAME) {
-                const semi_index = tokens.slice(i + 1).findIndex(t => t.type === TokenType.SEMICOLON) + i + 1;
-                if (semi_index === -1) {
-                    throwError(new TokenParserError(tokens[i]!, "No semicolon at the of the expression"));
-                }
-                const tokens_till_semicolon = tokens.slice(i, semi_index);
-                new SemicolonExprParser(this.context, tokens_till_semicolon).parse();
-                i = semi_index;
-            }
-            else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
-                continue;
-            }
-            else {
-                TODO(`ITER = ${i}, ${tokens[i]}`);
-            }
+
+        for (const line of splitBy(tokens, (t) => t.type === TokenType.SEMICOLON)) {
+            new SemicolonExprParser(this.context, line).parse();
         }
+        // for (let i = 0; i < tokens.length; ++i) {
+        //     if (tokens[i]!.type === TokenType.NAME) {
+        //         const semi_index = tokens.slice(i + 1).findIndex(t => t.type === TokenType.SEMICOLON) + i + 1;
+        //         if (semi_index === -1) {
+        //             throwError(new TokenParserError(tokens[i]!, "No semicolon at the of the expression"));
+        //         }
+        //         const tokens_till_semicolon = tokens.slice(i, semi_index);
+        //         new SemicolonExprParser(this.context, tokens_till_semicolon).parse();
+        //         i = semi_index;
+        //     }
+        //     else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
+        //         continue;
+        //     }
+        //     else {
+        //         TODO(`ITER = ${i}, ${tokens[i]}`);
+        //     }
+        // }
         return null;
     }
 
@@ -62,7 +66,7 @@ const main = () => {
             isConst = true;
             token = gen.next_token_or_throw();
         }
-        if (!(type = context.isFamiliarTypename(token.text))) {
+        if (!(type = context.hasTypename(token.text))) {
             throwError(new LexerError(gen, `Unknown VALUE TYPE: [${token.text}]`));
         }
         while ((token = gen.next_token_or_throw()).type === TokenType.KWD_CONST) {
@@ -84,10 +88,10 @@ const main = () => {
     };
     const parseDeclarationTypeWithName = (token: Token, gen: Lexer): [Token, Value] => {
         const [next_token, type] = parseDeclarationType(token, gen);
-        if (next_token.type !== TokenType.NAME || context.isFamiliarValueName(next_token.text)) {
+        if (next_token.type !== TokenType.NAME || context.hasValue(next_token.text)) {
             throwError(new ParserError(gen, `Token type ${TokenType[next_token.type]}`));
         }
-        return [gen.next_token_or_throw(), new Value(next_token.text, type, next_token.pos)];
+        return [gen.next_token_or_throw(), new Value(next_token.text, type, next_token.pos, 100, AddrType.Stack)];
     }
 
 
@@ -109,7 +113,7 @@ const main = () => {
         let obj: Value;
 
 
-        if (token.type === TokenType.NAME && !context.isFamiliarValueName(token.text)) {
+        if (token.type === TokenType.NAME && !context.hasValue(token.text)) {
             const first_token = token;
             const name = token.text;
             token = lexer.next_token_or_throw();
@@ -131,7 +135,7 @@ const main = () => {
                         break;
                     }
                 }
-                const new_fun = new Value(name, FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType)), first_token.pos);
+                const new_fun = new Value(name, FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType)), first_token.pos, -100, AddrType.Stack);
                 context.addScopeValue(new_fun);
 
 
