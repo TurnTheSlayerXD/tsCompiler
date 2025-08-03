@@ -1,12 +1,12 @@
 #include <stdio.h>
 int main(int argc, char **argv)
 {
-    int x = 112312123123;
+    int x = 1488;
 
     int *y = &x;
-
     int **z = &y;
-    ***(&z) = 1;
 
-    print(x, 10);
+    print(&x, 4);
+    print(&**z, 4);
+    // print(&*z, 4);
 }

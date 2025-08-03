@@ -22,7 +22,7 @@ export class IntType implements ValueType {
     static instance: IntType | null = null;
     private constructor() {
     }
-  
+
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
         context.addAssembly(`
@@ -104,18 +104,33 @@ export class IntType implements ValueType {
         if (!this.isSameType(src.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
-
-        if (dst_self.addr_type === AddrType.Indirect) {
+        if (src.addr_type === AddrType.Indirect && dst_self.addr_type !== AddrType.Indirect) {
+            context.addAssembly(`
+                \rmovq ${src.address}(%rsp), %rax
+                \rmovl (%rax), %edx
+                \rmovl %edx, ${dst_self.address}(%rsp)
+            `);
+        }
+        else if (src.addr_type !== AddrType.Indirect && dst_self.addr_type === AddrType.Indirect) {
             context.addAssembly(`
                 \rmovl ${src.address}(%rsp), %edx
                 \rmovq ${dst_self.address}(%rsp), %rax
                 \rmovl %edx, (%rax)
             `);
         }
+        else if (src.addr_type === AddrType.Indirect && dst_self.addr_type === AddrType.Indirect) {
+            context.addAssembly(`
+                \rmovq ${src.address}(%rsp), %rax
+                \rmovl (%rax), %edx
+
+                \rmovq ${dst_self.address}(%rsp), %rax
+                \rmovl %edx, (%rax)
+            `);
+        }
         else {
             context.addAssembly(`
-            \rmovl ${src.address}(%rsp), %edx
-            \rmovl %edx, ${dst_self.address}(%rsp)
+                \rmovl ${src.address}(%rsp), %edx
+                \rmovl %edx, ${dst_self.address}(%rsp)
             `);
         }
     }
@@ -154,7 +169,7 @@ export class CharType implements ValueType {
             \rmovb %dh, ${dst_self.address}(%rsp)
             `);
     }
-    
+
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
@@ -271,23 +286,27 @@ export class PtrType implements ValueType {
             \rmovq (%rax), %rdx
             \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
             `);
+            return new Value(name, this.ptrTo, self.pos, context.stackPtr, AddrType.Indirect);
         }
-        const val = new Value(name, this.ptrTo, self.pos, context.stackPtr, AddrType.Indirect);
-        return val;
+        return new Value(name, this.ptrTo, self.pos, self.address, AddrType.Indirect);
     }
 
     asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
-            for (let i = literal.length - 1; i > -1; --i) {
-                context.pushStack(CharType.getInstance().size());
-                context.addAssembly(`
-                    \rmovb $${literal.charCodeAt(i)}, ${context.stackPtr}(%rsp)
-                    `);
-            }
-            context.pushStack(CharType.getInstance().size());
             context.addAssembly(`
-                    \rmovb $${'\0'.charCodeAt(0)}, ${context.stackPtr}(%rsp)
-                    `);
+                    \rmovb $${'\0'.charCodeAt(0)}, ${context.pushStack(CharType.getInstance().size())}(%rsp)
+                `);
+            for (let i = literal.length - 1; i > -1; --i) {
+                context.addAssembly(`
+                    \rmovb $${literal.charCodeAt(i)}, ${context.pushStack(CharType.getInstance().size())}(%rsp)
+                `);
+            }
+            context.addAssembly(`
+                    \rleaq ${context.stackPtr}(%rsp), %rdx
+                `);
+            context.addAssembly(`
+                    \rmovq %rdx, ${context.pushStack(this.size())}(%rsp) 
+                `);
             return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
         }
         if (literal === null) {
@@ -368,7 +387,7 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
-    
+
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
@@ -443,7 +462,7 @@ export class Value {
     }
 
     public toString = (): string => {
-        return `Value {\n\rName: [${this.name}]\n\rType: [${this.valueType.toString()}]\n\rAddress: ${this.address}(%rsp)\n\r}`
+        return `Value {\n\rName: [${this.name}]\n\rType: [${this.valueType.toString()}]\n\rAddress: ${this.address}(%rsp)\n\raddr_type: ${AddrType[this.addr_type]}\n\r}`
     }
 
     get address(): number {

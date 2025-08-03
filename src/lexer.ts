@@ -350,7 +350,7 @@ export class Lexer {
             return new Token(this.prev_cursor.clone(), text, KEYWORDS[text as keyof Keyword]);
         }
 
-        if (!(/^[a-zA-Z]+[0-9]*$/.test(text))) {
+        if (!(/^[a-zA-Z_]+[0-9]*$/.test(text))) {
             throwError(new LexerError(this, `[${text}] - Incorrect variable name`));
         }
 

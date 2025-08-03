@@ -213,7 +213,7 @@ export class SemicolonExprParser {
                         `);
 
                 this.context.addAssembly(`
-                        \rleaq  ${params[0]!.address}(%rsp), %rdx
+                        \rmovq  ${params[0]!.address}(%rsp), %rdx
                     `);
                 this.context.addAssembly(`
                         \rmovl  ${params[1]!.address}(%rsp), %r8d
@@ -222,7 +222,31 @@ export class SemicolonExprParser {
                         \rcallq	 *__imp_WriteConsoleA(%rip)
                     `);
                 return new Value('_temp', VoidType.getInstance(), tokens[0]!.pos, null, AddrType.Indirect);
-            } else {
+            }
+            else if (fun_value.name === 'print_int') {
+                this.context.addAssembly(`
+                    \rmovq  ${params[0]!.address}(%rsp), %rcx
+                `);
+
+                if (params[1]!.addr_type === AddrType.Indirect) {
+                    this.context.addAssembly(`
+                        \rmovq	${params[1]!.address}(%rsp), %rax
+                        \rmovl	(%rax), %edx
+                    `);
+                }
+                else {
+                    this.context.addAssembly(`
+                        \rmovl	${params[1]!.address}(%rsp), %edx
+                    `);
+                }
+
+                this.context.addAssembly(`
+                        \rcallq	printf
+                    `);
+
+                return new Value('_temp', VoidType.getInstance(), tokens[0]!.pos, null, AddrType.Indirect);
+            }
+            else {
                 TODO();
             }
         }
@@ -238,8 +262,7 @@ export class SemicolonExprParser {
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
             return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}]`));
         }
-
-        TODO();
+        TODO(`${tokens}`);
     }
 
 }

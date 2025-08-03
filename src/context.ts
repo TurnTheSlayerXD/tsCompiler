@@ -95,6 +95,10 @@ export class Context {
             return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
                 [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
         }
+        if (name === 'print_int') {
+            return new Value('print_int', FunctionType.getInstance(VoidType.getInstance(),
+                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
+        }
         const { scopeValues } = this;
         for (let i = scopeValues.length - 1; i > -1; --i) {
             const val = scopeValues[i]!.find(val => val.name === name);

@@ -20,7 +20,10 @@ class CurlExpressionParser {
         // console.log('CurlExpressionParser\n', `${tokens}`);
 
         for (const line of splitBy(tokens, (t) => t.type === TokenType.SEMICOLON)) {
-            new SemicolonExprParser(this.context, line).parse();
+            const filtered = line.filter(t => t.type !== TokenType.PREPROCESSOR);
+            if (filtered.length > 0) {
+                new SemicolonExprParser(this.context, line).parse();
+            }
         }
         // for (let i = 0; i < tokens.length; ++i) {
         //     if (tokens[i]!.type === TokenType.NAME) {
