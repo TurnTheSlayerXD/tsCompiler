@@ -238,6 +238,10 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_EQUAL);
         }
+        if (this.is_equal_to_expr(this.cursor, '!=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_NOT_EQUAL);
+        }
         if (this.is_equal_to_expr(this.cursor, '<=')) {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_LESS_EQ);
@@ -309,7 +313,7 @@ export class Lexer {
             return new Token(this.prev_cursor.clone(), '&', TokenType.OP_AMPERSAND);
         }
 
-        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
+        const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
 
         this.iter_while_not_equal_arr(this.cursor, STOP_SYMBOLS);
 

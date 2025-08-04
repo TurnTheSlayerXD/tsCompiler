@@ -15,8 +15,9 @@ export class Context {
     private literals: string[] = [];
     private asm: string = '';
 
+    private mark_num = 0;
 
-    public stackPtr: number = 100;
+    public stackPtr: number = 1000;
 
     public init_stack_offset = this.stackPtr;
 
@@ -119,6 +120,14 @@ export class Context {
         const found = type;
         return value;
         // return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found}`));
+    }
+
+    get mark() {
+        return `mark_${this.mark_num}`;
+    }
+
+    gen_mark() {
+        return `mark_${this.mark_num++}`;
     }
 
 }

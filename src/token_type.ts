@@ -33,6 +33,7 @@ export enum TokenType {
     OP_ARROW,
     OP_QUESTION,
     OP_COMP_EQUAL,
+    OP_COMP_NOT_EQUAL,
     OP_COMP_LESS,
     OP_COMP_GREATER,
     OP_COMP_GREATER_EQ,

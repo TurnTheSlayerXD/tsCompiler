@@ -21,24 +21,6 @@ export class SemicolonExprParser {
         this.tokens = tokens;
     }
 
-    static getPriority(type: TokenType): number {
-        if (type === TokenType.OP_ASSIGNMENT) {
-            return 0;
-        }
-        if (type === TokenType.OP_PLUS || type === TokenType.OP_MINUS) {
-            return 1;
-        }
-        if (type === TokenType.OP_MULTIPLY || type === TokenType.OP_DIVIDE) {
-            return 2;
-        }
-        if (type === TokenType.OP_DEREFERENCE || type === TokenType.OP_REFERENCE) {
-            return 3;
-        }
-        TODO("UNREACHABLE");
-    }
-
-
-
     static get_index_of_types(tokens: Token[], target_types: TokenType[], forward: boolean): number {
         let paren_count = 0;
         const types = tokens.map(t => t.type);
@@ -131,7 +113,7 @@ export class SemicolonExprParser {
         TODO();
     }
 
-    parse(): Value {
+    parse(is_l_value: boolean): Value {
         let { context, tokens } = this;
         // console.log(`${tokens}
         //     ____________\r`);
@@ -144,8 +126,8 @@ export class SemicolonExprParser {
             if (op_index === 0) {
                 throwError(new TokenParserError(token, `Expected lvalue expression`));
             }
-            const l_value = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
-            const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+            const l_value = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(true);
+            const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
 
             // console.log(`Left = \n${l_value}`);
             // console.log(`Right = \n${r_value}`);
@@ -153,6 +135,32 @@ export class SemicolonExprParser {
             l_value.valueType.asm_copy(context, r_value, l_value);
             return l_value;
         }
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
+            [TokenType.OP_COMP_GREATER,
+            TokenType.OP_COMP_EQUAL,
+            TokenType.OP_COMP_NOT_EQUAL,
+            TokenType.OP_COMP_GREATER_EQ,
+            TokenType.OP_COMP_LESS,
+            TokenType.OP_COMP_LESS_EQ], true)) !== -1) {
+            const token = tokens[op_index]!;
+            if (op_index === 0) {
+                throwError(new TokenParserError(token, `Expected left expression`));
+            }
+            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(false);
+            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
+
+            switch (token!.type) {
+                case TokenType.OP_COMP_GREATER: return left.valueType.asm_cmp_greater(context, left, right);
+                case TokenType.OP_COMP_GREATER_EQ: return left.valueType.asm_cmp_greater_or_equal(context, left, right);
+                case TokenType.OP_COMP_LESS: return left.valueType.asm_cmp_less(context, left, right);
+                case TokenType.OP_COMP_LESS_EQ: return left.valueType.asm_cmp_less_or_equal(context, left, right);
+                case TokenType.OP_COMP_EQUAL: return left.valueType.asm_cmp_equal(context, left, right);
+                case TokenType.OP_COMP_NOT_EQUAL: return left.valueType.asm_cmp_not_equal(context, left, right);
+            }
+
+            return left;
+        }
+
 
         if (tokens.length > 0 && tokens[0]!.type === TokenType.NAME && !!context.hasTypename(tokens[0]!.text)) {
             return this.parse_declaration(tokens);
@@ -163,29 +171,29 @@ export class SemicolonExprParser {
             const token = tokens[op_index]!;
             let left: Value, right: Value;
             if (op_index - 1 < 0) {
-                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
                 left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
             }
             else {
-                left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
-                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+                left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(false);
+                right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
             }
             return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
         }
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_MULTIPLY, TokenType.OP_DIVIDE], true)) !== -1) {
             const token = tokens[op_index]!;
-            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse();
-            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(false);
+            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
 
             return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
         }
 
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE], false)) !== -1) {
             const token = tokens[op_index]!;
-            const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse();
+            const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
             if (token.type === TokenType.OP_DEREFERENCE) {
                 const ptr_type = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
-                return ptr_type.asm_dereference(context, '_temp', arg);
+                return ptr_type.asm_dereference(context, '_temp', arg, is_l_value);
             }
             return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
         }
@@ -196,7 +204,7 @@ export class SemicolonExprParser {
             const fun_name = tokens[0]!.text;
             const splitted = splitBy(tokens.slice(2, c_parent_pos), t => t.type === TokenType.COMMA);
 
-            const params = splitted.map(s => new SemicolonExprParser(this.context, s).parse()
+            const params = splitted.map(s => new SemicolonExprParser(this.context, s).parse(false)
                 ?? throwError(new TokenParserError(tokens[0]!, "Void params are not allowed")));
 
             const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));

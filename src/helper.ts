@@ -31,6 +31,7 @@ export class TokenParserError extends Error {
     }
 }
 
+
 export class TypeError extends Error {
     constructor(pos: Position, msg: string) {
         super(`Type Error at ${pos}\n${msg}\n`);

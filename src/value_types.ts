@@ -1,5 +1,5 @@
 import { Context } from './context';
-import { ParserError, throwError, TODO, TypeError, UNREACHABLE } from './helper';
+import { ParserError, throwError, TODO, TokenParserError, TypeError, UNREACHABLE } from './helper';
 import { Position } from './lexer';
 
 export interface ValueType {
@@ -15,48 +15,165 @@ export interface ValueType {
     asm_from_minus(context: Context, self: Value, rhs: Value): Value;
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value;
     asm_from_divide(context: Context, self: Value, rhs: Value): Value;
+
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value;
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value;
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value;
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value;
+
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value;
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value;
 }
+
+enum MOV_I {
+    movl,
+    movr
+}
+
+enum BIN_I {
+    addb,
+    addl,
+    addq,
+
+    subb,
+    subl,
+    subq,
+
+    imulb,
+    imull,
+    imulq,
+
+    idivb,
+    idivl,
+    idivq,
+}
+enum REG {
+    ax,
+    al,
+    eax,
+    rax,
+
+    dx,
+    dh,
+    edx,
+    rdx,
+}
+
+function asm_div_action(context: Context, mov: MOV_I, div: BIN_I,
+    eax: REG, edx: REG, ecx: REG, ebx: REG,
+    lhs: Value, rhs: Value, size: number) {
+    TODO('DIVISION');
+}
+
+function asm_bin_action(context: Context, mov: MOV_I, act: BIN_I, reg: REG, lhs: Value, rhs: Value, size: number) {
+    if (lhs.addr_type === AddrType.Indirect && rhs.addr_type !== AddrType.Indirect) {
+        context.addAssembly(`
+                \rmovq ${lhs.address}(%rsp), %rax
+                \r${MOV_I[mov]} (%rax), %${REG[reg]}
+                \r${BIN_I[act]} ${rhs.address}(%rsp), %${REG[reg]}
+                \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
+            `);
+    }
+    else if (lhs.addr_type !== AddrType.Indirect && rhs.addr_type === AddrType.Indirect) {
+        context.addAssembly(`
+                \r${MOV_I[mov]} ${lhs.address}(%rsp), %${REG[reg]}
+                \rmovq ${rhs.address}(%rsp), %rax
+                \r${BIN_I[act]} (%rax), %${REG[reg]}
+                \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
+            `);
+    }
+    else if (lhs.addr_type === AddrType.Indirect && rhs.addr_type === AddrType.Indirect) {
+        context.addAssembly(`
+                \rmovq ${lhs.address}(%rsp), %rax
+                \r${MOV_I[mov]} (%rax), %${REG[reg]}
+                \rmovq ${rhs.address}(%rsp), %rax
+                \r${BIN_I[act]} (%rax), %${REG[reg]}
+                \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
+            `);
+    }
+    else {
+        context.addAssembly(`
+                \r${MOV_I[mov]} ${lhs.address}(%rsp), %${REG[reg]}
+                \r${BIN_I[act]} ${rhs.address}(%rsp), %${REG[reg]}
+                \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
+            `);
+    }
+
+}
+
+enum CMP_I {
+    jne,
+    je,
+    jge,
+    jle,
+    jg,
+    jl
+}
+
+function asm_comp_action(context: Context, self: Value, rhs: Value, cmp: CMP_I) {
+    const mark = context.gen_mark();
+    context.pushStack(CharType.getInstance().size());
+    context.addAssembly(`
+                \rmovl ${self.address}(%rsp), %eax
+                \rmovl ${rhs.address}(%rsp), %ebx
+                \rmovb $1, ${context.stackPtr}(%rsp) 
+                \rcmpl %eax, %ebx
+                \r${CMP_I[cmp]} ${mark}
+                \rmovb $0, ${context.stackPtr}(%rsp) 
+                ${mark}:
+            `);
+    return new Value('_temp', CharType.getInstance(), self.pos, context.stackPtr, AddrType.Stack);
+}
+
 
 export class IntType implements ValueType {
 
     static instance: IntType | null = null;
     private constructor() {
     }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.jne);
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.je);
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.jge);
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.jle);
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.jl);
+    }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return asm_comp_action(context, self, rhs, CMP_I.jg);
+    }
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        context.addAssembly(`
-            \rmovl ${self.address}(%rsp), %edx
-            \raddl ${rhs.address}(%rsp), %edx
-            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
-            `);
+        asm_bin_action(context, MOV_I.movl, BIN_I.addl, REG.edx, self, rhs, this.size());
         return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        context.addAssembly(`
-            \rmovl ${self.address}(%rsp), %edx
-            \rsubl ${rhs.address}(%rsp), %edx
-            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
-            `);
+        asm_bin_action(context, MOV_I.movl, BIN_I.subl, REG.edx, self, rhs, this.size());
         return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        context.addAssembly(`
-            \rmovl ${self.address}(%rsp), %edx
-            \rimull ${rhs.address}(%rsp), %edx
-            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
-            `);
+        asm_bin_action(context, MOV_I.movl, BIN_I.imull, REG.edx, self, rhs, this.size());
         return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        context.addAssembly(`
-            \rmovl ${self.address}(%rsp), %edx
-            \rmull ${rhs.address}(%rsp), %edx
-            \rmovl %edx, ${context.pushStack(this.size())}(%rsp)
-            `);
+        asm_bin_action(context, MOV_I.movl, BIN_I.idivl, REG.edx, self, rhs, this.size());
         return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
 
@@ -142,6 +259,24 @@ export class CharType implements ValueType {
     static instance: CharType | null = null;
     private constructor() {
     }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
     asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         context.pushStack(this.size());
         context.addAssembly(`
@@ -208,6 +343,24 @@ export class VoidType implements ValueType {
     static instance: VoidType | null = null;
     private constructor() {
     }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
     }
@@ -256,6 +409,24 @@ export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 
     private constructor(public ptrTo: ValueType) { }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
 
     asm_take_reference_from(context: Context, name: string, arg: Value): Value {
         arg.valueType.isSameType(this.ptrTo) || UNREACHABLE();
@@ -278,15 +449,15 @@ export class PtrType implements ValueType {
         return val;
     }
 
-    asm_dereference(context: Context, name: string, self: Value): Value {
+    asm_dereference(context: Context, name: string, self: Value, is_l_value: boolean): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        if (this.ptrTo instanceof PtrType) {
+        if (!is_l_value) {
             context.addAssembly(`
             \rmovq ${self.address}(%rsp), %rax
             \rmovq (%rax), %rdx
             \rmovq %rdx, ${context.pushStack(this.size())}(%rsp)
             `);
-            return new Value(name, this.ptrTo, self.pos, context.stackPtr, AddrType.Indirect);
+            return new Value(name, this.ptrTo, self.pos, context.stackPtr, AddrType.Stack);
         }
         return new Value(name, this.ptrTo, self.pos, self.address, AddrType.Indirect);
     }
@@ -334,7 +505,8 @@ export class PtrType implements ValueType {
         if (dst_self.addr_type === AddrType.Indirect) {
             context.addAssembly(`
                 \rmovq ${dst_self.address}(%rsp), %rax
-                \rmovq ${src.address}(%rsp), (%rax)
+                \rmovq ${src.address}(%rsp), %rdx
+                \rmovq %rdx, (%rax)
                 `);
         }
         else {
@@ -346,7 +518,15 @@ export class PtrType implements ValueType {
     }
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        if (!(rhs.valueType instanceof IntType)) {
+            throwError(new TypeError(self.pos, `Cannot sum variables of types {${this}} and {${rhs.valueType}}`));
+        }
+        context.addAssembly(`
+            movq ${self.address}(%rsp), %rdx
+            addq ${rhs.address}(%rsp), %rdx
+            movq %rdx, ${context.pushStack(this.size())}(%rsp)
+        `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
@@ -387,6 +567,24 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
 
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         throw new Error('Method not implemented.');
