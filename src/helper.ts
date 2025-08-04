@@ -47,7 +47,7 @@ export class RulesError extends Error {
 
 
 export function TODO(arg: string = ''): never {
-    throw new Error(`NOT IMPLEMENTED ${arg}`);
+    throw new Error(`NOT IMPLEMENTED\n\r${arg}`);
 }
 
 export function UNREACHABLE(arg: string = ''): never {

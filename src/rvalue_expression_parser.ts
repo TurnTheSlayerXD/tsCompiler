@@ -131,9 +131,8 @@ export class SemicolonExprParser {
 
             // console.log(`Left = \n${l_value}`);
             // console.log(`Right = \n${r_value}`);
-
             l_value.valueType.asm_copy(context, r_value, l_value);
-            return l_value;
+            return r_value;
         }
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
             [TokenType.OP_COMP_GREATER,
