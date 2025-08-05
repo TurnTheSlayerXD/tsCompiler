@@ -96,8 +96,7 @@ function asm_bin_action(context: Context, mov: MOV_I, act: BIN_I, reg: REG, lhs:
     const lhs_addr = lhs.stack_addr(context);
     const rhs_addr = rhs.stack_addr(context);
     context.addAssembly(`
-                \rmovq ${lhs_addr}(%rsp), %rax
-                \r${MOV_I[mov]} (%rax), %${REG[reg]}
+                \r${MOV_I[mov]} ${lhs_addr}(%rsp), %${REG[reg]}
                 \r${BIN_I[act]} ${rhs_addr}(%rsp), %${REG[reg]}
                 \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
             `);

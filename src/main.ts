@@ -116,7 +116,7 @@ const main = () => {
                 token = lexer.next_token_or_throw();
                 if (token.type === TokenType.O_CURL) {
                     const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
-                    new CurlExpressionParser(context, tokens).parse();
+                    new CurlExpressionParser(context, tokens, null, null).parse();
                 }
 
                 context.addAssembly(`\rxor %eax, %eax

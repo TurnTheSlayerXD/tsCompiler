@@ -7,7 +7,7 @@ import { Value } from "./value_types";
 
 export class CurlExpressionParser {
 
-    constructor(public context: Context, public tokens: Token[], public cycle_begin_mark: string | null, public cycle_end_mark: string | null) {
+    constructor(public context: Context, public tokens: Token[], public parent_cycle_begin_mark: string | null, public parent_cycle_end_mark: string | null) {
     }
 
     parse(): Value | null {
@@ -21,9 +21,9 @@ export class CurlExpressionParser {
             let o_paren_pos;
             let c_paren_pos = i;
             let token = tokens[i]!;
+            context.pushScope();
             if (with_condition) {
                 o_paren_pos = i + 1;
-                context.pushScope();
                 if (o_paren_pos >= tokens.length
                     || tokens[o_paren_pos]!.type !== TokenType.O_PAREN
                     || (c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN)) === -1) {
@@ -45,7 +45,7 @@ export class CurlExpressionParser {
                 || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
                 throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
             }
-            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), this.cycle_begin_mark, this.cycle_end_mark).parse();
+            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), this.parent_cycle_begin_mark, this.parent_cycle_end_mark).parse();
             context.addAssembly(`
                 \rjmp ${mark_if_true}
                 `);
@@ -75,16 +75,43 @@ export class CurlExpressionParser {
                 new SemicolonExprParser(context, splitted[0]!).parse(false);
             }
 
-            context.get
+            const cycle_begin_mark = context.gen_mark();
+            const cycle_end_mark = context.gen_mark();
+
+            context.addAssembly(`
+                    \r${cycle_begin_mark}:
+                `);
             if (splitted[1]!.length > 0) {
-
-
-                const cond_part = new SemicolonExprParser(context, splitted[1]!).parse(false);
-
-
+                const cond_res = new SemicolonExprParser(context, splitted[1]!).parse(false);
+                // res - 1 byte value which either $0 or $1
+                context.addAssembly(`
+                        \r #FOR
+                        \rxor %edx, %edx
+                        \rmovb ${cond_res.stack_addr(context)}(%rsp), %dh
+                        \rcmpb $0, %dh
+                        \rje ${cycle_end_mark}
+                `);
             }
+
+            let o_curl_pos = c_paren_pos + 1, c_curl_pos;
+            if (o_curl_pos >= tokens.length
+                || tokens[o_curl_pos]!.type !== TokenType.O_CURL
+                || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
+                throwError(new TokenParserError(tokens[i]!, `No matching O_CURL found for FOR keyword`));
+            }
+            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), cycle_begin_mark, cycle_end_mark).parse();
+
+            if (splitted[2]!.length > 0) {
+                new SemicolonExprParser(context, splitted[2]!).parse(false);
+            }
+            context.addAssembly(`
+                \rjmp ${cycle_begin_mark}
+                `);
+            context.addAssembly(`
+                    \r${cycle_end_mark}:
+                `);
             context.popScope();
-            const iter_part = new SemicolonExprParser(context, splitted[2]!).parse(false);
+            return c_curl_pos;
         }
         const parse_WHILE_expr = (i: number): number => {
             TODO();
@@ -132,10 +159,14 @@ export class CurlExpressionParser {
                 i = parse_WHILE_expr(i);
             }
             else if (tokens[i]!.type === TokenType.KWD_BREAK) {
-                TODO();
+                context.addAssembly(`
+                        \rjmp ${this.parent_cycle_end_mark}
+                    `);
             }
             else if (tokens[i]!.type === TokenType.KWD_CONTINUE) {
-                TODO();
+                context.addAssembly(`
+                        \rjmp ${this.parent_cycle_begin_mark}
+                    `);
             }
             else {
                 let j = tokens.slice(i).findIndex((t) => t.type === TokenType.SEMICOLON);
