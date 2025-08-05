@@ -1,5 +1,5 @@
 import { LexerError, ParserError, throwError } from './helper';
-import { TokenType } from './token_type';
+import { Keyword, KEYWORDS, STOP_SYMBOLS, TokenType } from './token_type';
 
 export class Position {
     constructor(public row: number, public col: number, public count: number) {
@@ -254,6 +254,7 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '&&', TokenType.OP_AND);
         }
+
         if (this.is_equal_to_expr(this.cursor, '||')) {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '||', TokenType.OP_OR);
@@ -266,7 +267,10 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '||', TokenType.OP_DECREMENT);
         }
-
+        if (this.is_equal_to_expr(this.cursor, '!')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '&&', TokenType.OP_NEGATE);
+        }
         if (this.at(this.cursor) === '+') {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '+', TokenType.OP_PLUS);
@@ -313,7 +317,6 @@ export class Lexer {
             return new Token(this.prev_cursor.clone(), '&', TokenType.OP_AMPERSAND);
         }
 
-        const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
 
         this.iter_while_not_equal_arr(this.cursor, STOP_SYMBOLS);
 
@@ -332,23 +335,6 @@ export class Lexer {
             return new Token(this.prev_cursor.clone(), text, TokenType.NUM_INT);
         }
 
-        type Keyword = {
-            'return': TokenType,
-            'if': TokenType,
-            'else': TokenType,
-            'for': TokenType,
-            'while': TokenType,
-            'const': TokenType,
-        };
-
-        const KEYWORDS: Keyword = {
-            'return': TokenType.KWD_RETURN,
-            'if': TokenType.KWD_IF,
-            'else': TokenType.KWD_ELSE,
-            'for': TokenType.KWD_FOR,
-            'while': TokenType.KWD_WHILE,
-            'const': TokenType.KWD_CONST,
-        };
 
         if (text in KEYWORDS) {
             return new Token(this.prev_cursor.clone(), text, KEYWORDS[text as keyof Keyword]);

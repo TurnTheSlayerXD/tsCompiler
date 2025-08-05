@@ -1,5 +1,5 @@
 import { Context } from "./context";
-import { getMatchingBracket, throwError, TODO, TokenParserError } from "./helper";
+import { getMatchingBracket, splitBy, throwError, TODO, TokenParserError } from "./helper";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 import { TokenType } from "./token_type";
@@ -7,7 +7,7 @@ import { Value } from "./value_types";
 
 export class CurlExpressionParser {
 
-    constructor(public context: Context, public tokens: Token[]) {
+    constructor(public context: Context, public tokens: Token[], public cycle_begin_mark: string | null, public cycle_end_mark: string | null) {
     }
 
     parse(): Value | null {
@@ -34,7 +34,7 @@ export class CurlExpressionParser {
                 context.addAssembly(`
                         \r #IF
                         \rxor %edx, %edx
-                        \rmovb ${res.address}(%rsp), %dh
+                        \rmovb ${res.stack_addr(context)}(%rsp), %dh
                         \rcmpb $0, %dh
                         \rje ${mark_if_false}
                 `);
@@ -45,7 +45,7 @@ export class CurlExpressionParser {
                 || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
                 throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
             }
-            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos)).parse();
+            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), this.cycle_begin_mark, this.cycle_end_mark).parse();
             context.addAssembly(`
                 \rjmp ${mark_if_true}
                 `);
@@ -54,10 +54,39 @@ export class CurlExpressionParser {
             return c_curl_pos;
         };
 
-        const parse_FOR_expr = (): number => {
-            TODO();
+        const parse_FOR_expr = (i: number): number => {
+
+            if (i + 1 >= tokens.length || tokens[i + 1]!.type !== TokenType.O_PAREN) {
+                throwError(new TokenParserError(tokens[i]!, 'Expected bracket after FOR keyword'));
+            }
+            let o_paren_pos = i + 1;
+            let c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
+            if (c_paren_pos === -1) {
+                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
+            }
+            let splitted = splitBy(tokens.slice(o_paren_pos + 1, c_paren_pos), (t) => t.type === TokenType.SEMICOLON);
+            if (splitted.length !== 3) {
+                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Expected three expressions inside FOR braces'));
+            }
+
+
+            context.pushScope();
+            if (splitted[0]!.length > 0) {
+                new SemicolonExprParser(context, splitted[0]!).parse(false);
+            }
+
+            context.get
+            if (splitted[1]!.length > 0) {
+
+
+                const cond_part = new SemicolonExprParser(context, splitted[1]!).parse(false);
+
+
+            }
+            context.popScope();
+            const iter_part = new SemicolonExprParser(context, splitted[2]!).parse(false);
         }
-        const parse_WHILE_expr = (): number => {
+        const parse_WHILE_expr = (i: number): number => {
             TODO();
         }
 
@@ -95,6 +124,18 @@ export class CurlExpressionParser {
                 context.addAssembly(`
                         \r${mark_if_true}:
                     `);
+            }
+            else if (tokens[i]!.type === TokenType.KWD_FOR) {
+                i = parse_FOR_expr(i);
+            }
+            else if (tokens[i]!.type === TokenType.KWD_WHILE) {
+                i = parse_WHILE_expr(i);
+            }
+            else if (tokens[i]!.type === TokenType.KWD_BREAK) {
+                TODO();
+            }
+            else if (tokens[i]!.type === TokenType.KWD_CONTINUE) {
+                TODO();
             }
             else {
                 let j = tokens.slice(i).findIndex((t) => t.type === TokenType.SEMICOLON);

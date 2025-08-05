@@ -46,6 +46,7 @@ export enum TokenType {
 
     OP_AND,
     OP_OR,
+    OP_NEGATE,
 
     OP_DECREMENT,
     OP_INCREMENT,
@@ -60,6 +61,8 @@ export enum TokenType {
     KWD_ELSE,
     KWD_FOR,
     KWD_WHILE,
+    KWD_BREAK,
+    KWD_CONTINUE,
 }
 
 export const OP_TOKENS = [
@@ -101,4 +104,29 @@ export function is_op_token_type(type: TokenType) {
 
 export function is_value_or_name_type(type: TokenType) {
     return OP_TOKENS.includes(type);
-} 
+}
+
+
+export type Keyword = {
+    'return': TokenType,
+    'if': TokenType,
+    'else': TokenType,
+    'for': TokenType,
+    'while': TokenType,
+    'const': TokenType,
+    'break': TokenType,
+    'continue': TokenType,
+};
+
+export const KEYWORDS: Keyword = {
+    'return': TokenType.KWD_RETURN,
+    'if': TokenType.KWD_IF,
+    'else': TokenType.KWD_ELSE,
+    'for': TokenType.KWD_FOR,
+    'while': TokenType.KWD_WHILE,
+    'const': TokenType.KWD_CONST,
+    'break': TokenType.KWD_BREAK,
+    'continue': TokenType.KWD_CONTINUE,
+};
+
+export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];

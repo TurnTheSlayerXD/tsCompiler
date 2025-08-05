@@ -58,13 +58,16 @@ export function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[
     const arrs: T[][] = [];
     let prev_i = 0;
     for (let i = 0; i < arr.length; ++i) {
-        if (cbk(arr[i]!) && i - prev_i > 0) {
+        if (cbk(arr[i]!)) {
             arrs.push(arr.slice(prev_i, i));
             prev_i = i + 1;
         }
     }
     if (arr.length - prev_i > 0) {
         arrs.push(arr.slice(prev_i, arr.length));
+    }
+    else {
+        arrs.push([]);
     }
     return arrs;
 }

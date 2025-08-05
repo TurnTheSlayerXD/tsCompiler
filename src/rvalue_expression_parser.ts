@@ -128,12 +128,59 @@ export class SemicolonExprParser {
             }
             const l_value = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(true);
             const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
-
             // console.log(`Left = \n${l_value}`);
             // console.log(`Right = \n${r_value}`);
             l_value.valueType.asm_copy(context, r_value, l_value);
             return r_value;
         }
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
+            [TokenType.OP_AND,
+            TokenType.OP_OR,
+            ], true)) !== -1) {
+            const token = tokens[op_index]!;
+            if (op_index === 0) {
+                throwError(new TokenParserError(token, `Expected left expression`));
+            }
+            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(false);
+            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
+
+            const left_addr = left.valueType.asm_to_boolean(context, left).stack_addr(context);
+            const right_addr = right.valueType.asm_to_boolean(context, right).stack_addr(context);
+
+            const res_addr = context.pushStack(CharType.getInstance().size);
+            const mark = context.gen_mark();
+            switch (token!.type) {
+                case TokenType.OP_AND: {
+                    context.addAssembly(`
+                        \rmovb ${left_addr}(%rsp), %dh
+                        \rmovb ${right_addr}(%rsp), %al
+                        \randb %dh, %al
+                        \rmovb $1, ${res_addr}(%rsp)
+                        \rcmpb $0, %al
+                        \rjne ${mark}  
+                        \rmovb $0, ${res_addr}(%rsp)
+                        \r${mark}:
+                    `);
+                    break;
+                }
+                case TokenType.OP_OR: {
+                    context.addAssembly(`
+                        \rmovb ${left_addr}(%rsp), %dh
+                        \rmovb ${right_addr}(%rsp), %al
+                        \rorb %dh, %al
+                        \rmovb $1, ${res_addr}(%rsp)
+                        \rcmpb $0, %al
+                        \rjne ${mark}  
+                        \rmovb $0, ${res_addr}(%rsp)
+                        \r${mark}:
+                    `);
+                    break;
+                }
+            }
+            return new Value('_temp', CharType.getInstance(), left.pos, res_addr, AddrType.Stack);
+        }
+
+
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
             [TokenType.OP_COMP_GREATER,
             TokenType.OP_COMP_EQUAL,
@@ -157,7 +204,7 @@ export class SemicolonExprParser {
                 case TokenType.OP_COMP_NOT_EQUAL: return left.valueType.asm_cmp_not_equal(context, left, right);
             }
 
-            return left;
+            TODO('CMP');
         }
 
 
@@ -189,8 +236,12 @@ export class SemicolonExprParser {
 
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE], false)) !== -1) {
             const token = tokens[op_index]!;
-            const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
-            if (token.type === TokenType.OP_DEREFERENCE) {
+            let arg;
+            if (token.type === TokenType.OP_REFERENCE) {
+                arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(true);
+            }
+            else {
+                arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
                 const ptr_type = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
                 return ptr_type.asm_dereference(context, '_temp', arg, is_l_value);
             }
@@ -220,10 +271,10 @@ export class SemicolonExprParser {
                         `);
 
                 this.context.addAssembly(`
-                        \rmovq  ${params[0]!.address}(%rsp), %rdx
+                        \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rdx
                     `);
                 this.context.addAssembly(`
-                        \rmovl  ${params[1]!.address}(%rsp), %r8d
+                        \rmovl  ${params[1]!.stack_addr(context)}(%rsp), %r8d
                     `);
                 this.context.addAssembly(`
                         \rcallq	 *__imp_WriteConsoleA(%rip)
@@ -232,18 +283,18 @@ export class SemicolonExprParser {
             }
             else if (fun_value.name === 'print_int') {
                 this.context.addAssembly(`
-                    \rmovq  ${params[0]!.address}(%rsp), %rcx
+                    \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rcx
                 `);
 
                 if (params[1]!.addr_type === AddrType.Indirect) {
                     this.context.addAssembly(`
-                        \rmovq	${params[1]!.address}(%rsp), %rax
+                        \rmovq	${params[1]!.stack_addr(context)}(%rsp), %rax
                         \rmovl	(%rax), %edx
                     `);
                 }
                 else {
                     this.context.addAssembly(`
-                        \rmovl	${params[1]!.address}(%rsp), %edx
+                        \rmovl	${params[1]!.stack_addr(context)}(%rsp), %edx
                     `);
                 }
 
