@@ -121,7 +121,7 @@ export class SemicolonExprParser {
 
         let op_index;
 
-        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_ASSIGNMENT,], true)) !== -1) {
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_ASSIGNMENT, TokenType.OP_ASSIGNMENT_PLUS, TokenType.OP_ASSIGNMENT_MINUS, TokenType.OP_ASSIGNMENT_MULTIPLY, TokenType.OP_ASSIGNMENT_DIVIDE], true)) !== -1) {
             const token = tokens[op_index]!;
             if (op_index === 0) {
                 throwError(new TokenParserError(token, `Expected lvalue expression`));
@@ -130,8 +130,34 @@ export class SemicolonExprParser {
             const r_value = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
             // console.log(`Left = \n${l_value}`);
             // console.log(`Right = \n${r_value}`);
-            l_value.valueType.asm_copy(context, r_value, l_value);
-            return r_value;
+            switch (token.type) {
+                case TokenType.OP_ASSIGNMENT_PLUS: {
+                    const new_value = l_value.valueType.asm_from_plus(context, l_value, r_value);
+                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    return new_value;
+                }
+                case TokenType.OP_ASSIGNMENT_MINUS: {
+                    const new_value = l_value.valueType.asm_from_minus(context, l_value, r_value);
+                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    return new_value;
+                }
+                case TokenType.OP_ASSIGNMENT_MULTIPLY: {
+                    const new_value = l_value.valueType.asm_from_multiply(context, l_value, r_value);
+                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    return new_value;
+                }
+                case TokenType.OP_ASSIGNMENT_DIVIDE: {
+                    const new_value = l_value.valueType.asm_from_divide(context, l_value, r_value);
+                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    return new_value;
+                }
+                case TokenType.OP_ASSIGNMENT: {
+                    l_value.valueType.asm_copy(context, r_value, l_value);
+                    return r_value;
+                }
+                default:
+                    TODO();
+            }
         }
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
             [TokenType.OP_AND,
@@ -233,6 +259,12 @@ export class SemicolonExprParser {
 
             return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
         }
+        if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_PERCENT], true)) !== -1) {
+            const token = tokens[op_index]!;
+            const left = new SemicolonExprParser(context, tokens.slice(0, op_index)).parse(false);
+            const right = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
+            return left.valueType.asm_from_percent(context, left, right);
+        }
 
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE], false)) !== -1) {
             const token = tokens[op_index]!;
@@ -317,6 +349,11 @@ export class SemicolonExprParser {
             const new_value = PtrType.getInstance(CharType.getInstance()).asm_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
             return new_value;
         }
+        if (tokens.length === 1 && tokens[0]!.type === TokenType.CHAR_LITERAL) {
+            const new_value = CharType.getInstance().asm_from_literal(this.context, '_temp', tokens[0]!.text, tokens[0]!.pos);
+            return new_value;
+        }
+
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
             return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}] [${context.scopeValues}]`));
         }

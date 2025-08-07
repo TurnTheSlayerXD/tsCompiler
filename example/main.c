@@ -2,15 +2,23 @@
 
 int main(int argc, char **argv)
 {
+    int y = 10;
 
-    for (int i = 1; i < 10; i = i + 1)
+    int *x = &y;
+    while (*x > 0)
     {
-        if (i > 5)
+        if ((*x + 1) % 2 == 1)
         {
-            print(">5 ", 4);
+            print("NOT EVEN | ", 13);
         }
-        else{
-            print("<=5 ", 4);
+        else if ((*x + 1) % 2 == 0)
+        {
+            print("EVEN | ", 13);
         }
+        else
+        {
+            (1) + (1);
+        }
+        *x -= 1;
     }
 }

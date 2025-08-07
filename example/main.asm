@@ -135,30 +135,29 @@ _vsnprintf:                             # @_vsnprintf
 main:                                   # @main
 .seh_proc main
 # %bb.0:
-	subq	$24, %rsp
-	.seh_stackalloc 24
+	subq	$32, %rsp
+	.seh_stackalloc 32
 	.seh_endprologue
-	movl	$0, 20(%rsp)
-	movq	%rdx, 8(%rsp)
-	movl	%ecx, 4(%rsp)
-	movb	$10, 3(%rsp)
-	movsbl	3(%rsp), %eax
-	cmpl	$0, %eax
-	jle	.LBB4_2
-# %bb.1:
-	movb	$3, 3(%rsp)
-	jmp	.LBB4_5
-.LBB4_2:
-	movsbl	3(%rsp), %eax
-	cmpl	$0, %eax
-	jge	.LBB4_4
-# %bb.3:
-	movb	$4, 3(%rsp)
+	movl	$0, 28(%rsp)
+	movq	%rdx, 16(%rsp)
+	movl	%ecx, 12(%rsp)
+	movl	$3, 8(%rsp)
+	movl	$10, 4(%rsp)
+.LBB4_1:                                # =>This Inner Loop Header: Depth=1
+	cmpl	$0, 4(%rsp)
+	jle	.LBB4_4
+# %bb.2:                                #   in Loop: Header=BB4_1 Depth=1
+	jmp	.LBB4_3
+.LBB4_3:                                #   in Loop: Header=BB4_1 Depth=1
+	movl	8(%rsp), %ecx
+	movl	4(%rsp), %eax
+	cltd
+	idivl	%ecx
+	movl	%eax, 4(%rsp)
+	jmp	.LBB4_1
 .LBB4_4:
-	jmp	.LBB4_5
-.LBB4_5:
-	movl	20(%rsp), %eax
-	addq	$24, %rsp
+	movl	28(%rsp), %eax
+	addq	$32, %rsp
 	retq
 	.seh_endproc
                                         # -- End function

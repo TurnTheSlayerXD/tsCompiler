@@ -114,7 +114,52 @@ export class CurlExpressionParser {
             return c_curl_pos;
         }
         const parse_WHILE_expr = (i: number): number => {
-            TODO();
+
+            if (i + 1 >= tokens.length || tokens[i + 1]!.type !== TokenType.O_PAREN) {
+                throwError(new TokenParserError(tokens[i]!, 'Expected bracket after FOR keyword'));
+            }
+            let o_paren_pos = i + 1;
+            let c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
+            if (c_paren_pos === -1) {
+                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
+            }
+
+            const condition_tokens = tokens.slice(o_paren_pos + 1, c_paren_pos);
+            context.pushScope();
+
+            if (!condition_tokens.length) {
+                throwError(new TokenParserError(tokens[i]!, 'Expected expression inside WHILE braces'));
+            }
+            const cycle_begin_mark = context.gen_mark();
+            const cycle_end_mark = context.gen_mark();
+            context.addAssembly(`
+                    \r${cycle_begin_mark}:
+                `);
+            const cond_res = new SemicolonExprParser(context, condition_tokens).parse(false);
+            // res - 1 byte value which either $0 or $1
+            context.addAssembly(`
+                    \r #WHILE
+                    \rxor %edx, %edx
+                    \rmovb ${cond_res.stack_addr(context)}(%rsp), %dh
+                    \rcmpb $0, %dh
+                    \rje ${cycle_end_mark}
+                `);
+
+            let o_curl_pos = c_paren_pos + 1, c_curl_pos;
+            if (o_curl_pos >= tokens.length
+                || tokens[o_curl_pos]!.type !== TokenType.O_CURL
+                || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
+                throwError(new TokenParserError(tokens[i]!, `No matching O_CURL found for FOR keyword`));
+            }
+            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), cycle_begin_mark, cycle_end_mark).parse();
+            context.addAssembly(`
+                \rjmp ${cycle_begin_mark}
+                `);
+            context.addAssembly(`
+                    \r${cycle_end_mark}:
+                `);
+            context.popScope();
+            return c_curl_pos;
         }
 
 
@@ -152,6 +197,9 @@ export class CurlExpressionParser {
                         \r${mark_if_true}:
                     `);
             }
+            else if (tokens[i]!.type === TokenType.KWD_ELSE) {
+                throwError(new TokenParserError(tokens[i]!, 'KWD ELSE must be preceeded with IF expression'));
+            }
             else if (tokens[i]!.type === TokenType.KWD_FOR) {
                 i = parse_FOR_expr(i);
             }
@@ -160,13 +208,16 @@ export class CurlExpressionParser {
             }
             else if (tokens[i]!.type === TokenType.KWD_BREAK) {
                 context.addAssembly(`
-                        \rjmp ${this.parent_cycle_end_mark}
+                        \rjmp ${this.parent_cycle_end_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD BREAK can be used only inside CYCLE'))}
                     `);
             }
             else if (tokens[i]!.type === TokenType.KWD_CONTINUE) {
                 context.addAssembly(`
-                        \rjmp ${this.parent_cycle_begin_mark}
+                        \rjmp ${this.parent_cycle_begin_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD CONTINUE can be used only inside CYCLE'))}
                     `);
+            }
+            else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
+                continue;
             }
             else {
                 let j = tokens.slice(i).findIndex((t) => t.type === TokenType.SEMICOLON);

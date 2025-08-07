@@ -219,7 +219,7 @@ export class Lexer {
         }
         if (this.at(this.cursor) === '\'') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal_one(this.cursor, '"');
+            this.iter_while_not_equal_one(this.cursor, '\'');
             if (this.iseof(this.cursor)) {
                 throw new LexerError(this, `Unmatched quota [']`);
             }
@@ -227,7 +227,7 @@ export class Lexer {
                 throw new LexerError(this, `Char Quotas cannot contain underline string length less than 1 [${this.text.substring(this.prev_cursor.count, this.cursor.count + 1)}]`);
             }
             this.iter_cursor(this.cursor, 1);
-            return new Token(this.prev_cursor.clone(), this.text.substring(this.prev_cursor.count, this.cursor.count), TokenType.CHAR_LITERAL);
+            return new Token(this.prev_cursor.clone(), this.text.substring(this.prev_cursor.count + 1, this.cursor.count - 1), TokenType.CHAR_LITERAL);
         }
 
         if (this.is_equal_to_expr(this.cursor, '->')) {
@@ -267,6 +267,25 @@ export class Lexer {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '||', TokenType.OP_DECREMENT);
         }
+
+        if (this.is_equal_to_expr(this.cursor, '+=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT_PLUS);
+        }
+        if (this.is_equal_to_expr(this.cursor, '-=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT_MINUS);
+        }
+        if (this.is_equal_to_expr(this.cursor, '*=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT_MULTIPLY);
+        }
+        if (this.is_equal_to_expr(this.cursor, '/=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT_DIVIDE);
+        }
+
+
         if (this.is_equal_to_expr(this.cursor, '!')) {
             this.iter_cursor(this.cursor, 2);
             return new Token(this.prev_cursor.clone(), '&&', TokenType.OP_NEGATE);
@@ -291,6 +310,10 @@ export class Lexer {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '/', TokenType.OP_DIVIDE);
         }
+        if (this.at(this.cursor) === '%') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '/', TokenType.OP_PERCENT);
+        }
         if (this.at(this.cursor) === '.') {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '.', TokenType.OP_DOT);
@@ -308,10 +331,13 @@ export class Lexer {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '>', TokenType.OP_COMP_GREATER);
         }
+
+
         if (this.at(this.cursor) === '=') {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '=', TokenType.OP_ASSIGNMENT);
         }
+
         if (this.at(this.cursor) === '&') {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '&', TokenType.OP_AMPERSAND);

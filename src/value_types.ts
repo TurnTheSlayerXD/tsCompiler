@@ -15,6 +15,7 @@ export interface ValueType {
     asm_from_minus(context: Context, self: Value, rhs: Value): Value;
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value;
     asm_from_divide(context: Context, self: Value, rhs: Value): Value;
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value;
 
     asm_cmp_less(context: Context, self: Value, rhs: Value): Value;
     asm_cmp_greater(context: Context, self: Value, rhs: Value): Value;
@@ -137,6 +138,8 @@ export class IntType implements ValueType {
 
     private constructor() {
     }
+
+
     asm_to_boolean(context: Context, self: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
         return asm_to_boolean(context, self, CMP_I.cmpl);
@@ -177,21 +180,57 @@ export class IntType implements ValueType {
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
+        if (rhs.valueType instanceof CharType) {
+            context.addAssembly(`
+                    \rmovsbl ${rhs.stack_addr(context)}, %edx
+                    \raddl ${self.stack_addr(context)}, %edx
+                    \rmovl %edx, ${context.pushStack(this.size)}(%rsp)
+                `);
+            return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
+        }
         const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.addl, REG.edx, self, rhs, this.size);
         return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
+        if (rhs.valueType instanceof CharType) {
+            context.addAssembly(`
+                    \rmovsbl ${rhs.stack_addr(context)}(%rsp), %eax
+                    \rmovl ${self.stack_addr(context)}(%rsp), %edx
+                    \rsubl %eax, %edx
+                    \rmovl %edx, ${context.pushStack(this.size)}(%rsp)
+                `);
+            return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
+        }
         const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.subl, REG.edx, self, rhs, this.size);
         return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.imull, REG.edx, self, rhs, this.size);
-        return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
+        context.addAssembly(`
+                    \rmovl ${self.stack_addr(context)}(%rsp), %eax
+                    \rimull ${rhs.stack_addr(context)}(%rsp)
+                    \rmovl %eax, ${context.pushStack(this.size)}(%rsp)
+                `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
-        TODO('asm_from_divide INT');
+        context.addAssembly(`
+                \rmovl ${self.stack_addr(context)}(%rsp), %eax
+                \rcdq
+                \ridivl ${rhs.stack_addr(context)}(%rsp) 
+                \rmovl %eax, ${context.pushStack(this.size)}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
+    }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        context.addAssembly(`
+                \rmovl ${self.stack_addr(context)}(%rsp), %eax
+                \rcdq
+                \ridivl ${rhs.stack_addr(context)}(%rsp) 
+                \rmovl %edx, ${context.pushStack(this.size)}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
 
     isSameType(type: ValueType): boolean {
@@ -247,6 +286,7 @@ export class CharType implements ValueType {
     }
     private constructor() {
     }
+
     get reg_i(): REG {
         return REG.dh;
     }
@@ -275,14 +315,14 @@ export class CharType implements ValueType {
     asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
         context.pushStack(this.size);
         context.addAssembly(`
-            \rmovb $${literal ?? 0} ${context.stackPtr}(%rsp)
+            \rmovb $${literal?.charCodeAt(0) ?? 0} ${context.stackPtr}(%rsp)
             `);
         return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
     }
 
     asm_copy(context: Context, src: Value, dst_self: Value): void {
         dst_self.valueType.isSameType(this) || UNREACHABLE();
-        if (!this.isSameType(src.valueType)) {
+        if (!(src.valueType instanceof CharType) && !this.isSameType(src.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
         const src_addr = src.stack_addr(context);
@@ -302,16 +342,34 @@ export class CharType implements ValueType {
     }
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        self.valueType.isSameType(this) || UNREACHABLE();
+        if (rhs.valueType instanceof IntType) {
+            return rhs.valueType.asm_from_plus(context, rhs, self);
+        }
+        TODO('CHAR PLUS ASM');
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
+        self.valueType.isSameType(this) || UNREACHABLE();
+        if (rhs.valueType instanceof IntType) {
+            return rhs.valueType.asm_from_minus(context, rhs, self);
+        }
+        TODO('CHAR PLUS ASM');
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
     asm_from_divide(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
+    }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        context.addAssembly(`
+                \rmovb ${self.stack_addr(context)}(%rsp), %ax
+                \rcbw
+                \ridivb ${rhs.stack_addr(context)}(%rsp) 
+                \rmovb %dx, ${context.pushStack(this.size)}
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
 
     static getInstance(): CharType {
@@ -339,6 +397,9 @@ export class CharType implements ValueType {
 export class VoidType implements ValueType {
     static instance: VoidType | null = null;
     private constructor() {
+    }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
     }
     asm_to_boolean(context: Context, self: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -417,6 +478,9 @@ export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 
     private constructor(public ptrTo: ValueType) { }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
     get reg_i(): REG {
         return REG.rdx;
     }
@@ -530,16 +594,33 @@ export class PtrType implements ValueType {
         if (!(rhs.valueType instanceof IntType)) {
             throwError(new TypeError(self.pos, `Cannot sum variables of types {${this}} and {${rhs.valueType}}`));
         }
-        const stack_addr = asm_bin_action(context, this.mov_i, BIN_I.addq, REG.rdx, self, rhs, this.size);
-        return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
+        const lhs_addr = self.stack_addr(context);
+        const rhs_addr = rhs.stack_addr(context);
+        context.addAssembly(`
+                \rmovslq ${rhs_addr}(%rsp), %rdx
+                \rimulq $${this.ptrTo.size}, %rdx 
+                \rmovq ${lhs_addr}(%rsp), %rax
+                \raddq %rdx, %rax
+                \rmovq %rax, ${context.pushStack(this.size)}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         if (!(rhs.valueType instanceof IntType)) {
             throwError(new TypeError(self.pos, `Cannot sum variables of types {${this}} and {${rhs.valueType}}`));
         }
-        const stack_addr = asm_bin_action(context, this.mov_i, BIN_I.addq, REG.rdx, self, rhs, this.size);
-        return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
+        const lhs_addr = self.stack_addr(context);
+        const rhs_addr = rhs.stack_addr(context);
+        context.addAssembly(`
+                \rmovslq ${rhs_addr}(%rsp), %rdx
+                \rimulq $${this.ptrTo.size}, %rdx 
+                \rmovq ${lhs_addr}(%rsp), %rax
+                \rsubq %rdx, %rax
+                \rmovq %rax, ${context.pushStack(this.size)}(%rsp)
+            `);
+        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
+
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
@@ -576,6 +657,9 @@ export class FunctionType implements ValueType {
     private static instances: FunctionType[] = [];
 
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
     asm_to_boolean(context: Context, self: Value): Value {
         throw new Error('Method not implemented.');
     }
