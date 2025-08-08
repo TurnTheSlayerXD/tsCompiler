@@ -133,26 +133,26 @@ export class SemicolonExprParser {
             switch (token.type) {
                 case TokenType.OP_ASSIGNMENT_PLUS: {
                     const new_value = l_value.valueType.asm_from_plus(context, l_value, r_value);
-                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MINUS: {
                     const new_value = l_value.valueType.asm_from_minus(context, l_value, r_value);
-                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MULTIPLY: {
                     const new_value = l_value.valueType.asm_from_multiply(context, l_value, r_value);
-                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_DIVIDE: {
                     const new_value = l_value.valueType.asm_from_divide(context, l_value, r_value);
-                    l_value.valueType.asm_copy(context, new_value, l_value);
+                    l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT: {
-                    l_value.valueType.asm_copy(context, r_value, l_value);
+                    l_value.valueType.asm_copy(context, l_value, r_value);
                     return r_value;
                 }
                 default:
@@ -357,7 +357,7 @@ export class SemicolonExprParser {
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
             return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}] [${context.scopeValues}]`));
         }
-        TODO(`${tokens}`);
+        TODO(`${tokens}, len=${tokens.length}`);
     }
 
 }

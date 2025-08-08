@@ -114,3 +114,19 @@ export function iterUntilMatchingBracket<T extends TokenType>(lexer: Lexer, init
 }
 
 
+export function convert_string_to_char_codes(str: string): number[] {
+    const codes: number[] = [];
+    for (let i = 0; i < str.length; ++i) {
+        if (str[i]! === '\\') {
+            i + 1 < str.length || UNREACHABLE();
+            const c = str[i + 1]!;
+            codes.push(c === 'n' ? 10 : c === 't' ? 9 : c === 'r' ? 13 : c === '0' ? 0 : UNREACHABLE());
+            i += 1;
+        }
+        else {
+            codes.push(str.charCodeAt(i));
+        }
+    }
+    console.log(`CODES: ${codes}`);
+    return codes;
+}

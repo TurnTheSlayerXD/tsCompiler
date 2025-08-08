@@ -87,6 +87,10 @@ export const OP_TOKENS = [
     TokenType.OP_AMPERSAND,
     TokenType.OP_ASSIGNMENT,
 
+    TokenType.OP_AND,
+    TokenType.OP_OR,
+    TokenType.OP_NEGATE,
+
 
     TokenType.OP_ASTERISK,
     TokenType.OP_REFERENCE,
