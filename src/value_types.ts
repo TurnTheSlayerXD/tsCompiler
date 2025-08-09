@@ -367,7 +367,6 @@ export class CharType implements ValueType {
         if (!ok) {
             return left.valueType.asm_cmp_not_equal(context, left, right);
         }
-        console.log(`CHAR COMPARE ${self} ${rhs}`)
         return asm_comp_action_b(context, self, rhs, JN_I.jne);
     }
     asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {

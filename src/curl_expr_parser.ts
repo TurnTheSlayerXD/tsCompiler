@@ -79,13 +79,13 @@ export class CurlExpressionParser {
             const cycle_end_mark = context.gen_mark();
 
             context.addAssembly(`
-                    \r${cycle_begin_mark}:
+                    \r  ${cycle_begin_mark}:
                 `);
             if (splitted[1]!.length > 0) {
                 const cond_res = new SemicolonExprParser(context, splitted[1]!).parse(false);
                 // res - 1 byte value which either $0 or $1
                 context.addAssembly(`
-                        \r #FOR
+                        \r      #FOR
                         \rxor %edx, %edx
                         \rmovb ${cond_res.stack_addr(context)}(%rsp), %dh
                         \rcmpb $0, %dh

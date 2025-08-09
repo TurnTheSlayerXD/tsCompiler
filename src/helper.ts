@@ -127,6 +127,5 @@ export function convert_string_to_char_codes(str: string): number[] {
             codes.push(str.charCodeAt(i));
         }
     }
-    console.log(`CODES: ${codes}`);
     return codes;
 }

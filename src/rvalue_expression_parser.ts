@@ -355,7 +355,7 @@ export class SemicolonExprParser {
         }
 
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NAME) {
-            return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}] [${context.scopeValues}]`));
+            return this.context.hasValue(tokens[0]!.text) ?? throwError(new TokenParserError(tokens[0]!, `Using undeclared var name [${tokens[0]!.text}]`));
         }
         TODO(`${tokens}, len=${tokens.length}`);
     }

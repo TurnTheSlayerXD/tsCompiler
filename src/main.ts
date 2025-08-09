@@ -110,17 +110,18 @@ const main = () => {
                                      \r.globl	${new_fun.name}
                                      \r${new_fun.name}:
                                      \r.seh_proc ${new_fun.name}
-                                     \rsubq	$${context.stackPtr}, %rsp
                                      \r`);
 
+                
                 token = lexer.next_token_or_throw();
                 if (token.type === TokenType.O_CURL) {
                     const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
+                    context.pushScope();
                     new CurlExpressionParser(context, tokens, null, null).parse();
+                    context.popScope();
                 }
 
                 context.addAssembly(`\rxor %eax, %eax
-                                     \raddq	$${context.init_stack_offset}, %rsp
 	                                 \rretq
 	                                 \r.seh_endproc
                                      \r`);
