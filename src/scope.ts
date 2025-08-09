@@ -7,3 +7,10 @@ export class Scope {
         public scopeValues: Value[] = [],
         public scopeTypes: ValueType[] = []) { }
 }
+
+
+1000
+992
+500
+
+432

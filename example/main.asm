@@ -133,8 +133,6 @@ _vsnprintf:                             # @_vsnprintf
 	.globl	main                            # -- Begin function main
 	.p2align	4
 main:                                   # @main
-.seh_proc main
-# %bb.0:
 	subq	$32, %rsp
 	.seh_stackalloc 32
 	.seh_endprologue

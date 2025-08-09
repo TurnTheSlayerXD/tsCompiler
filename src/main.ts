@@ -102,7 +102,7 @@ const main = () => {
                     }
                 }
                 const new_fun = new Value(name, FunctionType.getInstance(decl_type, fun_params.map(v => v.valueType)), first_token.pos, -100, AddrType.Stack);
-                context.addScopeValue(new_fun);
+                // context.addScopeValue(new_fun);
 
 
                 context.addAssembly(`\r.def	${new_fun.name};

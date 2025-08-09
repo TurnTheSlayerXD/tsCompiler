@@ -294,12 +294,12 @@ export class SemicolonExprParser {
 
             if (fun_value.name === 'print') {
                 this.context.addAssembly(`
-                        \rmovl  $4294967285, %ecx
-                        \rcallq	*__imp_GetStdHandle(%rip)
-                        \rmovq	%rax, ${context.pushStack(8)}(%rsp)
-                        \rmovl	$0, ${context.pushStack(4)}(%rsp)
-                        \rmovq	${context.stackPtr + 4}(%rsp), %rcx
-                        \rleaq	${context.stackPtr}(%rsp), %r9
+                        \rmovl $4294967285, %ecx
+                        \rcallq *__imp_GetStdHandle(%rip)
+                        \rmovq %rax, ${context.pushStack(8)}(%rsp)
+                        \rmovl $0, ${context.pushStack(4)}(%rsp)
+                        \rmovq ${context.stackPtr + 4}(%rsp), %rcx
+                        \rleaq ${context.stackPtr}(%rsp), %r9
                         `);
 
                 this.context.addAssembly(`
