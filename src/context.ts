@@ -4,6 +4,50 @@ import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } 
 import * as fs from 'fs';
 import { AddrType } from "./value_types"
 import { Scope } from "./scope";
+
+
+
+/**
+ * 
+ * begin_scope1
+ * 
+ * 990
+ * 800
+ * 
+ * end_scope1
+ * 
+ * begin_scope2
+ * 
+ * 1990
+ * 1800
+ * 
+ * 950
+ * 900
+ * 
+ * end_scope2
+ * 
+ * 
+ * begin_scope1 - size = 200
+ * 
+ * 190
+ * 0
+ * 
+ * end_scope1
+ * 
+ * begin_scope2 - size = 100
+ * 
+ * 1990
+ * 1800
+ * 
+ * 50
+ * 0
+ * 
+ * end_scope2
+ * 
+ */
+
+
+
 export class Context {
 
     BUILT_IN_TYPES = {

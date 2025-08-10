@@ -8,9 +8,3 @@ export class Scope {
         public scopeTypes: ValueType[] = []) { }
 }
 
-
-1000
-992
-500
-
-432
