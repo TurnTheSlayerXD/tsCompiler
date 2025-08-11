@@ -117,8 +117,6 @@ export class SemicolonExprParser {
         let { context, tokens } = this;
         // console.log(`${tokens}
         //     ____________\r`);
-
-
         let op_index;
 
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_ASSIGNMENT, TokenType.OP_ASSIGNMENT_PLUS, TokenType.OP_ASSIGNMENT_MINUS, TokenType.OP_ASSIGNMENT_MULTIPLY, TokenType.OP_ASSIGNMENT_DIVIDE], true)) !== -1) {
