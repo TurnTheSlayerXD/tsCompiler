@@ -2,18 +2,14 @@ import { throwError, UNREACHABLE } from "./helper";
 import { Value, ValueType } from "./value_types";
 
 export class Scope {
-    private _used_space: number;
-    public cur_offset = 0;
+    private _used_space: number = 8;
+    public cur_offset = 8;
     constructor(
         public scopeName: string,
         public parentScope: Scope | null,
         public scopeValues: Value[] = [],
         public scopeTypes: ValueType[] = [],
-        used_space = 0,
     ) {
-
-        this._used_space = used_space;
-
     }
 
     get used_space(): number {

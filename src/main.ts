@@ -112,7 +112,7 @@ const main = () => {
                                      \r.seh_proc ${new_fun.name}
                                      \r`);
 
-                
+
                 token = lexer.next_token_or_throw();
                 if (token.type === TokenType.O_CURL) {
                     const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
@@ -121,7 +121,9 @@ const main = () => {
                     context.popScope();
                 }
 
-                context.addAssembly(`\rxor %eax, %eax
+
+                context.addAssembly(`
+                                     \rxor %eax, %eax
 	                                 \rretq
 	                                 \r.seh_endproc
                                      \r`);

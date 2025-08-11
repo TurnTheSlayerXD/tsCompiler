@@ -2,9 +2,12 @@
 
 int main(int argc, char **argv)
 {
-    char *word = "Hello, world";
-    for (char *ptr = word; *ptr != '\0'; ptr += 1)
+    char *word = "Hello, world\n";
+    for (int j = 0; j < 10; j += 1)
     {
-        print(ptr, 1);
+        for (int i = 0; *(word + i) != '\0'; i += 1)
+        {
+            print(word + i, 1);
+        }
     }
 }

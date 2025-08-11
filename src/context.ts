@@ -96,9 +96,10 @@ export class Context {
 
     asmToFile(filename: string) {
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
-        this.optimize_stack_space();
+        fs.writeFileSync('./v1.asm', this.asm);
 
-        fs.writeFileSync(filename, this.asm);
+        this.optimize_stack_space();
+        fs.writeFileSync('./v2.asm', this.asm);
     }
 
     hasTypename(typename: string): ValueType | null {
@@ -228,13 +229,16 @@ export class Context {
                     const ptr_scope = mapped_rsp_scope.get(ptr) ?? UNREACHABLE();
                     const loc = mapped_rsp_loc.get(ptr) ?? UNREACHABLE();
                     if (ptr_scope == scope) {
-                        scope.cur_offset -= loc.size;
-                        loc.own_offset = scope.cur_offset;
-                        Context.replace_rsp_ptr_in_line(lines, l, scope.cur_offset);
+                        if (!loc.own_offset) {
+                            scope.cur_offset -= loc.size;
+                            loc.own_offset = scope.cur_offset;
+                        }
+                        [1, 4, 8].includes(loc.size) || UNREACHABLE();
+                        Context.replace_rsp_ptr_in_line(lines, l, loc.own_offset);
                     }
                     else {
-                        console.log(lines[l]);
                         const dist = scope.get_distance_to(ptr_scope);
+                        (!!loc.own_offset && loc.own_offset >= 0) || UNREACHABLE();
                         Context.replace_rsp_ptr_in_line(lines, l, dist + (loc.own_offset ?? UNREACHABLE()))
                     }
                 }
