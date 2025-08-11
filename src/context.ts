@@ -1,4 +1,4 @@
-import { findIndex, LexerError, ParserError, throwError, TODO } from "./helper";
+import { findIndex, LexerError, ParserError, throwError, TODO, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
@@ -68,9 +68,10 @@ export class Context {
 
     constructor(public lexer: Lexer) { }
 
+    private _stackPtr: number = this.init_stack_offset;
 
     get stackPtr(): number {
-        return this.scopes.at(-1)!.stackPtr;
+        return this._stackPtr;
     }
 
     gen_scope_id(): number {
@@ -78,8 +79,10 @@ export class Context {
     }
 
     pushStack(size: number): number {
-        this.scopes.at(-1)!.stackPtr -= size;
-        return this.scopes.at(-1)!.stackPtr;
+        const scope = this.scopes.at(-1)!;
+        scope.used_space += size;
+        this._stackPtr -= size;
+        return this._stackPtr;
     }
 
     getLiteralsAsm() {
@@ -120,7 +123,12 @@ export class Context {
                 \r#__end_${this.scopes.at(-1)!.scopeName}
             `);
         }
-        this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, this.init_stack_offset));
+        if (this.scopes.length > 0) {
+            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, this.scopes.at(-1)!));
+        }
+        else {
+            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, null));
+        }
         this.addAssembly(`
                 \r#__begin_${this.scopes.at(-1)!.scopeName}
                 \r#__init
@@ -144,55 +152,141 @@ export class Context {
         }
     }
 
-    optimize_stack_space() {
-        const lines = this.asm.split('\n');
-
-        let prev = 0;
-        let begin;
+    *iter_scopes(lines: string[]): Generator<{ scope: Scope, begin: number, end: number }> {
+        let begin, prev = 0;
         while ((begin = findIndex(lines, l => l.startsWith('#__begin_'), prev)) !== -1) {
             let end = findIndex(lines, l => l.startsWith('#__end_'), begin);
             prev = end + 1;
-
             const scope_id = lines[begin]!.split('#__begin_', 2)[1]!;
+            const cur_scope = this.dead_scopes.get(scope_id) ?? UNREACHABLE();
+            yield { scope: cur_scope, begin, end };
+        }
+    }
 
+    static parse_rsp_ptr_from_line(cur_line: string): number {
+        let i = cur_line.indexOf('(%rsp)');
+        i !== -1 || UNREACHABLE();
+        let j = cur_line.lastIndexOf(',', i);
+        j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
+        j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
+        j += 1;
+        const offset = parseInt(cur_line.substring(j, i).trim());
+        !Number.isNaN(offset) || throwError(new Error(`parseInt, line: [${cur_line}]`));
+        return offset;
+    }
+    static replace_rsp_ptr_in_line(lines: string[], c: number, ptr: number): void {
+        const cur_line = lines[c]!;
+        let i = cur_line.indexOf('(%rsp)');
+        i !== -1 || UNREACHABLE();
+        let j = cur_line.lastIndexOf(',', i);
+        j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
+        j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
+        j += 1;
+        lines[c] = `\r${cur_line.substring(0, j)} ${ptr}${cur_line.substring(i)}`;
+    }
 
-            scope_id === lines[end]!.split('#__end_', 2)[1]! || throwError(`Unmatched scopes: ${begin}, ${end}`);
-            const cur_scope = this.dead_scopes.get(scope_id) ?? throwError(`No scope with id: ${scope_id}`);
+    optimize_stack_space() {
+        const lines = this.asm.split('\n');
+        const mapped_rsp_scope = new Map<number, Scope>();
+        const mapped_rsp_loc = new Map<number, { own_offset?: number, size: number }>();
+        for (const { scope, begin, end } of this.iter_scopes(lines)) {
+            lines.slice(begin, end)
+                .filter(l => l.includes('(%rsp)'))
+                .map(cur_line => Context.parse_rsp_ptr_from_line(cur_line))
+                .forEach(rsp => {
+                    if (!mapped_rsp_scope.has(rsp)) {
+                        mapped_rsp_scope.set(rsp, scope)
+                    }
+                });
+        }
 
-            const used_stack_space = String(this.init_stack_offset - cur_scope.stackPtr);
-
-            let i;
-            if ((i = findIndex(lines, (l) => l.startsWith('#__init'), begin, end)) !== -1) {
-                lines[i + 1] = `\rsubq $${used_stack_space}, %rsp`;
-            }
-            if ((i = findIndex(lines, (l) => l.startsWith('#__clear'), begin, end)) !== -1) {
-                lines[i + 1] = `\raddq $${used_stack_space}, %rsp`;
-            }
-
-            for (let c = begin + 2; c < end; ++c) {
-                const cur_line: string = lines[c]!;
-                let i;
-                console.log(c, cur_line);
-
-                if (c === 28) {
-                }
-                if ((i = cur_line.indexOf('(%rsp)')) !== -1) {
-
-                    let j = cur_line.lastIndexOf(',', i);
-                    j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
-                    j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
-                    j += 1;
-                    const offset = parseInt(cur_line.substring(j, i));
-                    !Number.isNaN(offset) || throwError(new Error(`parseInt, line: [${cur_line}]`));
-                    const new_offset = offset - cur_scope.stackPtr;
-                    lines[c] = `${cur_line.substring(0, j)} ${new_offset}${cur_line.substring(i)}`;
-                    prev = c;
+        let lowest_ptr: number = 1000;
+        let ptr: number;
+        for (let i = 0; i < lines.length; ++i) {
+            const l = lines[i]!;
+            if (l.includes('(%rsp)')) {
+                ptr = Context.parse_rsp_ptr_from_line(l);
+                if (ptr < lowest_ptr) {
+                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr });
+                    lowest_ptr = ptr;
                 }
             }
         }
 
+        for (const { scope, begin, end } of this.iter_scopes(lines)) {
+            let i;
+            if ((i = findIndex(lines, (l) => l.startsWith('#__init'), begin, end)) !== -1) {
+                lines[i + 1] = `\rsubq $${scope.used_space}, %rsp`;
+            }
+            if ((i = findIndex(lines, (l) => l.startsWith('#__clear'), begin, end)) !== -1) {
+                lines[i + 1] = `\raddq $${scope.used_space}, %rsp`;
+            }
+
+            for (let l = begin; l < end; ++l) {
+                if (lines[l]!.includes('(%rsp)')) {
+                    const ptr = Context.parse_rsp_ptr_from_line(lines[l]!);
+                    const ptr_scope = mapped_rsp_scope.get(ptr) ?? UNREACHABLE();
+                    const loc = mapped_rsp_loc.get(ptr) ?? UNREACHABLE();
+                    if (ptr_scope == scope) {
+                        scope.cur_offset -= loc.size;
+                        loc.own_offset = scope.cur_offset;
+                        Context.replace_rsp_ptr_in_line(lines, l, scope.cur_offset);
+                    }
+                    else {
+                        console.log(lines[l]);
+                        const dist = scope.get_distance_to(ptr_scope);
+                        Context.replace_rsp_ptr_in_line(lines, l, dist + (loc.own_offset ?? UNREACHABLE()))
+                    }
+                }
+            }
+
+        }
+
         this.asm = lines.join('\n');
     }
+    // let prev = 0;
+    // let begin;
+    // while ((begin = findIndex(lines, l => l.startsWith('#__begin_'), prev)) !== -1) {
+    //     let end = findIndex(lines, l => l.startsWith('#__end_'), begin);
+    //     prev = end + 1;
+
+    //     scope_id === lines[end]!.split('#__end_', 2)[1]! || throwError(`Unmatched scopes: ${begin}, ${end}`);
+    //     const cur_scope = this.dead_scopes.get(scope_id) ?? throwError(`No scope with id: ${scope_id}`);
+
+    //     const used_stack_space = String(this.init_stack_offset - cur_scope.stackPtr);
+
+    //     let i;
+    //     if ((i = findIndex(lines, (l) => l.startsWith('#__init'), begin, end)) !== -1) {
+    //         lines[i + 1] = `\rsubq $${used_stack_space}, %rsp`;
+    //     }
+    //     if ((i = findIndex(lines, (l) => l.startsWith('#__clear'), begin, end)) !== -1) {
+    //         lines[i + 1] = `\raddq $${used_stack_space}, %rsp`;
+    //     }
+
+    //     for (let c = begin + 2; c < end; ++c) {
+    //         const cur_line: string = lines[c]!;
+    //         let i;
+    //         console.log(c, cur_line);
+
+    //         if (c === 28) {
+    //         }
+    //         if ((i = cur_line.indexOf('(%rsp)')) !== -1) {
+
+    //             let j = cur_line.lastIndexOf(',', i);
+    //             j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
+    //             j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
+    //             j += 1;
+    //             const offset = parseInt(cur_line.substring(j, i));
+    //             !Number.isNaN(offset) || throwError(new Error(`parseInt, line: [${cur_line}]`));
+    //             const new_offset = offset - cur_scope.stackPtr;
+    //             lines[c] = `${cur_line.substring(0, j)} ${new_offset}${cur_line.substring(i)}`;
+    //             prev = c;
+    //         }
+    //     }
+    // }
+
+    // this.asm = lines.join('\n');
+
 
 
     addScopeType() {
