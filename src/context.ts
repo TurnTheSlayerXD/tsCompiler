@@ -5,49 +5,6 @@ import * as fs from 'fs';
 import { AddrType } from "./value_types"
 import { Scope } from "./scope";
 
-
-
-/**
- * 
- * begin_scope1
- * 
- * 990
- * 800
- * 
- * end_scope1
- * 
- * begin_scope2
- * 
- * 1990
- * 1800
- * 
- * 950
- * 900
- * 
- * end_scope2
- * 
- * 
- * begin_scope1 - size = 200
- * 
- * 190
- * 0
- * 
- * end_scope1
- * 
- * begin_scope2 - size = 100
- * 
- * 1990
- * 1800
- * 
- * 50
- * 0
- * 
- * end_scope2
- * 
- */
-
-
-
 export class Context {
 
     BUILT_IN_TYPES = {
@@ -248,50 +205,6 @@ export class Context {
 
         this.asm = lines.join('\n');
     }
-    // let prev = 0;
-    // let begin;
-    // while ((begin = findIndex(lines, l => l.startsWith('#__begin_'), prev)) !== -1) {
-    //     let end = findIndex(lines, l => l.startsWith('#__end_'), begin);
-    //     prev = end + 1;
-
-    //     scope_id === lines[end]!.split('#__end_', 2)[1]! || throwError(`Unmatched scopes: ${begin}, ${end}`);
-    //     const cur_scope = this.dead_scopes.get(scope_id) ?? throwError(`No scope with id: ${scope_id}`);
-
-    //     const used_stack_space = String(this.init_stack_offset - cur_scope.stackPtr);
-
-    //     let i;
-    //     if ((i = findIndex(lines, (l) => l.startsWith('#__init'), begin, end)) !== -1) {
-    //         lines[i + 1] = `\rsubq $${used_stack_space}, %rsp`;
-    //     }
-    //     if ((i = findIndex(lines, (l) => l.startsWith('#__clear'), begin, end)) !== -1) {
-    //         lines[i + 1] = `\raddq $${used_stack_space}, %rsp`;
-    //     }
-
-    //     for (let c = begin + 2; c < end; ++c) {
-    //         const cur_line: string = lines[c]!;
-    //         let i;
-    //         console.log(c, cur_line);
-
-    //         if (c === 28) {
-    //         }
-    //         if ((i = cur_line.indexOf('(%rsp)')) !== -1) {
-
-    //             let j = cur_line.lastIndexOf(',', i);
-    //             j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
-    //             j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
-    //             j += 1;
-    //             const offset = parseInt(cur_line.substring(j, i));
-    //             !Number.isNaN(offset) || throwError(new Error(`parseInt, line: [${cur_line}]`));
-    //             const new_offset = offset - cur_scope.stackPtr;
-    //             lines[c] = `${cur_line.substring(0, j)} ${new_offset}${cur_line.substring(i)}`;
-    //             prev = c;
-    //         }
-    //     }
-    // }
-
-    // this.asm = lines.join('\n');
-
-
 
     addScopeType() {
         TODO();
