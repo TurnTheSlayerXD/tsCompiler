@@ -439,7 +439,7 @@ export class CharType implements ValueType {
         } else {
             context.addAssembly(`
                 \rmovb ${src_addr}(%rsp), %dh
-                \rmovb %duh, ${dst_addr}(%rsp)
+                \rmovb %dh, ${dst_addr}(%rsp)
             `);
         }
     }

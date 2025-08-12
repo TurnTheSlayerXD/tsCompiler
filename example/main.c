@@ -2,12 +2,15 @@
 
 int main(int argc, char **argv)
 {
-    char *word = "Hello, world\n";
-    for (int j = 0; j < 10; j += 1)
+    for (int i = 1; i < argc; i += 1)
     {
-        for (int i = 0; *(word + i) != '\0'; i += 1)
+        int count = 0;
+        for (char *t = *(argv + i); *t != '\0'; t += 1)
         {
-            print(word + i, 1);
+            count += 1;
         }
+        char num = '0' + count;
+        print(&num, 1);
+        print("\n", 1);
     }
 }

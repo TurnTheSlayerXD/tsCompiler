@@ -1,36 +1,52 @@
 import { Context } from "./context";
-import { throwError, TokenParserError } from "./helper";
+import { throwError, TODO, TokenParserError } from "./helper";
 import { Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { PtrType, ValueType } from "./value_types";
 
 export function parse_type_from_tokens(context: Context, tokens: Token[]): ValueType {
-    let i = 0;
     let type: ValueType | null;
     let isConst = false;
-    while (i < tokens.length && tokens[i]!.type === TokenType.KWD_CONST) {
+    const iter = tokens.values();
+    let iter_out: IteratorResult<Token>;
+    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
         isConst = true;
-        ++i;
     }
-    if (i >= tokens.length) {
+    if (iter_out.done) {
         throwError(new TokenParserError(tokens.at(-1)!, `No type declared except keyword CONST`));
     }
-    if (!(type = context.hasTypename(tokens[i]!.text))) {
-        throwError(new TokenParserError(tokens[i]!, `Unknown VALUE TYPE: [${tokens[i]!.text}]`));
+    if (!(type = context.hasTypename(iter_out.value.text))) {
+        throwError(new TokenParserError(iter_out.value, `Unknown VALUE TYPE: [${iter_out.value.text}]`));
     }
-    ++i;
-    while (i < tokens.length && tokens[i]!.type === TokenType.KWD_CONST) {
+    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
         isConst = true;
-        ++i;
     }
     type.is_const = isConst;
-    while (i < tokens.length && (tokens[i]!.type === TokenType.OP_ASTERISK || tokens[i]!.type === TokenType.OP_DEREFERENCE)) {
+    while (!iter_out.done && (iter_out.value.type === TokenType.OP_ASTERISK || iter_out.value.type === TokenType.OP_DEREFERENCE)) {
         type = PtrType.getInstance(type);
-        ++i;
-        while (i < tokens.length && tokens[i]!.type === TokenType.KWD_CONST) {
+        while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
             type.is_const = true;
-            ++i;
         }
     }
     return type;
+}
+
+export function parse_declaration_from_tokens(context: Context, tokens: Token[]): { type: ValueType, name: string } {
+    if (tokens.length === 0) {
+        throwError(new Error('Expected lvalue expression'));
+    }
+    if (tokens.at(-1)!.type !== TokenType.NAME) {
+        throwError(new Error('Expected variable name in lvalue expression'));
+    }
+    const value_name = tokens.at(-1)!.text;
+    let typename;
+    if (tokens.length >= 2 && tokens[0]!.type === TokenType.NAME && !!(typename = context.hasTypename(tokens[0]!.text))) {
+        // then it is declaration of variable
+        if (!!context.hasValue(value_name)) {
+            throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));
+        }
+        const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
+        return { type: value_type, name: value_name };
+    }
+    TODO();
 }
