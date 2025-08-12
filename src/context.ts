@@ -1,4 +1,4 @@
-import { findIndex, LexerError, ParserError, throwError, TODO, UNREACHABLE } from "./helper";
+import { findIndex, LexerError, ParserError, RulesError, throwError, TODO, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
@@ -12,11 +12,15 @@ export class Context {
         char: CharType.constructor,
     };
 
+    public cur_function: Value | null = null;
+
     private literals: string[] = [];
     private asm: string = '';
     private dead_scopes = new Map<string, Scope>();
     private mark_num = 0;
     private scope_id: number = 0;
+
+    private globals: Value[] = [];
 
     public subq_expr_stack_positions: number[] = [];
     public init_stack_offset = 1000;
@@ -34,6 +38,8 @@ export class Context {
     gen_scope_id(): number {
         return this.scope_id++;
     }
+
+
 
     pushStack(size: number): number {
         const scope = this.scopes.at(-1)!;
@@ -94,11 +100,15 @@ export class Context {
             `);
     }
 
+    emitPopStackExpr() {
+        this.addAssembly(`
+            \raddq $${this.init_stack_offset}, %rsp
+        `);
+    }
 
     popScope() {
+        this.emitPopStackExpr();
         this.addAssembly(`
-            \r#__clear
-            \raddq $${this.init_stack_offset}, %rsp
             \r#__end_${this.scopes.at(-1)!.scopeName}
         `);
         const popped = this.scopes.pop()!;
@@ -215,6 +225,9 @@ export class Context {
     }
 
     addScopeValue(value: Value) {
+        if (this.scopes.length === 0) {
+            throwError(new Error(`Trying to access scope though it does not exist: ${value.pos}`));
+        }
         const scope = this.scopes.at(-1)!;
         if (scope.scopeValues.find(v => v.name === value.name)) {
             throwError(new Error(`Pushing scope with existing name[${value.name}]`));
@@ -245,6 +258,10 @@ export class Context {
                 return val;
             }
         }
+        let i;
+        if ((i = this.globals.findIndex(v => v.name === name)) !== -1) {
+            return this.globals[i]!;
+        }
         return null;
     }
 
@@ -256,8 +273,7 @@ export class Context {
         const value = this.hasValueOrThrow(name);
         const expected = value.valueType;
         const found = type;
-        return value;
-        // return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${ expected }, found ${ found } `));
+        return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found} `));
     }
 
     get mark() {
@@ -268,6 +284,12 @@ export class Context {
         return `mark_${this.mark_num++} `;
     }
 
+    addGlobalValue(value: Value) {
+        if (this.globals.some(v => v.name === value.name)) {
+            throwError(new RulesError(value.pos, `Pushing GLObal scope with existing value: ${value}`));
+        }
+        this.globals.push(value);
+    }
 }
 
 

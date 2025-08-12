@@ -1,9 +1,10 @@
 import { Context } from "./context";
-import { getMatchingBracket, splitBy, throwError, TODO, TokenParserError } from "./helper";
+import { get_rax_i } from "./converter";
+import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserError } from "./helper";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 import { TokenType } from "./token_type";
-import { Value } from "./value_types";
+import { MOV_I, REG_I, Value } from "./value_types";
 
 export class CurlExpressionParser {
 
@@ -46,11 +47,10 @@ export class CurlExpressionParser {
                 throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
             }
             new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), this.parent_cycle_begin_mark, this.parent_cycle_end_mark).parse();
+            context.popScope();
             context.addAssembly(`
                 \rjmp ${mark_if_true}
                 `);
-            context.popScope();
-
             return c_curl_pos;
         };
 
@@ -215,6 +215,35 @@ export class CurlExpressionParser {
                 context.addAssembly(`
                         \rjmp ${this.parent_cycle_begin_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD CONTINUE can be used only inside CYCLE'))}
                     `);
+            }
+            else if (tokens[i]!.type === TokenType.KWD_RETURN) {
+                let semi_pos = findIndex(tokens, t => t.type === TokenType.SEMICOLON, i);
+                if (semi_pos === -1) {
+                    throwError(new TokenParserError(tokens[i]!, `Expected SEMICOLON after expression`));
+                }
+                if (semi_pos === i + 1) {
+                    return null;
+                }
+                const res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse(false);
+                const [reg, mov] = get_rax_i(res.valueType.size);
+                context.addAssembly(`
+                        \r${MOV_I[mov]} ${res.stack_addr(context)}(%rsp), %${REG_I[reg]} 
+                    `);
+                context.emitPopStackExpr();
+                const { cur_function } = context;
+                if (!cur_function) {
+                    throwError(new TokenParserError(tokens[i]!, 'Unexpected KWD_RETURN as not in function'));
+                }
+                if (cur_function.name === 'main') {
+                    context.addAssembly(`
+                        \rxor %rax, %rax
+                        \rretq
+                    `);
+                } else {
+                    context.addAssembly(`
+                        \rretq
+                    `);
+                }
             }
             else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
                 continue;

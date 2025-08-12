@@ -1,5 +1,5 @@
 import { Context } from './context';
-import { convert_values } from './converter';
+import { are_converible_types, convert_values } from './converter';
 import { convert_string_to_char_codes, ParserError, RulesError, throwError, TODO, TokenParserError, TypeError, UNREACHABLE } from './helper';
 import { Position } from './lexer';
 
@@ -28,18 +28,18 @@ export interface ValueType {
 
     asm_to_boolean(context: Context, self: Value): Value;
 
-    get reg_i(): REG;
+    get reg_i(): REG_I;
     get mov_i(): MOV_I;
 }
 
-enum MOV_I {
+export enum MOV_I {
     movl,
     movr,
     movb,
     movq,
 }
 
-enum BIN_I {
+export enum BIN_I {
     addb,
     addl,
     addq,
@@ -56,7 +56,7 @@ enum BIN_I {
     idivl,
     idivq,
 }
-enum REG {
+export enum REG_I {
     ax,
     al,
     eax,
@@ -66,9 +66,15 @@ enum REG {
     dh,
     edx,
     rdx,
+
+    cx,
+    ch,
+    ecx,
+    rcx
 }
 
-enum CMP_I {
+
+export enum CMP_I {
     cmpl,
     cmpq,
     cmpb
@@ -76,7 +82,7 @@ enum CMP_I {
 
 
 function asm_div_action(context: Context, mov: MOV_I, div: BIN_I,
-    eax: REG, edx: REG, ecx: REG, ebx: REG,
+    eax: REG_I, edx: REG_I, ecx: REG_I, ebx: REG_I,
     lhs: Value, rhs: Value, size: number) {
     TODO('DIVISION');
 }
@@ -94,13 +100,13 @@ function asm_to_boolean(context: Context, self: Value, cmp_i: CMP_I): Value {
     return new Value('_temp', CharType.getInstance(), self.pos, result_addr, AddrType.Stack);
 }
 
-function asm_bin_action(context: Context, mov: MOV_I, act: BIN_I, reg: REG, lhs: Value, rhs: Value, size: number): number {
+function asm_bin_action(context: Context, mov: MOV_I, act: BIN_I, reg: REG_I, lhs: Value, rhs: Value, size: number): number {
     const lhs_addr = lhs.stack_addr(context);
     const rhs_addr = rhs.stack_addr(context);
     context.addAssembly(`
-                \r${MOV_I[mov]} ${lhs_addr}(%rsp), %${REG[reg]}
-                \r${BIN_I[act]} ${rhs_addr}(%rsp), %${REG[reg]}
-                \r${MOV_I[mov]} %${REG[reg]}, ${context.pushStack(size)}(%rsp) 
+                \r${MOV_I[mov]} ${lhs_addr}(%rsp), %${REG_I[reg]}
+                \r${BIN_I[act]} ${rhs_addr}(%rsp), %${REG_I[reg]}
+                \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(size)}(%rsp) 
             `);
     return context.stackPtr;
 }
@@ -182,8 +188,8 @@ export class IntType implements ValueType {
         self.valueType.isSameType(this) || UNREACHABLE();
         return asm_to_boolean(context, self, CMP_I.cmpl);
     }
-    get reg_i(): REG {
-        return REG.edx;
+    get reg_i(): REG_I {
+        return REG_I.edx;
     }
     get size(): number {
         return 4;
@@ -246,7 +252,7 @@ export class IntType implements ValueType {
         if (!ok) {
             return left.valueType.asm_from_plus(context, left, right);
         }
-        const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.addl, REG.edx, self, rhs, this.size);
+        const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.addl, REG_I.edx, self, rhs, this.size);
         return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
@@ -255,7 +261,7 @@ export class IntType implements ValueType {
         if (!ok) {
             return left.valueType.asm_from_minus(context, left, right);
         }
-        const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.subl, REG.edx, self, rhs, this.size);
+        const stack_addr = asm_bin_action(context, MOV_I.movl, BIN_I.subl, REG_I.edx, self, rhs, this.size);
         return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
@@ -324,7 +330,7 @@ export class IntType implements ValueType {
     }
     asm_copy(context: Context, dst: Value, src: Value): void {
         dst.valueType.isSameType(this) || UNREACHABLE();
-        if (!this.isSameType(src.valueType)) {
+        if (!are_converible_types(src.valueType, dst.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
         const src_addr = src.stack_addr(context);
@@ -354,8 +360,8 @@ export class CharType implements ValueType {
     private constructor() {
     }
 
-    get reg_i(): REG {
-        return REG.dh;
+    get reg_i(): REG_I {
+        return REG_I.dh;
     }
     asm_to_boolean(context: Context, self: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
@@ -425,7 +431,7 @@ export class CharType implements ValueType {
 
     asm_copy(context: Context, dst: Value, src: Value): void {
         dst.valueType.isSameType(this) || UNREACHABLE();
-        if (!this.isSameType(src.valueType) && !IntType.getInstance().isSameType(src.valueType)) {
+        if (!are_converible_types(src.valueType, dst.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
         const src_addr = src.stack_addr(context);
@@ -508,7 +514,7 @@ export class VoidType implements ValueType {
         self.valueType.isSameType(this) || UNREACHABLE();
         TODO();
     }
-    get reg_i(): REG {
+    get reg_i(): REG_I {
         throw new Error('Method not implemented.');
     }
     get mov_i(): MOV_I {
@@ -584,8 +590,8 @@ export class PtrType implements ValueType {
     asm_from_percent(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    get reg_i(): REG {
-        return REG.rdx;
+    get reg_i(): REG_I {
+        return REG_I.rdx;
     }
     get mov_i(): MOV_I {
         return MOV_I.movq;
@@ -669,8 +675,8 @@ export class PtrType implements ValueType {
         }
         context.addAssembly(`
             \rmovq ${self.real_addr}(%rsp), %rax
-            \r${MOV_I[this.ptrTo.mov_i]} (%rax), %${REG[this.ptrTo.reg_i]} 
-            \r${MOV_I[this.ptrTo.mov_i]} %${REG[this.ptrTo.reg_i]}, ${context.pushStack(this.ptrTo.size)}(%rsp)
+            \r${MOV_I[this.ptrTo.mov_i]} (%rax), %${REG_I[this.ptrTo.reg_i]} 
+            \r${MOV_I[this.ptrTo.mov_i]} %${REG_I[this.ptrTo.reg_i]}, ${context.pushStack(this.ptrTo.size)}(%rsp)
         `)
         return new Value('_temp', this.ptrTo, self.pos, context.stackPtr, AddrType.Stack);
     }
@@ -703,7 +709,7 @@ export class PtrType implements ValueType {
     }
     asm_copy(context: Context, dst: Value, src: Value): void {
         dst.valueType.isSameType(this) || UNREACHABLE();
-        if (!this.isSameType(src.valueType)) {
+        if (!are_converible_types(src.valueType, dst.valueType)) {
             throwError(new TypeError(src.pos, `Can't convert ${src.valueType} to ${this.toString()}`));
         }
         const src_addr = src.stack_addr(context);
@@ -796,7 +802,7 @@ export class FunctionType implements ValueType {
     asm_to_boolean(context: Context, self: Value): Value {
         throw new Error('Method not implemented.');
     }
-    get reg_i(): REG {
+    get reg_i(): REG_I {
         throw new Error('Method not implemented.');
     }
     asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
@@ -896,8 +902,8 @@ export class Value {
         if (this.addr_type === AddrType.Indirect) {
             context.addAssembly(`
                 \rmovq ${this._address}(%rsp), %rax
-                \rmovl (%rax), %${REG[this.valueType.reg_i]}
-                \rmovl %${REG[this.valueType.reg_i]}, ${context.pushStack(this.valueType.size)}(%rsp)
+                \rmovl (%rax), %${REG_I[this.valueType.reg_i]}
+                \rmovl %${REG_I[this.valueType.reg_i]}, ${context.pushStack(this.valueType.size)}(%rsp)
             `);
             return context.stackPtr;
         } else {

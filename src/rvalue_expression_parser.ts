@@ -1,9 +1,10 @@
 import { Context } from "./context";
+import { get_rax_i } from "./converter";
 import { getMatchingBracket, splitBy, throwError, TokenParserError, TODO, ParserError, RulesError } from "./helper";
 import { Position, Token } from "./lexer";
 import { is_op_token_type, OP_TOKENS, TokenType } from "./token_type";
 import { parse_type_from_tokens } from "./type_parsing";
-import { Value, FunctionType, VoidType, IntType, PtrType, CharType, ValueType, AddrType } from "./value_types";
+import { Value, FunctionType, VoidType, IntType, PtrType, CharType, ValueType, AddrType, MOV_I, REG_I } from "./value_types";
 
 
 export class SemicolonExprParser {
@@ -287,8 +288,12 @@ export class SemicolonExprParser {
             const params = splitted.map(s => new SemicolonExprParser(this.context, s).parse(false)
                 ?? throwError(new TokenParserError(tokens[0]!, "Void params are not allowed")));
 
-            const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));
-            const fun_value = context.getValueWithTypeOrThrow(fun_name, actual_type);
+            // const actual_type = FunctionType.getInstance(VoidType.getInstance(), params.map(p => p.valueType));
+            // const fun_value = context.getValueWithTypeOrThrow(fun_name, actual_type);
+            const fun_value = context.hasValueOrThrow(fun_name);
+            if (!(fun_value.valueType instanceof FunctionType)) {
+                throwError(new TokenParserError(tokens[0]!, `Calling not callable obj [${fun_value}]`));
+            }
 
             if (fun_value.name === 'print') {
                 this.context.addAssembly(`
@@ -311,31 +316,30 @@ export class SemicolonExprParser {
                     `);
                 return new Value('_temp', VoidType.getInstance(), tokens[0]!.pos, null, AddrType.Indirect);
             }
-            else if (fun_value.name === 'print_int') {
-                this.context.addAssembly(`
-                    \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rcx
-                `);
-
-                if (params[1]!.addr_type === AddrType.Indirect) {
-                    this.context.addAssembly(`
-                        \rmovq	${params[1]!.stack_addr(context)}(%rsp), %rax
-                        \rmovl	(%rax), %edx
-                    `);
-                }
-                else {
-                    this.context.addAssembly(`
-                        \rmovl	${params[1]!.stack_addr(context)}(%rsp), %edx
-                    `);
-                }
-
-                this.context.addAssembly(`
-                        \rcallq	printf
-                    `);
-
-                return new Value('_temp', VoidType.getInstance(), tokens[0]!.pos, null, AddrType.Indirect);
-            }
             else {
-                TODO();
+                let in_stack: Value;
+                const { paramTypes } = fun_value.valueType;
+                if (paramTypes.length !== params.length) {
+                    throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
+                }
+                for (let i = 0; i < paramTypes.length; ++i) {
+                    in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos);
+                    in_stack.valueType.asm_copy(context, in_stack, params[i]!);
+                }
+                if (params.length > 0) {
+                    context.addAssembly(`
+                        \r#__parameter_offset_pass
+                        \rleaq ${in_stack!.stack_addr(context)}(%rsp), %rcx
+                    `);
+                }
+                context.addAssembly(`
+                        \rcallq ${fun_name}
+                    `);
+                const [reg, mov] = get_rax_i(fun_value.valueType.returnType.size);
+                context.addAssembly(`   
+                        \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_value.valueType.returnType.size)}(%rsp)
+                    `);
+                return new Value('_temp', fun_value.valueType.returnType, tokens[0]!.pos, context.stackPtr, AddrType.Stack);
             }
         }
         if (tokens.length === 1 && tokens[0]!.type === TokenType.NUM_INT) {

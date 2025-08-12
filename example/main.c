@@ -1,16 +1,17 @@
 #include <stdio.h>
 
+int fuu(int a, int b, int c)
+{
+    if (a == 1)
+    {
+        return 0;
+    }
+
+    return a + b + c;
+}
+
 int main(int argc, char **argv)
 {
-    for (int i = 1; i < argc; i += 1)
-    {
-        int count = 0;
-        for (char *t = *(argv + i); *t != '\0'; t += 1)
-        {
-            count += 1;
-        }
-        char num = '0' + count;
-        print(&num, 1);
-        print("\n", 1);
-    }
+    char res = fuu(1, 2, 3) - 6 + '1';
+    print(&res, 1);
 }

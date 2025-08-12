@@ -130,7 +130,7 @@ export function convert_string_to_char_codes(str: string): number[] {
     return codes;
 }
 
-export function findIndex<T>(arr: Array<T>, predicate: (arg: T) => boolean, start_pos: number=0, end_pos: number|undefined=undefined): number {
+export function findIndex<T>(arr: Array<T>, predicate: (arg: T) => boolean, start_pos: number = 0, end_pos: number | undefined = undefined): number {
     end_pos = end_pos ?? arr.length;
     for (let i = start_pos; i < end_pos; ++i) {
         if (predicate(arr[i]!)) {

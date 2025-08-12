@@ -5,7 +5,8 @@ import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError,
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { AddrType, CharType, FunctionType, IntType, PtrType, Value } from "./value_types";
+import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I, Value } from "./value_types";
+import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 
 
 const main = () => {
@@ -56,47 +57,59 @@ const main = () => {
                 const fun_params = splitted_params.map(p => parse_declaration_from_tokens(context, p));
                 const fun_value = new Value(fun_name, FunctionType.getInstance(fun_return_type, fun_params.map(v => v.type)), token.pos, -100, AddrType.Stack);
 
+
                 context.addAssembly(`\r.def	${fun_value.name};
                                      \r.endef
                                      \r.globl	${fun_value.name}
                                      \r${fun_value.name}:
                                      \r.seh_proc ${fun_value.name}
                                      \r`);
+                context.addGlobalValue(fun_value);
                 context.pushScope();
-
                 if (fun_value.name === 'main' && fun_params.length > 0) {
                     if (fun_params.length !== 2
                         || !fun_params[0]!.type.isSameType(IntType.getInstance())
                         || !fun_params[1]!.type.isSameType(PtrType.getInstance(PtrType.getInstance(CharType.getInstance())))) {
                         throwError(new ParserError(lexer, `Expected [int, char**] param types in main declaration or no params at all\nFound: ${fun_params.map(p => p.type).join(', ')}`));
                     }
-
-
                     context.addAssembly(`
                             \rmovl %ecx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
                         `);
                     context.addScopeValue(new Value(fun_params[0]!.name, IntType.getInstance(), token_params[0]!.pos, context.stackPtr, AddrType.Stack));
-
                     context.addAssembly(`
                             \rmovq %rdx, ${context.pushStack(fun_params[1]!.type.size)}(%rsp)
                         `);
                     context.addScopeValue(new Value(fun_params[1]!.name, PtrType.getInstance(PtrType.getInstance(CharType.getInstance())), token_params[1]!.pos, context.stackPtr, AddrType.Stack));
-
                 }
-
+                else {
+                    let offset = 0;
+                    for (const param of fun_params.reverse()) {
+                        const val = new Value(param.name, param.type, token.pos, context.pushStack(param.type.size), AddrType.Stack);
+                        context.addScopeValue(val);
+                        const [reg_c, mov] = get_rcx_i(param.type.size);
+                        const [reg_d, _] = get_rdx_i(param.type.size);
+                        context.addAssembly(`
+                                \r${MOV_I[mov]} ${offset}(%rcx), %${REG_I[reg_d]}                                
+                                \r${MOV_I[mov]} %${REG_I[reg_d]}, ${val.real_addr}(%rsp)                               
+                            `);
+                        offset += param.type.size;
+                    }
+                }
+                const last_scope = context.scopes.at(-1);
                 token = lexer.next_token_or_throw();
+                context.cur_function = fun_value;
                 if (token.type === TokenType.O_CURL) {
                     const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
                     new CurlExpressionParser(context, tokens, null, null).parse();
                 }
-
-                context.popScope();
-                context.addAssembly(`
+                if (last_scope == context.scopes.at(-1)) {
+                    context.popScope();
+                    context.addAssembly(`
                                      \rxor %eax, %eax
 	                                 \rretq
 	                                 \r.seh_endproc
-                                     \r`);
-
+                                     `);
+                }
             }
             else if (token.type === TokenType.SEMICOLON) {
                 TODO();
