@@ -22,7 +22,6 @@ export class CurlExpressionParser {
             let o_paren_pos;
             let c_paren_pos = i;
             let token = tokens[i]!;
-            context.pushScope();
             if (with_condition) {
                 o_paren_pos = i + 1;
                 if (o_paren_pos >= tokens.length
@@ -40,6 +39,7 @@ export class CurlExpressionParser {
                         \rje ${mark_if_false}
                 `);
             }
+            context.pushScope();
             let o_curl_pos = c_paren_pos + 1, c_curl_pos;
             if (o_curl_pos >= tokens.length
                 || tokens[o_curl_pos]!.type !== TokenType.O_CURL
@@ -229,11 +229,12 @@ export class CurlExpressionParser {
                 context.addAssembly(`
                         \r${MOV_I[mov]} ${res.stack_addr(context)}(%rsp), %${REG_I[reg]} 
                     `);
-                context.emitPopStackExpr();
+                context.clearAllStacks();
                 const { cur_function } = context;
                 if (!cur_function) {
                     throwError(new TokenParserError(tokens[i]!, 'Unexpected KWD_RETURN as not in function'));
                 }
+
                 if (cur_function.name === 'main') {
                     context.addAssembly(`
                         \rxor %rax, %rax
@@ -244,6 +245,7 @@ export class CurlExpressionParser {
                         \rretq
                     `);
                 }
+                i = semi_pos;
             }
             else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
                 continue;

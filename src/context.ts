@@ -1,4 +1,4 @@
-import { findIndex, LexerError, ParserError, RulesError, throwError, TODO, UNREACHABLE } from "./helper";
+import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
 import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
@@ -95,20 +95,24 @@ export class Context {
         }
         this.addAssembly(`
                 \r#__begin_${this.scopes.at(-1)!.scopeName}
-                \r#__init
+                \r#__init_${this.scopes.at(-1)!.scopeName}
                 \rsubq $${this.init_stack_offset}, %rsp
             `);
     }
 
-    emitPopStackExpr() {
-        this.addAssembly(`
+    clearAllStacks() {
+        for (let i = this.scopes.length - 1; i > -1; --i) {
+            this.addAssembly(`
+            \r#__clear_${this.scopes[i]!.scopeName}
             \raddq $${this.init_stack_offset}, %rsp
         `);
+        }
     }
 
     popScope() {
-        this.emitPopStackExpr();
         this.addAssembly(`
+            \r#__clear_${this.scopes.at(-1)!.scopeName}
+            \raddq $${this.init_stack_offset}, %rsp
             \r#__end_${this.scopes.at(-1)!.scopeName}
         `);
         const popped = this.scopes.pop()!;
@@ -182,14 +186,6 @@ export class Context {
         }
 
         for (const { scope, begin, end } of this.iter_scopes(lines)) {
-            let i;
-            if ((i = findIndex(lines, (l) => l.startsWith('#__init'), begin, end)) !== -1) {
-                lines[i + 1] = `\rsubq $${scope.used_space}, %rsp`;
-            }
-            if ((i = findIndex(lines, (l) => l.startsWith('#__clear'), begin, end)) !== -1) {
-                lines[i + 1] = `\raddq $${scope.used_space}, %rsp`;
-            }
-
             for (let l = begin; l < end; ++l) {
                 if (lines[l]!.includes('(%rsp)')) {
                     const ptr = Context.parse_rsp_ptr_from_line(lines[l]!);
@@ -210,8 +206,19 @@ export class Context {
                     }
                 }
             }
-
         }
+
+        for (const i of filterIndexes(lines, l => l.startsWith('#__init_'))) {
+            const scope_name = lines[i]!.split('#__init_', 2)[1]!;
+            const scope = this.dead_scopes.get(scope_name) ?? UNREACHABLE();
+            lines[i + 1] = `subq $${scope.used_space}, %rsp`;
+        }
+        for (const i of filterIndexes(lines, l => l.startsWith('#__clear_'))) {
+            const scope_name = lines[i]!.split('#__clear_', 2)[1]!;
+            const scope = this.dead_scopes.get(scope_name) ?? UNREACHABLE();
+            lines[i + 1] = `addq $${scope.used_space}, %rsp`;
+        }
+
 
         this.asm = lines.join('\n');
     }
@@ -289,6 +296,10 @@ export class Context {
             throwError(new RulesError(value.pos, `Pushing GLObal scope with existing value: ${value}`));
         }
         this.globals.push(value);
+    }
+
+    ends_with_retq(): boolean {
+        return this.asm.replaceAll('\n', ' ').trimEnd().endsWith('retq');
     }
 }
 

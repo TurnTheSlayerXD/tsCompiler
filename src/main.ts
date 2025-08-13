@@ -95,21 +95,30 @@ const main = () => {
                         offset += param.type.size;
                     }
                 }
-                const last_scope = context.scopes.at(-1);
                 token = lexer.next_token_or_throw();
                 context.cur_function = fun_value;
                 if (token.type === TokenType.O_CURL) {
                     const tokens = iterUntilMatchingBracket(lexer, token, TokenType.O_CURL, TokenType.C_CURL);
                     new CurlExpressionParser(context, tokens, null, null).parse();
                 }
-                if (last_scope == context.scopes.at(-1)) {
-                    context.popScope();
-                    context.addAssembly(`
-                                     \rxor %eax, %eax
+                context.popScope();
+
+                if (!context.ends_with_retq()) {
+                    if (fun_name === 'main') {
+                        context.addAssembly(`
+                                     \rxor %rax, %rax
 	                                 \rretq
+                                     `);
+                    }
+                    else {
+                        context.addAssembly(`
+	                                 \rretq
+                                     `);
+                    }
+                }
+                context.addAssembly(`
 	                                 \r.seh_endproc
                                      `);
-                }
             }
             else if (token.type === TokenType.SEMICOLON) {
                 TODO();

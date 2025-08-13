@@ -44,7 +44,7 @@ export function get_rax_i(size: number): [REG_I, MOV_I] {
     switch (size) {
         case 8: return [REG_I.rax, MOV_I.movq];
         case 4: return [REG_I.eax, MOV_I.movl];
-        case 1: return [REG_I.ax, MOV_I.movb];
+        case 1: return [REG_I.al, MOV_I.movb];
         default: TODO();
     }
 }

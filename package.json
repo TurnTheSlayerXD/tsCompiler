@@ -4,7 +4,7 @@
   "main": "./src/main.ts",
   "scripts": {
     "compile": "npx ts-node ./src/main.ts && clang ./v2.asm -o ./out.exe",
-    "test": "npx ts-node ./src/main.ts && clang ./out.asm -o out.exe && out.exe",
+    "test": "npx ts-node ./src/main.ts && clang ./v2.asm -o out.exe && out.exe",
     "asm" : "clang -S ./example/main.c -o ./example/main.asm",
     "ex": "clang -c ./example/main.asm -o ./example/main.o && clang ./example/main.o -o ./example/main.exe && start /min ./example/main.exe",
     "build": "npx tsc",
