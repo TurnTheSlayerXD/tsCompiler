@@ -73,7 +73,7 @@ export function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[
 }
 
 type Closing<T> = T extends TokenType.O_PAREN ? TokenType.C_PAREN :
-    T extends TokenType.O_CURL ? TokenType.C_CURL : never;
+    T extends TokenType.O_CURL ? TokenType.C_CURL : T extends TokenType.O_SQR ? TokenType.C_SQR : never;
 
 
 export function getMatchingBracket<T extends TokenType>(tokens: Token[], l_bracket_pos: number, o_br: T, c_br: Closing<T>): number {

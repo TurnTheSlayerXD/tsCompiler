@@ -10,6 +10,9 @@ export enum TokenType {
     O_PAREN,
     C_PAREN,
 
+    O_SQR,
+    C_SQR,
+
     O_CURL,
     C_CURL,
 
