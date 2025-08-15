@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "./src/main.ts",
   "scripts": {
+    "debug": "npx ts-node ./src/main.ts",
     "compile": "npx ts-node ./src/main.ts && clang ./v2.asm -o ./out.exe",
     "test": "npx ts-node ./src/main.ts && clang ./v2.asm -o out.exe && out.exe",
     "asm" : "clang -S ./example/main.c -o ./example/main.asm",

@@ -11,6 +11,7 @@ export class CurlExpressionParser {
     constructor(public context: Context, public tokens: Token[], public parent_cycle_begin_mark: string | null, public parent_cycle_end_mark: string | null) {
     }
 
+
     parse(): Value | null {
 
         const { context, tokens } = this;
@@ -259,7 +260,7 @@ export class CurlExpressionParser {
                 if (i === j) {
                     break;
                 }
-                new SemicolonExprParser(context, tokens.slice(i, j)).parse(false);
+                new SemicolonExprParser(context, tokens.slice(i, j)).parse_with_ast(false);
                 i = j;
             }
 

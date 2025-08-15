@@ -1,5 +1,6 @@
+import { Context } from "./context";
 import { Lexer, Position, Token } from "./lexer";
-import { TokenType } from "./token_type";
+import { is_op_token_type, TokenType } from "./token_type";
 
 export function throwError(error: any | undefined = undefined): never {
     if (error instanceof Error) {
@@ -149,4 +150,123 @@ export function filterIndexes<T>(arr: Array<T>, predicate: (arg: T) => boolean, 
         }
     }
     return indexes;
+}
+
+export type Category = { exec_order: 'left' | 'right', imp: number }
+export function get_token_category(type: TokenType): Category | null {
+
+    let _inc = -1;
+    let inc = () => ++_inc;
+
+    inc();
+    if ([TokenType.COMMA].includes(type)) return { exec_order: 'left', imp: _inc };
+    inc();
+    if ([TokenType.OP_ASSIGNMENT, TokenType.OP_ASSIGNMENT_PLUS, TokenType.OP_ASSIGNMENT_MINUS, TokenType.OP_ASSIGNMENT_MULTIPLY, TokenType.OP_ASSIGNMENT_DIVIDE].includes(type)) return { exec_order: 'left', imp: _inc };
+    inc();
+    if ([TokenType.OP_OR].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_AND].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_COMP_GREATER, TokenType.OP_COMP_EQ, TokenType.OP_COMP_NOT_EQ, TokenType.OP_COMP_GREATER_EQ, TokenType.OP_COMP_LESS, TokenType.OP_COMP_LESS_EQ,].includes(type))
+        return { exec_order: 'right', imp: _inc }
+    inc();
+    if ([TokenType.OP_PLUS, TokenType.OP_MINUS].includes(type)) { return { exec_order: 'right', imp: _inc }; }
+    inc();
+    if ([TokenType.OP_MULTIPLY, TokenType.OP_DIVIDE].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_PERCENT].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE].includes(type)) return { exec_order: 'left', imp: _inc };
+
+    inc();
+    if ([TokenType.NAME, TokenType.FUNC_CALL, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.SQR_CALL].includes(type)) return { exec_order: 'right', imp: _inc };
+
+    return null;
+}
+
+
+export function replace_ambigous_token_types(context: Context, tokens: Token[]) {
+    let paren_count = 0;
+    for (let i = 0; i < tokens.length; ++i) {
+        if (tokens[i]!.type === TokenType.O_PAREN) {
+            paren_count += 1;
+        }
+        else if (tokens[i]!.type === TokenType.C_PAREN) {
+            paren_count -= 1;
+        }
+        else if (paren_count === 0) {
+            if (tokens[i]!.type === TokenType.OP_ASTERISK) {
+                if ((i - 1 > -1 && (is_op_token_type(tokens[i - 1]!.type) || tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)))
+                    || i - 1 < 0) {
+                    // then asterics is dereference
+                    tokens[i]!.type = TokenType.OP_DEREFERENCE;
+                }
+                else {
+                    // then asterics is multiply
+                    tokens[i]!.type = TokenType.OP_MULTIPLY;
+                }
+            }
+
+            if (tokens[i]!.type === TokenType.OP_AMPERSAND) {
+                if ((i - 1 > -1 && is_op_token_type(tokens[i - 1]!.type)) || i - 1 < 0) {
+                    // then ampersand is reference
+                    tokens[i]!.type = TokenType.OP_REFERENCE;
+                }
+                else {
+                    // then ampersand is logical "plus"
+                    tokens[i]!.type = TokenType.OP_LOGICAL_PLUS;
+                }
+            }
+
+            if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
+                tokens[i]!.type = TokenType.FUNC_CALL;
+            }
+
+            if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
+                tokens[i]!.type = TokenType.SQR_CALL;
+            }
+
+        }
+    }
+}
+
+function syntaxHighlight(json: any): string {
+    if (typeof json != 'string') {
+        json = JSON.stringify(json, undefined, 10);
+    }
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match: string) {
+        var cls = 'number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+import * as fs from 'fs';
+export function prettyHtml(json: any) {
+    const str = syntaxHighlight(json);
+
+    const style = `
+    <style>
+        .key{ color: green; }
+        .number{ color: blue; }
+        .string{ color: red; }
+    </style>
+    
+    <pre>
+${str}
+    </pre
+    `;
+
+    fs.writeFileSync('./tree.html', style);
 }

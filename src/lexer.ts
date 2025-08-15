@@ -245,11 +245,11 @@ export class Lexer {
         }
         if (this.is_equal_to_expr(this.cursor, '==')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_EQUAL);
+            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '!=')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_NOT_EQUAL);
+            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_NOT_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '<=')) {
             this.iter_cursor(this.cursor, 2);

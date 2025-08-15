@@ -5,6 +5,9 @@ export enum TokenType {
 
     IN_TYPE,
     NAME,
+    FUNC_CALL,
+    SQR_CALL,
+
     KEYWORD,
 
     O_PAREN,
@@ -35,8 +38,8 @@ export enum TokenType {
     OP_DOT,
     OP_ARROW,
     OP_QUESTION,
-    OP_COMP_EQUAL,
-    OP_COMP_NOT_EQUAL,
+    OP_COMP_EQ,
+    OP_COMP_NOT_EQ,
     OP_COMP_LESS,
     OP_COMP_GREATER,
     OP_COMP_GREATER_EQ,
@@ -82,7 +85,7 @@ export const OP_TOKENS = [
     TokenType.OP_DOT,
     TokenType.OP_ARROW,
     TokenType.OP_QUESTION,
-    TokenType.OP_COMP_EQUAL,
+    TokenType.OP_COMP_EQ,
     TokenType.OP_COMP_LESS,
     TokenType.OP_COMP_GREATER,
     TokenType.OP_COMP_GREATER_EQ,
@@ -142,4 +145,4 @@ export const KEYWORDS: Keyword = {
     'continue': TokenType.KWD_CONTINUE,
 };
 
-export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
+export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', '[', ']', ';', '=', '==', '<', '>', '&', '%', '"'];

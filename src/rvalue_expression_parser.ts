@@ -1,6 +1,7 @@
+import { AstBuilder } from "./ast_builder";
 import { Context } from "./context";
 import { get_rax_i } from "./converter";
-import { getMatchingBracket, splitBy, throwError, TokenParserError, TODO, ParserError, RulesError } from "./helper";
+import { getMatchingBracket, splitBy, throwError, TokenParserError, TODO, ParserError, RulesError, replace_ambigous_token_types } from "./helper";
 import { Position, Token } from "./lexer";
 import { is_op_token_type, OP_TOKENS, TokenType } from "./token_type";
 import { parse_type_from_tokens } from "./type_parsing";
@@ -18,7 +19,7 @@ export class SemicolonExprParser {
                 tokens = tokens.slice(1, tokens.length - 1);
             }
         }
-        SemicolonExprParser.replace_ambigous_token_types(context, tokens);
+        replace_ambigous_token_types(context, tokens);
         this.tokens = tokens;
     }
 
@@ -54,42 +55,6 @@ export class SemicolonExprParser {
         return index;
     }
 
-    static replace_ambigous_token_types(context: Context, tokens: Token[]) {
-        let paren_count = 0;
-        for (let i = 0; i < tokens.length; ++i) {
-            if (tokens[i]!.type === TokenType.O_PAREN) {
-                paren_count += 1;
-            }
-            else if (tokens[i]!.type === TokenType.C_PAREN) {
-                paren_count -= 1;
-            }
-            else if (paren_count === 0) {
-                if (tokens[i]!.type === TokenType.OP_ASTERISK) {
-                    if ((i - 1 > -1 && (is_op_token_type(tokens[i - 1]!.type) || tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)))
-                        || i - 1 < 0) {
-                        // then asterics is dereference
-                        tokens[i]!.type = TokenType.OP_DEREFERENCE;
-                    }
-                    else {
-                        // then asterics is multiply
-                        tokens[i]!.type = TokenType.OP_MULTIPLY;
-                    }
-                }
-                if (tokens[i]!.type === TokenType.OP_AMPERSAND) {
-                    if ((i - 1 > -1 && is_op_token_type(tokens[i - 1]!.type)) || i - 1 < 0) {
-                        // then ampersand is reference
-                        tokens[i]!.type = TokenType.OP_REFERENCE;
-                    }
-                    else {
-                        // then ampersand is logical "plus"
-                        tokens[i]!.type = TokenType.OP_LOGICAL_PLUS;
-                    }
-                }
-            }
-        }
-    }
-
-
     parse_declaration(tokens: Token[]): Value {
         const { context } = this;
         let typename, l_value;
@@ -114,11 +79,11 @@ export class SemicolonExprParser {
         TODO();
     }
 
-    parse_ast(): Value {
 
+    parse_with_ast(is_l_value: boolean) {
 
-
-
+        const builder = new AstBuilder(this.tokens, this.context);
+        const root = builder.build();
     }
 
     parse(is_l_value: boolean): Value {
@@ -212,11 +177,10 @@ export class SemicolonExprParser {
             return new Value('_temp', CharType.getInstance(), left.pos, res_addr, AddrType.Stack);
         }
 
-
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens,
             [TokenType.OP_COMP_GREATER,
-            TokenType.OP_COMP_EQUAL,
-            TokenType.OP_COMP_NOT_EQUAL,
+            TokenType.OP_COMP_EQ,
+            TokenType.OP_COMP_NOT_EQ,
             TokenType.OP_COMP_GREATER_EQ,
             TokenType.OP_COMP_LESS,
             TokenType.OP_COMP_LESS_EQ], true)) !== -1) {
@@ -232,16 +196,11 @@ export class SemicolonExprParser {
                 case TokenType.OP_COMP_GREATER_EQ: return left.valueType.asm_cmp_greater_or_equal(context, left, right);
                 case TokenType.OP_COMP_LESS: return left.valueType.asm_cmp_less(context, left, right);
                 case TokenType.OP_COMP_LESS_EQ: return left.valueType.asm_cmp_less_or_equal(context, left, right);
-                case TokenType.OP_COMP_EQUAL: return left.valueType.asm_cmp_equal(context, left, right);
-                case TokenType.OP_COMP_NOT_EQUAL: return left.valueType.asm_cmp_not_equal(context, left, right);
+                case TokenType.OP_COMP_EQ: return left.valueType.asm_cmp_equal(context, left, right);
+                case TokenType.OP_COMP_NOT_EQ: return left.valueType.asm_cmp_not_equal(context, left, right);
             }
 
             TODO('CMP');
-        }
-
-
-        if (tokens.length > 0 && tokens[0]!.type === TokenType.NAME && !!context.hasTypename(tokens[0]!.text)) {
-            return this.parse_declaration(tokens);
         }
 
         // console.log(`OP INDEX = ${op_index}`);
@@ -274,16 +233,13 @@ export class SemicolonExprParser {
 
         if ((op_index = SemicolonExprParser.get_index_of_types(tokens, [TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE], false)) !== -1) {
             const token = tokens[op_index]!;
-            let arg;
             if (token.type === TokenType.OP_REFERENCE) {
-                arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(true);
+                const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(true);
+                return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
             }
-            else {
-                arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
-                const ptr_type = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
-                return ptr_type.asm_dereference(context, '_temp', arg, is_l_value);
-            }
-            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
+            const arg = new SemicolonExprParser(context, tokens.slice(op_index + 1,)).parse(false);
+            const ptr_type = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
+            return ptr_type.asm_dereference(context, '_temp', arg, is_l_value);
         }
 
 
@@ -370,3 +326,4 @@ export class SemicolonExprParser {
     }
 
 }
+
