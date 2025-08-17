@@ -179,7 +179,10 @@ export function get_token_category(type: TokenType): Category | null {
     if ([TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE].includes(type)) return { exec_order: 'left', imp: _inc };
 
     inc();
-    if ([TokenType.NAME, TokenType.FUNC_CALL, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.SQR_CALL].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL].includes(type)) return { exec_order: 'right', imp: _inc };
+
+    inc();
+    if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'left', imp: _inc };
 
     return null;
 }
@@ -218,13 +221,13 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
                 }
             }
 
-            if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
-                tokens[i]!.type = TokenType.FUNC_CALL;
-            }
+            // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
+            //     tokens[i]!.type = TokenType.FUNC_CALL;
+            // }
 
-            if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
-                tokens[i]!.type = TokenType.SQR_CALL;
-            }
+            // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
+            //     tokens[i]!.type = TokenType.SQR_CALL;
+            // }
 
         }
     }

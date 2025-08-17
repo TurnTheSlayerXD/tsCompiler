@@ -5,8 +5,6 @@ export enum TokenType {
 
     IN_TYPE,
     NAME,
-    FUNC_CALL,
-    SQR_CALL,
 
     KEYWORD,
 
