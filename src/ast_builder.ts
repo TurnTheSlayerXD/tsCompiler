@@ -378,6 +378,11 @@ export class AstBuilder {
 }
 
 function is_declaration_from_ast_node(root: AstNode): ValueType | null {
+    const { type } = root.order.tok;
 
-    TODO('TODO is_declaration_from_ast_node case');
+    if ()
+
+    if (type === TokenType.NAME) {
+
+    }
 }
