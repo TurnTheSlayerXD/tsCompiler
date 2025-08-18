@@ -1,5 +1,5 @@
 import { Context } from "./context";
-import { get_rax_i } from "./converter";
+import { get_rax_i, get_rdx_i } from "./converter";
 import { Category, get_token_category, prettyHtml, replace_ambigous_token_types, RulesError, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { C_BRACES, O_BRACES, OP_TOKENS, TokenType } from "./token_type";
@@ -303,6 +303,38 @@ export class AstNode {
             const applied_type = applied.valueType as PtrType ?? throwError(new TokenParserError(token, 'Expected PTR type'));
             const res = applied_type.asm_dereference(context, '_temp', applied, is_lvalue);
             return res;
+        }
+        if ([TokenType.O_CURL].includes(type)) {
+            const params = [];
+            let comma_token: AstNode | null = this.right;
+            while (comma_token && comma_token.type === TokenType.COMMA) {
+                if (!comma_token.left) {
+                    throwError(new TokenParserError(comma_token.order.tok, 'Expected expression before comma'));
+                }
+                params.push(comma_token.left.eval(false));
+                comma_token = comma_token.right;
+            }
+            if (!!comma_token) {
+                params.push(comma_token.eval(false));
+            }
+            params.reverse();
+            if (params.length > 0) {
+                const valueType = params[0]!.valueType;
+                for (const src of params) {
+                    const dst = new Value('_temp', valueType, src.pos, context.pushStack(valueType.size), AddrType.Stack);
+                    valueType.asm_copy(context, dst, src);
+                }
+                context.addAssembly(`
+                        \rleaq ${context.stackPtr}(%rsp), %rdx
+                        \rmovq %rdx, ${context.pushStack(8)}(%rsp)
+                    `);
+                const ret = new Value('_temp', PtrType.getInstance(valueType), params[0]!.pos, context.stackPtr, AddrType.Stack);
+                return ret;
+            }
+            context.addAssembly(`
+                    \rmovq $0, ${context.pushStack(8)}
+                `);
+            return new Value('_temp', PtrType.getInstance(IntType.getInstance()), params[0]!.pos, context.stackPtr, AddrType.Stack);
         }
         TODO(`unhandeled: ${token}`);
     }
