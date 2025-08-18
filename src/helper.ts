@@ -1,12 +1,12 @@
 import { Context } from "./context";
 import { Lexer, Position, Token } from "./lexer";
-import { is_op_token_type, TokenType } from "./token_type";
+import { is_op_token_type, O_BRACES, TokenType } from "./token_type";
 
 export function throwError(error: any | undefined = undefined): never {
     if (error instanceof Error) {
         throw error;
     }
-    else if (error instanceof String) {
+    else if (typeof error === 'string') {
         throw new Error(error as string);
     }
     else {
@@ -38,6 +38,8 @@ export class TypeError extends Error {
         super(`Type Error at ${pos}\n${msg}\n`);
     }
 }
+
+
 
 export class RulesError extends Error {
     constructor(pos: Position, msg: string) {
@@ -179,7 +181,7 @@ export function get_token_category(type: TokenType): Category | null {
     if ([TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE].includes(type)) return { exec_order: 'left', imp: _inc };
 
     inc();
-    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.TYPE_PTR, TokenType.TYPE_REF].includes(type)) return { exec_order: 'right', imp: _inc };
 
     inc();
     if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'left', imp: _inc };
@@ -191,45 +193,51 @@ export function get_token_category(type: TokenType): Category | null {
 export function replace_ambigous_token_types(context: Context, tokens: Token[]) {
     let paren_count = 0;
     for (let i = 0; i < tokens.length; ++i) {
-        if (tokens[i]!.type === TokenType.O_PAREN) {
-            paren_count += 1;
-        }
-        else if (tokens[i]!.type === TokenType.C_PAREN) {
-            paren_count -= 1;
-        }
-        else if (paren_count === 0) {
-            if (tokens[i]!.type === TokenType.OP_ASTERISK) {
-                if ((i - 1 > -1 && (is_op_token_type(tokens[i - 1]!.type) || tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)))
-                    || i - 1 < 0) {
-                    // then asterics is dereference
-                    tokens[i]!.type = TokenType.OP_DEREFERENCE;
-                }
-                else {
-                    // then asterics is multiply
-                    tokens[i]!.type = TokenType.OP_MULTIPLY;
-                }
+
+        if (tokens[i]!.type === TokenType.OP_ASTERISK) {
+            if (i - 1 > -1 && (tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)
+                || tokens[i - 1]!.type === TokenType.TYPE_PTR)) {
+                // then asterics is type modifier
+                tokens[i]!.type = TokenType.TYPE_PTR;
             }
-
-            if (tokens[i]!.type === TokenType.OP_AMPERSAND) {
-                if ((i - 1 > -1 && is_op_token_type(tokens[i - 1]!.type)) || i - 1 < 0) {
-                    // then ampersand is reference
-                    tokens[i]!.type = TokenType.OP_REFERENCE;
-                }
-                else {
-                    // then ampersand is logical "plus"
-                    tokens[i]!.type = TokenType.OP_LOGICAL_PLUS;
-                }
+            else if ((i - 1 > -1
+                && (is_op_token_type(tokens[i - 1]!.type) || O_BRACES.includes(tokens[i - 1]!.type)))
+                || i - 1 < 0) {
+                // then asterics is dereference
+                tokens[i]!.type = TokenType.OP_DEREFERENCE;
             }
-
-            // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
-            //     tokens[i]!.type = TokenType.FUNC_CALL;
-            // }
-
-            // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
-            //     tokens[i]!.type = TokenType.SQR_CALL;
-            // }
-
+            else {
+                // then asterics is multiply
+                tokens[i]!.type = TokenType.OP_MULTIPLY;
+            }
         }
+
+        if (tokens[i]!.type === TokenType.OP_AMPERSAND) {
+            if (i - 1 > -1 && (tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)
+                || tokens[i - 1]!.type === TokenType.TYPE_REF)) {
+                // then ampersand is type modifier
+                tokens[i]!.type = TokenType.TYPE_REF;
+            }
+            else if ((i - 1 > -1
+                && (is_op_token_type(tokens[i - 1]!.type) || O_BRACES.includes(tokens[i - 1]!.type)))
+                || i - 1 < 0) {
+                // then ampersand is dereference
+                tokens[i]!.type = TokenType.OP_REFERENCE;
+            }
+            else {
+                // then ampersand is logical "plus"
+                tokens[i]!.type = TokenType.OP_LOGICAL_PLUS;
+            }
+        }
+
+        // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
+        //     tokens[i]!.type = TokenType.FUNC_CALL;
+        // }
+
+        // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
+        //     tokens[i]!.type = TokenType.SQR_CALL;
+        // }
+
     }
 }
 

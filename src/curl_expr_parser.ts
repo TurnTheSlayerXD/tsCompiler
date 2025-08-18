@@ -30,7 +30,7 @@ export class CurlExpressionParser {
                     || (c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN)) === -1) {
                     throwError(new TokenParserError(token, `No matching O_PAREN found for IF keyword`));
                 }
-                const res = new SemicolonExprParser(context, tokens.slice(o_paren_pos + 1, c_paren_pos)).parse(false);
+                const res = new SemicolonExprParser(context, tokens.slice(o_paren_pos + 1, c_paren_pos)).parse_with_ast(false, false);
                 // res - 1 byte value which either $0 or $1
                 context.addAssembly(`
                         \r #IF
@@ -47,7 +47,8 @@ export class CurlExpressionParser {
                 || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
                 throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
             }
-            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), this.parent_cycle_begin_mark, this.parent_cycle_end_mark).parse();
+            new CurlExpressionParser(context,
+                tokens.slice(o_curl_pos + 1, c_curl_pos), this.parent_cycle_begin_mark, this.parent_cycle_end_mark).parse();
             context.popScope();
             context.addAssembly(`
                 \rjmp ${mark_if_true}
@@ -73,7 +74,7 @@ export class CurlExpressionParser {
 
             context.pushScope();
             if (splitted[0]!.length > 0) {
-                new SemicolonExprParser(context, splitted[0]!).parse(false);
+                new SemicolonExprParser(context, splitted[0]!).parse_with_ast(false, true);
             }
 
             const cycle_begin_mark = context.gen_mark();
@@ -83,7 +84,7 @@ export class CurlExpressionParser {
                     \r  ${cycle_begin_mark}:
                 `);
             if (splitted[1]!.length > 0) {
-                const cond_res = new SemicolonExprParser(context, splitted[1]!).parse(false);
+                const cond_res = new SemicolonExprParser(context, splitted[1]!).parse_with_ast(false, true);
                 // res - 1 byte value which either $0 or $1
                 context.addAssembly(`
                         \r      #FOR
@@ -103,7 +104,7 @@ export class CurlExpressionParser {
             new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), cycle_begin_mark, cycle_end_mark).parse();
 
             if (splitted[2]!.length > 0) {
-                new SemicolonExprParser(context, splitted[2]!).parse(false);
+                new SemicolonExprParser(context, splitted[2]!).parse_with_ast(false, true);
             }
             context.addAssembly(`
                 \rjmp ${cycle_begin_mark}
@@ -136,7 +137,7 @@ export class CurlExpressionParser {
             context.addAssembly(`
                     \r${cycle_begin_mark}:
                 `);
-            const cond_res = new SemicolonExprParser(context, condition_tokens).parse(false);
+            const cond_res = new SemicolonExprParser(context, condition_tokens).parse_with_ast(false, true);
             // res - 1 byte value which either $0 or $1
             context.addAssembly(`
                     \r #WHILE
@@ -225,7 +226,7 @@ export class CurlExpressionParser {
                 if (semi_pos === i + 1) {
                     return null;
                 }
-                const res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse(false);
+                const res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
                 const [reg, mov] = get_rax_i(res.valueType.size);
                 context.addAssembly(`
                         \r${MOV_I[mov]} ${res.stack_addr(context)}(%rsp), %${REG_I[reg]} 
@@ -260,7 +261,7 @@ export class CurlExpressionParser {
                 if (i === j) {
                     break;
                 }
-                new SemicolonExprParser(context, tokens.slice(i, j)).parse_with_ast(false);
+                new SemicolonExprParser(context, tokens.slice(i, j)).parse_with_ast(false, true);
                 i = j;
             }
 

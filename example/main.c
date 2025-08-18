@@ -2,5 +2,12 @@
 
 int main(int argc, char **argv)
 {
-    int num = fuu(1, 2, 3) + arg[1];
+    char *f = "FACK";
+    char *ptr = "Hello, world";
+
+    *(&ptr) = f + 1;
+
+    *(ptr) = 'B';
+
+    print(ptr, 3);
 }

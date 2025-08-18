@@ -73,6 +73,10 @@ export enum TokenType {
     KWD_WHILE,
     KWD_BREAK,
     KWD_CONTINUE,
+
+    TYPE_PTR,
+    TYPE_REF,
+
 }
 
 export const OP_TOKENS = [
@@ -111,6 +115,10 @@ export const VALUE_TOKENS = [
     TokenType.STRING_LITERAL_SQUARE,
     TokenType.NAME,
 ];
+
+export const O_BRACES = [TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR];
+export const C_BRACES = [TokenType.C_PAREN, TokenType.C_CURL, TokenType.C_SQR];
+
 
 export function is_op_token_type(type: TokenType) {
     return OP_TOKENS.includes(type);

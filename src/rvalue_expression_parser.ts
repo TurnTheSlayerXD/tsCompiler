@@ -1,4 +1,4 @@
-import { AstBuilder } from "./ast_builder";
+import { AstBuilder, handle_declaration_case } from "./ast_builder";
 import { Context } from "./context";
 import { get_rax_i } from "./converter";
 import { getMatchingBracket, splitBy, throwError, TokenParserError, TODO, ParserError, RulesError, replace_ambigous_token_types } from "./helper";
@@ -80,10 +80,14 @@ export class SemicolonExprParser {
     }
 
 
-    parse_with_ast(is_l_value: boolean) {
-
+    parse_with_ast(is_l_value: boolean, can_include_declaration: boolean) {
         const builder = new AstBuilder(this.tokens, this.context);
         const root = builder.build();
+        let value_type;
+        if (can_include_declaration && !!(value_type = handle_declaration_case(root))) {
+            return value_type.type.asm_from_literal(this.context, value_type.name, null, root.order.tok.pos);
+        }
+        return root.eval(false);
     }
 
     parse(is_l_value: boolean): Value {

@@ -22,11 +22,14 @@ export function parse_type_from_tokens(context: Context, tokens: Token[]): Value
         isConst = true;
     }
     type.is_const = isConst;
-    while (!iter_out.done && (iter_out.value.type === TokenType.OP_ASTERISK || iter_out.value.type === TokenType.OP_DEREFERENCE)) {
+    while (!iter_out.done && (iter_out.value.type === TokenType.TYPE_PTR)) {
         type = PtrType.getInstance(type);
         while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
             type.is_const = true;
         }
+    }
+    if (!iter_out.done) {
+        throwError(new TokenParserError(iter_out.value!, `Couldn't parse type declaration: ${tokens}`));
     }
     return type;
 }
