@@ -13,26 +13,48 @@ int strlen(char *s)
 void print_num(int num)
 {
     char *s = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-    int c = 0;
-    while (num > 0)
+    if (num == 0)
     {
-        int rest = num % 10;
-        num /= 10;
-        *(s + c) = '0' + rest;
-        c += 1;
+        print("0", 1);
     }
-    int len = strlen(s);
-    for (int i = 0; i < len / 2; i += 1)
+    else
     {
-        char buf = *(s + i);
-        *(s + i) = *(s + len - 1 - i);
-        *(s + len - 1 - i) = buf;
+        int c = 0;
+        while (num > 0)
+        {
+            int rest = num % 10;
+            num /= 10;
+            s[c] = '0' + rest;
+            c += 1;
+        }
+        int len = strlen(s);
+        for (int i = 0; i < len / 2; i += 1)
+        {
+            char buf = s[i];
+            s[i] = s[len - 1 - i];
+            s[len - 1 - i] = buf;
+        }
+        print(s, len);
     }
-    print(s, len);
+}
+
+void print_str(char *str)
+{
+    print(str, strlen(str));
+}
+
+void say_hello()
+{
+    print_str("Hello from C lang compiled with Typescript");
 }
 
 int main(int argc, char **argv)
 {
-    int num = 14883;
+    print_str("Hello");
+    print_str("\n");
+    int num = (3 * (8 + 6) - (+1)) / 5;
     print_num(num);
+    print_str("\n");
+    say_hello();
+    print("\n", 1);
 }

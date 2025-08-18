@@ -9,6 +9,11 @@ import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I, Value
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
     }
+
+    get type(): TokenType {
+        return this.order.tok.type;
+    }
+
     insert_node(node: AstNode) {
         AstNode._insert_node(this, node);
     }
@@ -209,21 +214,96 @@ export class AstNode {
         }
         if ([TokenType.NAME].includes(type)) {
             let ret;
-            if (!!(ret = handle_function_call_case(this))) {
-                return ret;
-            }
             if (this.left || this.right) {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
             return this.context.hasValue(token.text) ?? throwError(new TokenParserError(token, `Using undeclared var name [${token.text}]`));
         }
-        if (O_BRACES.includes(type)) {
+        if ([TokenType.O_PAREN].includes(type)) {
+            //handle function call case
+            if (this.left) {
+                const fun_obj = this.left.eval(false);
+                let params = [];
+                let comma_token: AstNode | null = this.right;
+                while (comma_token && comma_token.type === TokenType.COMMA) {
+                    if (!comma_token.left) {
+                        throwError(new TokenParserError(comma_token.order.tok, 'Expected expression before comma'));
+                    }
+                    params.push(comma_token.left.eval(false));
+                    comma_token = comma_token.right;
+                }
+                if (!!comma_token) {
+                    params.push(comma_token.eval(false));
+                }
+                const fun_name = fun_obj.name;
+                if (!(fun_obj.valueType instanceof FunctionType)) {
+                    throwError(new TokenParserError(token, `Calling not callable obj [${fun_obj}]`));
+                }
+                if (fun_obj.name === 'print') {
+                    context.addAssembly(`
+                        \rmovl $4294967285, %ecx
+                        \rcallq *__imp_GetStdHandle(%rip)
+                        \rmovq %rax, ${context.pushStack(8)}(%rsp)
+                        \rmovl $0, ${context.pushStack(4)}(%rsp)
+                        \rmovq ${context.stackPtr + 4}(%rsp), %rcx
+                        \rleaq ${context.stackPtr}(%rsp), %r9
+                    `);
+
+                    context.addAssembly(`
+                        \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rdx
+                    `);
+                    context.addAssembly(`
+                        \rmovl  ${params[1]!.stack_addr(context)}(%rsp), %r8d
+                    `);
+                    context.addAssembly(`
+                        \rcallq	 *__imp_WriteConsoleA(%rip)
+                    `);
+                    return new Value('_temp', VoidType.getInstance(), token.pos, null, AddrType.Indirect);
+                }
+                else {
+                    let in_stack: Value;
+                    const { paramTypes } = fun_obj.valueType;
+                    if (paramTypes.length !== params.length) {
+                        throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
+                    }
+                    for (let i = 0; i < paramTypes.length; ++i) {
+                        in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos);
+                        in_stack.valueType.asm_copy(context, in_stack, params[i]!);
+                    }
+                    if (params.length > 0) {
+                        context.addAssembly(`
+                        \r#__parameter_offset_pass
+                        \rleaq ${in_stack!.stack_addr(context)}(%rsp), %rcx
+                    `);
+                    }
+                    context.addAssembly(`
+                        \rcallq ${fun_name}
+                    `);
+                    const [reg, mov] = get_rax_i(fun_obj.valueType.returnType.size);
+                    context.addAssembly(`   
+                        \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_obj.valueType.returnType.size)}(%rsp)
+                    `);
+                    return new Value('_temp', fun_obj.valueType.returnType, token.pos, context.stackPtr, AddrType.Stack);
+                }
+            }
+            // empty brackets returns void
             if (!this.right) {
                 return new Value('_temp', VoidType.getInstance(), token.pos, null, AddrType.Stack);
             }
+            //otherwise it is just for operation ordering
             return this.right.eval(false);
         }
-
+        if ([TokenType.O_SQR].includes(type)) {
+            if (!this.left || !this.right) {
+                throwError(new TokenParserError(token, `OP square brackets requires both LEFT and right args`));
+            }
+            const ind_val = this.right.eval(false);
+            const ptr_val = this.left.eval(false);
+            const applied = ptr_val.valueType.asm_from_plus(context, ptr_val, ind_val);
+            const applied_type = applied.valueType as PtrType ?? throwError(new TokenParserError(token, 'Expected PTR type'));
+            const res = applied_type.asm_dereference(context, '_temp', applied, is_lvalue);
+            return res;
+        }
         TODO(`unhandeled: ${token}`);
     }
 }
@@ -274,7 +354,7 @@ export class AstBuilder {
         for (let i = 0; i < this.tokens.length; ++i) {
             const tok = this.tokens[i]!;
             if (O_BRACES.includes(tok.type)) {
-                res.push({ tok, pos: i, depth: cur_depth });
+                res.push({ tok, pos: i, depth: cur_depth, });
                 cur_depth += 1;
             }
             else if (C_BRACES.includes(tok.type)) {
@@ -286,8 +366,6 @@ export class AstBuilder {
         }
         return res;
     }
-
-
 
     build(): AstNode {
         const ordered = this.map_to_ordered();
@@ -342,92 +420,18 @@ function gather_nodes_in_order(root: AstNode): AstNode[] {
 }
 
 export function handle_declaration_case(root: AstNode): { type: ValueType, name: string } | null {
-    if (!!root.right) {
+    if (root.right || root.order.tok.type !== TokenType.NAME) {
         return null;
     }
-    let left = root.left;
+    let left: AstNode | null = root;
     const toks: Token[] = [];
     while (!!left && [TokenType.NAME, TokenType.TYPE_PTR, TokenType.TYPE_REF].includes(left.order.tok.type)) {
         toks.push(left.order.tok);
         left = left.left;
     }
-    if (toks.length === 0) {
+    if (toks.length === 1) {
         return null;
     }
     toks.reverse();
-    toks.push(root.order.tok);
     return parse_declaration_from_tokens(root.context, toks);
-}
-
-function handle_function_call_case(root: AstNode): Value | null {
-    const { context } = root;
-    const token = root.order.tok;
-    if (!!root.right && root.right.order.tok.type === TokenType.O_PAREN) {
-        const paren_node = root.right;
-        let params = [];
-        let comma_token: AstNode | null = paren_node.right;
-        while (!!comma_token && comma_token.order.tok.type === TokenType.COMMA) {
-            if (!comma_token.left) {
-                throwError(new TokenParserError(comma_token.order.tok, 'Expected expression before comma'));
-            }
-            params.push(comma_token.left.eval(false));
-            comma_token = comma_token.right;
-        }
-        if (!!comma_token) {
-            params.push(comma_token.eval(false));
-        }
-        const fun_name = token.text;
-        const fun_value = context.hasValueOrThrow(fun_name);
-        if (!(fun_value.valueType instanceof FunctionType)) {
-            throwError(new TokenParserError(token, `Calling not callable obj [${fun_value}]`));
-        }
-        if (fun_value.name === 'print') {
-            context.addAssembly(`
-                        \rmovl $4294967285, %ecx
-                        \rcallq *__imp_GetStdHandle(%rip)
-                        \rmovq %rax, ${context.pushStack(8)}(%rsp)
-                        \rmovl $0, ${context.pushStack(4)}(%rsp)
-                        \rmovq ${context.stackPtr + 4}(%rsp), %rcx
-                        \rleaq ${context.stackPtr}(%rsp), %r9
-                    `);
-
-            context.addAssembly(`
-                \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rdx
-            `);
-            context.addAssembly(`
-                \rmovl  ${params[1]!.stack_addr(context)}(%rsp), %r8d
-            `);
-            context.addAssembly(`
-                \rcallq	 *__imp_WriteConsoleA(%rip)
-            `);
-            return new Value('_temp', VoidType.getInstance(), token.pos, null, AddrType.Indirect);
-        }
-        else {
-            let in_stack: Value;
-            const { paramTypes } = fun_value.valueType;
-            if (paramTypes.length !== params.length) {
-                throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
-            }
-            for (let i = 0; i < paramTypes.length; ++i) {
-                in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos);
-                in_stack.valueType.asm_copy(context, in_stack, params[i]!);
-            }
-            if (params.length > 0) {
-                context.addAssembly(`
-                        \r#__parameter_offset_pass
-                        \rleaq ${in_stack!.stack_addr(context)}(%rsp), %rcx
-                    `);
-            }
-            context.addAssembly(`
-                        \rcallq ${fun_name}
-                    `);
-            const [reg, mov] = get_rax_i(fun_value.valueType.returnType.size);
-            context.addAssembly(`   
-                        \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_value.valueType.returnType.size)}(%rsp)
-                    `);
-            return new Value('_temp', fun_value.valueType.returnType, token.pos, context.stackPtr, AddrType.Stack);
-        }
-    }
-
-    return null;
 }

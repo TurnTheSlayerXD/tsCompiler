@@ -56,10 +56,12 @@ const main = () => {
                 const fun_return_type = return_decl.type;
 
                 const token_params = iterUntilMatchingBracket(lexer, token, TokenType.O_PAREN, TokenType.C_PAREN)
-                const splitted_params = splitBy(token_params, t => t.type === TokenType.COMMA);
-
-                for (const p of splitted_params) {
-                    replace_ambigous_token_types(context, p);
+                let splitted_params: Token[][] = [];
+                if (token_params.length > 0) {
+                    splitted_params = splitBy(token_params, t => t.type === TokenType.COMMA);
+                    for (const p of splitted_params) {
+                        replace_ambigous_token_types(context, p);
+                    }
                 }
                 const fun_params = splitted_params.map(p => parse_declaration_from_tokens(context, p));
                 const fun_value = new Value(fun_name, FunctionType.getInstance(fun_return_type, fun_params.map(v => v.type)), token.pos, -100, AddrType.Stack);

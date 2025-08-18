@@ -39,7 +39,7 @@ export function parse_declaration_from_tokens(context: Context, tokens: Token[])
         throwError(new Error('Expected lvalue expression'));
     }
     if (tokens.at(-1)!.type !== TokenType.NAME) {
-        throwError(new Error('Expected variable name in lvalue expression'));
+        throwError(new TokenParserError(tokens.at(-1)!, 'Expected variable name in lvalue expression'));
     }
     const value_name = tokens.at(-1)!.text;
     let typename;
@@ -51,5 +51,5 @@ export function parse_declaration_from_tokens(context: Context, tokens: Token[])
         const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
         return { type: value_type, name: value_name };
     }
-    TODO();
+    TODO(`${tokens}`);
 }

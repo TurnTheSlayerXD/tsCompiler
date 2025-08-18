@@ -15,10 +15,10 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < argc; i += 1)
     {
-        for (int j = 0; j < strlen(*(argv + i)); j += 1)
-        {
-            print((*(argv + i)) + j, 1);
-        }
+        argv[i][0] = 'D';
+        argv[i][1] = 'M';
+        argv[i][2] = 'B';
+        print(argv[i], strlen(argv[i]));
         print("\n", 1);
     }
 }

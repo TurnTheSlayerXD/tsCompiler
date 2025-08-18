@@ -13,12 +13,8 @@ export class CurlExpressionParser {
 
 
     parse(): Value | null {
-
         const { context, tokens } = this;
         // console.log('CurlExpressionParser\n', `${tokens}`);
-        let is_prev_if = false;
-        let mark_for_next_if: string | null = null;
-
         const parse_IF_expr = (i: number, with_condition: boolean, mark_if_false: string, mark_if_true: string): number => {
             let o_paren_pos;
             let c_paren_pos = i;
