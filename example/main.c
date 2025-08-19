@@ -93,7 +93,7 @@ int parse_int_from_str(char *str)
 
 int main(int argc, char **argv)
 {
-    char *str = "-1488";
+    int **str = {{}};
     int res = parse_int_from_str(str);
 
     print_int(res);
