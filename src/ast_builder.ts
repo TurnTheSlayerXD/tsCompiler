@@ -2,7 +2,7 @@ import { Context } from "./context";
 import { get_rax_i, get_rdx_i } from "./converter";
 import { Category, get_token_category, prettyHtml, replace_ambigous_token_types, RulesError, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
-import { C_BRACES, O_BRACES, OP_TOKENS, TokenType } from "./token_type";
+import { C_BRACES, DECL_TOKENS, O_BRACES, OP_TOKENS, TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
 import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I, Value, ValueType, VoidType } from "./value_types";
 
@@ -208,7 +208,6 @@ export class AstNode {
             return new_value;
         }
         if ([TokenType.NAME].includes(type)) {
-            let ret;
             if (this.left || this.right) {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
@@ -344,6 +343,10 @@ type OperToken = OrderedToken & Category;
 
 export class AstBuilder {
     constructor(private tokens: Token[], private context: Context) {
+        const res = this.is_paren_correct();
+        if (!res.ok) {
+            throwError(res.err);
+        }
         replace_ambigous_token_types(context, tokens);
     }
 
@@ -447,12 +450,12 @@ function gather_nodes_in_order(root: AstNode): AstNode[] {
 }
 
 export function handle_declaration_case(root: AstNode): { type: ValueType, name: string } | null {
-    if (root.right || root.order.tok.type !== TokenType.NAME) {
+    let left: AstNode | null = root;
+    if (!!left && DECL_TOKENS.includes(root.type)) {
         return null;
     }
-    let left: AstNode | null = root;
     const toks: Token[] = [];
-    while (!!left && [TokenType.NAME, TokenType.TYPE_PTR, TokenType.TYPE_REF].includes(left.order.tok.type)) {
+    while (!!left && [TokenType.NAME, TokenType.DECL_PTR, TokenType.DECL_REF].includes(left.order.tok.type)) {
         toks.push(left.order.tok);
         left = left.left;
     }

@@ -182,48 +182,62 @@ export function get_token_category(type: TokenType): Category | null {
     inc();
     if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
     inc();
-    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.TYPE_PTR, TokenType.TYPE_REF].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.DECL_PTR, TokenType.DECL_REF, TokenType.DECL_NAME, TokenType.O_DECL_SQR, TokenType.C_DECL_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
     return null;
 }
 
 
 export function replace_ambigous_token_types(context: Context, tokens: Token[]) {
     for (let i = 0; i < tokens.length; ++i) {
-        if (tokens[i]!.type === TokenType.OP_ASTERISK) {
-            if (i - 1 > -1 && (tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)
-                || tokens[i - 1]!.type === TokenType.TYPE_PTR)) {
+        let cur = tokens[i]!;
+        let prev = tokens[i - 1];
+
+        if (cur.type === TokenType.OP_ASTERISK) {
+            if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
+                || prev.type === TokenType.DECL_PTR)) {
                 // then asterics is type modifier
-                tokens[i]!.type = TokenType.TYPE_PTR;
+                cur.type = TokenType.DECL_PTR;
             }
-            else if ((i - 1 > -1
-                && (is_op_token_type(tokens[i - 1]!.type) || O_BRACES.includes(tokens[i - 1]!.type)))
+            else if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
                 || i - 1 < 0) {
                 // then asterics is dereference
-                tokens[i]!.type = TokenType.OP_DEREFERENCE;
+                cur.type = TokenType.OP_DEREFERENCE;
             }
             else {
                 // then asterics is multiply
-                tokens[i]!.type = TokenType.OP_MULTIPLY;
+                cur.type = TokenType.OP_MULTIPLY;
             }
         }
 
-        if (tokens[i]!.type === TokenType.OP_AMPERSAND) {
-            if (i - 1 > -1 && (tokens[i - 1]!.type === TokenType.NAME && !!context.hasTypename(tokens[i - 1]!.text)
-                || tokens[i - 1]!.type === TokenType.TYPE_REF)) {
+        else if (cur.type === TokenType.OP_AMPERSAND) {
+            if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
+                || prev.type === TokenType.DECL_REF)) {
                 // then ampersand is type modifier
-                tokens[i]!.type = TokenType.TYPE_REF;
+                cur.type = TokenType.DECL_REF;
             }
-            else if ((i - 1 > -1
-                && (is_op_token_type(tokens[i - 1]!.type) || O_BRACES.includes(tokens[i - 1]!.type)))
+            else if ((prev
+                && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
                 || i - 1 < 0) {
                 // then ampersand is dereference
-                tokens[i]!.type = TokenType.OP_REFERENCE;
+                cur.type = TokenType.OP_REFERENCE;
             }
             else {
                 // then ampersand is logical "plus"
-                tokens[i]!.type = TokenType.OP_LOGICAL_PLUS;
+                cur.type = TokenType.OP_LOGICAL_PLUS;
             }
         }
+
+        else if (cur.type === TokenType.NAME && prev && ([TokenType.NAME, TokenType.DECL_PTR, TokenType.DECL_REF].includes(prev.type))) {
+            cur.type = TokenType.DECL_NAME;
+        }
+
+        else if (cur.type === TokenType.O_SQR && prev && prev.type === TokenType.DECL_NAME) {
+            cur.type = TokenType.O_DECL_SQR;
+        }
+        else if (cur.type === TokenType.C_SQR && prev && prev.type === TokenType.O_DECL_SQR) {
+            cur.type = TokenType.C_DECL_SQR;
+        }
+
 
         // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
         //     tokens[i]!.type = TokenType.FUNC_CALL;

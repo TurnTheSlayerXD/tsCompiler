@@ -22,7 +22,7 @@ export function parse_type_from_tokens(context: Context, tokens: Token[]): Value
         isConst = true;
     }
     type.is_const = isConst;
-    while (!iter_out.done && (iter_out.value.type === TokenType.TYPE_PTR)) {
+    while (!iter_out.done && (iter_out.value.type === TokenType.DECL_PTR)) {
         type = PtrType.getInstance(type);
         while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
             type.is_const = true;
