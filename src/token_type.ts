@@ -79,6 +79,7 @@ export enum TokenType {
     DECL_NAME,
     O_DECL_SQR,
     C_DECL_SQR,
+    DECL_TYPENAME,
 }
 
 export const OP_TOKENS = [
