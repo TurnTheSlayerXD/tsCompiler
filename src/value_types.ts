@@ -62,7 +62,6 @@ export enum REG_I {
     eax,
     rax,
 
-    dx,
     dh,
     edx,
     rdx,
@@ -452,17 +451,21 @@ export class CharType implements ValueType {
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        if (rhs.valueType instanceof IntType) {
-            return rhs.valueType.asm_from_plus(context, rhs, self);
+        const { ok, left, right } = convert_values(context, self, rhs);
+        if (!ok) {
+            return left.valueType.asm_from_plus(context, left, right);
         }
-        TODO('CHAR PLUS ASM');
+        const stack_addr = asm_bin_action(context, MOV_I.movb, BIN_I.addb, REG_I.dh, self, rhs, this.size);
+        return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        if (rhs.valueType instanceof IntType) {
-            return rhs.valueType.asm_from_minus(context, rhs, self);
+        const { ok, left, right } = convert_values(context, self, rhs);
+        if (!ok) {
+            return left.valueType.asm_from_minus(context, left, right);
         }
-        TODO('CHAR PLUS ASM');
+        const stack_addr = asm_bin_action(context, MOV_I.movb, BIN_I.subb, REG_I.dh, self, rhs, this.size);
+        return new Value('_temp', this, self.pos, stack_addr, AddrType.Stack);
     }
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
@@ -745,19 +748,31 @@ export class PtrType implements ValueType {
         return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
     }
     asm_from_minus(context: Context, self: Value, rhs: Value): Value {
-        if (!(rhs.valueType instanceof IntType)) {
-            throwError(new TypeError(self.pos, `Cannot sum variables of types {${this}} and {${rhs.valueType}}`));
-        }
-        const lhs_addr = self.stack_addr(context);
-        const rhs_addr = rhs.stack_addr(context);
-        context.addAssembly(`
+        if (rhs.valueType instanceof IntType) {
+            const lhs_addr = self.stack_addr(context);
+            const rhs_addr = rhs.stack_addr(context);
+            context.addAssembly(`
                 \rmovslq ${rhs_addr}(%rsp), %rdx
                 \rimulq $${this.ptrTo.size}, %rdx 
                 \rmovq ${lhs_addr}(%rsp), %rax
                 \rsubq %rdx, %rax
                 \rmovq %rax, ${context.pushStack(this.size)}(%rsp)
             `);
-        return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
+            return new Value('_temp', this, self.pos, context.stackPtr, AddrType.Stack);
+        }
+        if (rhs.valueType instanceof PtrType) {
+            this.isSameType(rhs.valueType) || throwError(new RulesError(self.pos, `Cannot subtract pointers of different type:\n\rlhs - ${self}\n\rrhs - ${rhs}`));
+            const lhs_addr = self.stack_addr(context);
+            const rhs_addr = rhs.stack_addr(context);
+            context.addAssembly(`
+                \rmovslq ${rhs_addr}(%rsp), %rdx
+                \rmovq ${lhs_addr}(%rsp), %rax
+                \rsubq %rdx, %rax
+                \rmovl %eax, ${context.pushStack(IntType.getInstance().size)}(%rsp)
+            `);
+            return new Value('_temp', IntType.getInstance(), self.pos, context.stackPtr, AddrType.Stack);
+        }
+        TODO(`Unhandeled subtract ${self}, ${rhs}`);
     }
 
     asm_from_multiply(context: Context, self: Value, rhs: Value): Value {

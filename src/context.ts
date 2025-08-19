@@ -62,6 +62,7 @@ export class Context {
         fs.writeFileSync('./v1.asm', this.asm);
 
         this.optimize_stack_space();
+        this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
         fs.writeFileSync('./v2.asm', this.asm);
     }
 
@@ -236,8 +237,8 @@ export class Context {
             throwError(new Error(`Trying to access scope though it does not exist: ${value.pos}`));
         }
         const scope = this.scopes.at(-1)!;
-        if (scope.scopeValues.find(v => v.name === value.name)) {
-            throwError(new Error(`Pushing scope with existing name[${value.name}]`));
+        if (!!scope.scopeValues.find(v => v.name === value.name)) {
+            throwError(new Error(`Pushing scope with existing name: [${value.name}]`));
         }
         scope.scopeValues.push(value);
     }
@@ -252,10 +253,6 @@ export class Context {
     hasValue(name: string): Value | null {
         if (name === 'print') {
             return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
-                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
-        }
-        if (name === 'print_int') {
-            return new Value('print_int', FunctionType.getInstance(VoidType.getInstance(),
                 [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
         }
         const scopeValues = this.scopes.map(s => s.scopeValues);

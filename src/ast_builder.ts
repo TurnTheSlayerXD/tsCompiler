@@ -50,11 +50,6 @@ export class AstNode {
                 if (type !== TokenType.OP_ASSIGNMENT) {
                     throwError(new TokenParserError(token, `Only basic assignment can be used with var type declaration`));
                 }
-                if (r_value.valueType.isSameType(new_value.type)) {
-                    r_value.name = new_value.name;
-                    context.addScopeValue(r_value);
-                    return r_value;
-                }
                 const l_value = new_value.type.asm_from_literal(context, new_value.name, null, this.left.order.tok.pos);
                 l_value.valueType.asm_copy(context, l_value, r_value);
                 context.addScopeValue(l_value)

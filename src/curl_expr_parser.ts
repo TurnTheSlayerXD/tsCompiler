@@ -1,10 +1,10 @@
 import { Context } from "./context";
-import { get_rax_i } from "./converter";
-import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserError } from "./helper";
+import { convert_val_to_type, get_rax_i } from "./converter";
+import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 import { TokenType } from "./token_type";
-import { MOV_I, REG_I, Value } from "./value_types";
+import { FunctionType, MOV_I, REG_I, Value } from "./value_types";
 
 export class CurlExpressionParser {
 
@@ -222,13 +222,15 @@ export class CurlExpressionParser {
                 if (semi_pos === i + 1) {
                     return null;
                 }
-                const res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
+                let res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
+                const { cur_function } = context;
+                const fun_type = cur_function?.valueType as FunctionType ?? UNREACHABLE();
+                res = convert_val_to_type(context, res, fun_type.returnType);
                 const [reg, mov] = get_rax_i(res.valueType.size);
                 context.addAssembly(`
                         \r${MOV_I[mov]} ${res.stack_addr(context)}(%rsp), %${REG_I[reg]} 
                     `);
                 context.clearAllStacks();
-                const { cur_function } = context;
                 if (!cur_function) {
                     throwError(new TokenParserError(tokens[i]!, 'Unexpected KWD_RETURN as not in function'));
                 }

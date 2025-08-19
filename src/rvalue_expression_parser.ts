@@ -11,7 +11,9 @@ export class SemicolonExprParser {
         const root = builder.build();
         let value_type;
         if (can_include_declaration && !!(value_type = handle_declaration_case(root))) {
-            return value_type.type.asm_from_literal(this.context, value_type.name, null, root.order.tok.pos);
+            const val =  value_type.type.asm_from_literal(this.context, value_type.name, null, root.order.tok.pos);
+            this.context.addScopeValue(val);
+            return val;
         }
         return root.eval(false);
     }

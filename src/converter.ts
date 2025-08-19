@@ -61,7 +61,22 @@ export function get_rdx_i(size: number): [REG_I, MOV_I] {
     switch (size) {
         case 8: return [REG_I.rdx, MOV_I.movq];
         case 4: return [REG_I.edx, MOV_I.movl];
-        case 1: return [REG_I.dx, MOV_I.movb];
+        case 1: return [REG_I.dh, MOV_I.movb];
         default: TODO();
     }
+}
+
+export function convert_val_to_type(context: Context, val: Value, type: ValueType): Value {
+    if (val.valueType.isSameType(type)) {
+        return val;
+    }
+    else if (val.valueType instanceof CharType && type instanceof IntType) {
+        context.addAssembly(`
+                    \rmovsbl ${val.stack_addr(context)}(%rsp), %edx
+                    \rmovl %edx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
+                `);
+        const new_value = new Value('_temp', IntType.getInstance(), val.pos, context.stackPtr, AddrType.Stack);
+        return new_value;
+    }
+    TODO();
 }
