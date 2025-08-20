@@ -1,11 +1,12 @@
+import { Context } from "./context";
 import { Lexer, Position, Token } from "./lexer";
-import { TokenType } from "./token_type";
+import { is_op_token_type, O_BRACES, TokenType } from "./token_type";
 
 export function throwError(error: any | undefined = undefined): never {
     if (error instanceof Error) {
         throw error;
     }
-    else if (error instanceof String) {
+    else if (typeof error === 'string') {
         throw new Error(error as string);
     }
     else {
@@ -37,6 +38,8 @@ export class TypeError extends Error {
         super(`Type Error at ${pos}\n${msg}\n`);
     }
 }
+
+
 
 export class RulesError extends Error {
     constructor(pos: Position, msg: string) {
@@ -73,7 +76,7 @@ export function splitBy<T, U extends (arg0: T) => boolean>(arr: T[], cbk: U): T[
 }
 
 type Closing<T> = T extends TokenType.O_PAREN ? TokenType.C_PAREN :
-    T extends TokenType.O_CURL ? TokenType.C_CURL : never;
+    T extends TokenType.O_CURL ? TokenType.C_CURL : T extends TokenType.O_SQR ? TokenType.C_SQR : never;
 
 
 export function getMatchingBracket<T extends TokenType>(tokens: Token[], l_bracket_pos: number, o_br: T, c_br: Closing<T>): number {
@@ -149,4 +152,132 @@ export function filterIndexes<T>(arr: Array<T>, predicate: (arg: T) => boolean, 
         }
     }
     return indexes;
+}
+
+export type Category = { exec_order: 'left' | 'right', imp: number }
+export function get_token_category(type: TokenType): Category | null {
+
+    let _inc = -1;
+    let inc = () => ++_inc;
+
+    inc();
+    if ([TokenType.COMMA].includes(type)) return { exec_order: 'left', imp: _inc };
+    inc();
+    if ([TokenType.OP_ASSIGNMENT, TokenType.OP_ASSIGNMENT_PLUS, TokenType.OP_ASSIGNMENT_MINUS, TokenType.OP_ASSIGNMENT_MULTIPLY, TokenType.OP_ASSIGNMENT_DIVIDE].includes(type)) return { exec_order: 'left', imp: _inc };
+    inc();
+    if ([TokenType.OP_OR].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_AND].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_COMP_GREATER, TokenType.OP_COMP_EQ, TokenType.OP_COMP_NOT_EQ, TokenType.OP_COMP_GREATER_EQ, TokenType.OP_COMP_LESS, TokenType.OP_COMP_LESS_EQ,].includes(type))
+        return { exec_order: 'right', imp: _inc }
+    inc();
+    if ([TokenType.OP_PLUS, TokenType.OP_MINUS].includes(type)) { return { exec_order: 'right', imp: _inc }; }
+    inc();
+    if ([TokenType.OP_MULTIPLY, TokenType.OP_DIVIDE].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_PERCENT].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE].includes(type)) return { exec_order: 'left', imp: _inc };
+    inc();
+    if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
+    inc();
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.DECL_PTR, TokenType.DECL_REF, TokenType.DECL_TYPENAME].includes(type)) return { exec_order: 'right', imp: _inc };
+    return null;
+}
+
+
+export function replace_ambigous_token_types(context: Context, tokens: Token[]) {
+    for (let i = 0; i < tokens.length; ++i) {
+        let cur = tokens[i]!;
+        let prev = tokens[i - 1];
+
+        if (cur.type === TokenType.OP_ASTERISK) {
+            if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
+                || prev.type === TokenType.DECL_PTR || prev.type === TokenType.DECL_TYPENAME)) {
+                // then asterics is type modifier
+                cur.type = TokenType.DECL_PTR;
+            }
+            else if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
+                || i - 1 < 0 ) {
+                // then asterics is dereference
+                cur.type = TokenType.OP_DEREFERENCE;
+            }
+            else {
+                // then asterics is multiply
+                cur.type = TokenType.OP_MULTIPLY;
+            }
+        }
+
+        else if (cur.type === TokenType.OP_AMPERSAND) {
+            if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
+                || prev.type === TokenType.DECL_REF || prev.type === TokenType.DECL_TYPENAME)) {
+                // then ampersand is type modifier
+                cur.type = TokenType.DECL_REF;
+            }
+            else if ((prev
+                && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
+                || i - 1 < 0) {
+                // then ampersand is dereference
+                cur.type = TokenType.OP_REFERENCE;
+            }
+            else {
+                // then ampersand is logical "plus"
+                cur.type = TokenType.OP_LOGICAL_PLUS;
+            }
+        }
+        else if (cur.type === TokenType.NAME && context.hasTypename(cur.text)) {
+            cur.type = TokenType.DECL_TYPENAME;
+        }
+
+        // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
+        //     tokens[i]!.type = TokenType.FUNC_CALL;
+        // }
+
+        // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_SQR) {
+        //     tokens[i]!.type = TokenType.SQR_CALL;
+        // }
+
+    }
+}
+
+function syntaxHighlight(json: any): string {
+    if (typeof json != 'string') {
+        json = JSON.stringify(json, undefined, 10);
+    }
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match: string) {
+        var cls = 'number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+import * as fs from 'fs';
+export function prettyHtml(json: any) {
+    const str = syntaxHighlight(json);
+
+    const style = `
+    <style>
+        .key{ color: green; }
+        .number{ color: blue; }
+        .string{ color: red; }
+    </style>
+    
+    <pre>
+${str}
+    </pre
+    `;
+
+    fs.writeFileSync('./tree.html', style);
 }

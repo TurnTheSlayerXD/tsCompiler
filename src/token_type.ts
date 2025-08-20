@@ -5,10 +5,14 @@ export enum TokenType {
 
     IN_TYPE,
     NAME,
+
     KEYWORD,
 
     O_PAREN,
     C_PAREN,
+
+    O_SQR,
+    C_SQR,
 
     O_CURL,
     C_CURL,
@@ -32,8 +36,8 @@ export enum TokenType {
     OP_DOT,
     OP_ARROW,
     OP_QUESTION,
-    OP_COMP_EQUAL,
-    OP_COMP_NOT_EQUAL,
+    OP_COMP_EQ,
+    OP_COMP_NOT_EQ,
     OP_COMP_LESS,
     OP_COMP_GREATER,
     OP_COMP_GREATER_EQ,
@@ -69,6 +73,10 @@ export enum TokenType {
     KWD_WHILE,
     KWD_BREAK,
     KWD_CONTINUE,
+
+    DECL_PTR,
+    DECL_REF,
+    DECL_TYPENAME,
 }
 
 export const OP_TOKENS = [
@@ -79,7 +87,7 @@ export const OP_TOKENS = [
     TokenType.OP_DOT,
     TokenType.OP_ARROW,
     TokenType.OP_QUESTION,
-    TokenType.OP_COMP_EQUAL,
+    TokenType.OP_COMP_EQ,
     TokenType.OP_COMP_LESS,
     TokenType.OP_COMP_GREATER,
     TokenType.OP_COMP_GREATER_EQ,
@@ -107,6 +115,10 @@ export const VALUE_TOKENS = [
     TokenType.STRING_LITERAL_SQUARE,
     TokenType.NAME,
 ];
+
+export const O_BRACES = [TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR];
+export const C_BRACES = [TokenType.C_PAREN, TokenType.C_CURL, TokenType.C_SQR];
+export const DECL_TOKENS = [TokenType.DECL_PTR, TokenType.DECL_REF];
 
 export function is_op_token_type(type: TokenType) {
     return OP_TOKENS.includes(type);
@@ -139,4 +151,4 @@ export const KEYWORDS: Keyword = {
     'continue': TokenType.KWD_CONTINUE,
 };
 
-export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '&', '%', '"'];
+export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', '[', ']', ';', '=', '==', '<', '>', '&', '%', '"'];

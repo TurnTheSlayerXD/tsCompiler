@@ -46,7 +46,9 @@ export class Token {
             && this.type !== TokenType.STRING_LITERAL
             && this.type !== TokenType.NUM_INT
             && this.type !== TokenType.NUM_FLOAT
-            && this.type !== TokenType.CHAR_LITERAL) {
+            && this.type !== TokenType.CHAR_LITERAL
+            && this.type !== TokenType.DECL_TYPENAME
+        ) {
             throw new TokenAccessException(this);
         }
         return this._text;
@@ -209,6 +211,14 @@ export class Lexer {
             this.iter_cursor(this.cursor, 1);
             return new Token(this.prev_cursor.clone(), '}', TokenType.C_CURL);
         }
+        if (this.at(this.cursor) === '[') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '[', TokenType.O_SQR);
+        }
+        if (this.at(this.cursor) === ']') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), ']', TokenType.C_SQR);
+        }
         if (this.at(this.cursor) === '"') {
             this.iter_cursor(this.cursor, 1);
             this.iter_while_not_equal_one(this.cursor, '"');
@@ -237,11 +247,11 @@ export class Lexer {
         }
         if (this.is_equal_to_expr(this.cursor, '==')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_EQUAL);
+            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '!=')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_NOT_EQUAL);
+            return new Token(this.prev_cursor.clone(), '.', TokenType.OP_COMP_NOT_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '<=')) {
             this.iter_cursor(this.cursor, 2);

@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { Context } from "./context";
 import { CurlExpressionParser } from "./curl_expr_parser";
-import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO } from "./helper";
+import { iterUntilMatchingBracket, LexerError, ParserError, replace_ambigous_token_types, splitBy, throwError, TODO } from "./helper";
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
@@ -10,8 +10,14 @@ import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 
 
 const main = () => {
-    const text = readFileSync("./example/main.c").toString();
-
+    const main_c = process.argv.slice(2)[0] ?? throwError(new Error('No input file provided'));
+    let text;
+    try {
+        text = readFileSync(main_c).toString();
+    }
+    catch (err) {
+        throwError(`No correct input filepath provided. Provided - ${main_c}`);
+    }
     const lexer = new Lexer(text);
 
     let token: Token | null;
@@ -32,8 +38,6 @@ const main = () => {
             continue;
         }
 
-
-
         if (token.type === TokenType.NAME) {
             const decl_tokens = [token];
 
@@ -47,16 +51,21 @@ const main = () => {
             }
 
             if (token.type == TokenType.O_PAREN) {
+                replace_ambigous_token_types(context, decl_tokens);
                 const return_decl = parse_declaration_from_tokens(context, decl_tokens);
                 const fun_name = return_decl.name;
                 const fun_return_type = return_decl.type;
 
                 const token_params = iterUntilMatchingBracket(lexer, token, TokenType.O_PAREN, TokenType.C_PAREN)
-                const splitted_params = splitBy(token_params, t => t.type === TokenType.COMMA);
-
+                let splitted_params: Token[][] = [];
+                if (token_params.length > 0) {
+                    splitted_params = splitBy(token_params, t => t.type === TokenType.COMMA);
+                    for (const p of splitted_params) {
+                        replace_ambigous_token_types(context, p);
+                    }
+                }
                 const fun_params = splitted_params.map(p => parse_declaration_from_tokens(context, p));
                 const fun_value = new Value(fun_name, FunctionType.getInstance(fun_return_type, fun_params.map(v => v.type)), token.pos, -100, AddrType.Stack);
-
 
                 context.addAssembly(`\r.def	${fun_value.name};
                                      \r.endef

@@ -22,11 +22,14 @@ export function parse_type_from_tokens(context: Context, tokens: Token[]): Value
         isConst = true;
     }
     type.is_const = isConst;
-    while (!iter_out.done && (iter_out.value.type === TokenType.OP_ASTERISK || iter_out.value.type === TokenType.OP_DEREFERENCE)) {
+    while (!iter_out.done && (iter_out.value.type === TokenType.DECL_PTR)) {
         type = PtrType.getInstance(type);
         while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
             type.is_const = true;
         }
+    }
+    if (!iter_out.done) {
+        throwError(new TokenParserError(iter_out.value!, `Couldn't parse type declaration: ${tokens}`));
     }
     return type;
 }
@@ -36,11 +39,10 @@ export function parse_declaration_from_tokens(context: Context, tokens: Token[])
         throwError(new Error('Expected lvalue expression'));
     }
     if (tokens.at(-1)!.type !== TokenType.NAME) {
-        throwError(new Error('Expected variable name in lvalue expression'));
+        throwError(new TokenParserError(tokens.at(-1)!, 'Expected variable name in lvalue expression'));
     }
     const value_name = tokens.at(-1)!.text;
-    let typename;
-    if (tokens.length >= 2 && tokens[0]!.type === TokenType.NAME && !!(typename = context.hasTypename(tokens[0]!.text))) {
+    if (tokens.length >= 2 && tokens[0]!.type === TokenType.DECL_TYPENAME) {
         // then it is declaration of variable
         if (!!context.hasValue(value_name)) {
             throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));
@@ -48,5 +50,5 @@ export function parse_declaration_from_tokens(context: Context, tokens: Token[])
         const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
         return { type: value_type, name: value_name };
     }
-    TODO();
+    TODO(`${tokens}`);
 }
