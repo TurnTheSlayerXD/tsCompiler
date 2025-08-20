@@ -19,7 +19,8 @@ void print_int(int num)
     {
         int c = 0;
         int minus = 1;
-        if (num < 0){
+        if (num < 0)
+        {
             num *= -1;
             minus = -1;
         }
@@ -30,7 +31,8 @@ void print_int(int num)
             s[c] = '0' + rest;
             c += 1;
         }
-        if(minus == -1){
+        if (minus == -1)
+        {
             s[c] = '-';
         }
         int len = strlen(s);
@@ -94,6 +96,15 @@ int main(int argc, char **argv)
 {
     char *str = "-1488";
     int res = parse_int_from_str(str);
+
+    if ((int x = 0) == 0)
+    {
+        print_str("x is equal to 0");
+    }
+    else
+    {
+        print_str("x is not equal to 0");
+    }
 
     print_int(res);
 }
