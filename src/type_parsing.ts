@@ -42,8 +42,7 @@ export function parse_declaration_from_tokens(context: Context, tokens: Token[])
         throwError(new TokenParserError(tokens.at(-1)!, 'Expected variable name in lvalue expression'));
     }
     const value_name = tokens.at(-1)!.text;
-    let typename;
-    if (tokens.length >= 2 && tokens[0]!.type === TokenType.NAME && !!(typename = context.hasTypename(tokens[0]!.text))) {
+    if (tokens.length >= 2 && tokens[0]!.type === TokenType.DECL_TYPENAME) {
         // then it is declaration of variable
         if (!!context.hasValue(value_name)) {
             throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));

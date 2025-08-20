@@ -46,7 +46,9 @@ export class Token {
             && this.type !== TokenType.STRING_LITERAL
             && this.type !== TokenType.NUM_INT
             && this.type !== TokenType.NUM_FLOAT
-            && this.type !== TokenType.CHAR_LITERAL) {
+            && this.type !== TokenType.CHAR_LITERAL
+            && this.type !== TokenType.DECL_TYPENAME
+        ) {
             throw new TokenAccessException(this);
         }
         return this._text;

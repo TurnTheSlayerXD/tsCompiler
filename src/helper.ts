@@ -182,7 +182,7 @@ export function get_token_category(type: TokenType): Category | null {
     inc();
     if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
     inc();
-    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.DECL_PTR, TokenType.DECL_REF, TokenType.DECL_NAME, TokenType.O_DECL_SQR, TokenType.C_DECL_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.DECL_PTR, TokenType.DECL_REF, TokenType.DECL_TYPENAME].includes(type)) return { exec_order: 'right', imp: _inc };
     return null;
 }
 
@@ -194,12 +194,12 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
 
         if (cur.type === TokenType.OP_ASTERISK) {
             if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
-                || prev.type === TokenType.DECL_PTR)) {
+                || prev.type === TokenType.DECL_PTR || prev.type === TokenType.DECL_TYPENAME)) {
                 // then asterics is type modifier
                 cur.type = TokenType.DECL_PTR;
             }
             else if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
-                || i - 1 < 0) {
+                || i - 1 < 0 ) {
                 // then asterics is dereference
                 cur.type = TokenType.OP_DEREFERENCE;
             }
@@ -211,7 +211,7 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
 
         else if (cur.type === TokenType.OP_AMPERSAND) {
             if (prev && (prev.type === TokenType.NAME && !!context.hasTypename(prev.text)
-                || prev.type === TokenType.DECL_REF)) {
+                || prev.type === TokenType.DECL_REF || prev.type === TokenType.DECL_TYPENAME)) {
                 // then ampersand is type modifier
                 cur.type = TokenType.DECL_REF;
             }
@@ -226,18 +226,9 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
                 cur.type = TokenType.OP_LOGICAL_PLUS;
             }
         }
-
-        else if (cur.type === TokenType.NAME && prev && ([TokenType.NAME, TokenType.DECL_PTR, TokenType.DECL_REF].includes(prev.type))) {
-            cur.type = TokenType.DECL_NAME;
+        else if (cur.type === TokenType.NAME && context.hasTypename(cur.text)) {
+            cur.type = TokenType.DECL_TYPENAME;
         }
-
-        else if (cur.type === TokenType.O_SQR && prev && prev.type === TokenType.DECL_NAME) {
-            cur.type = TokenType.O_DECL_SQR;
-        }
-        else if (cur.type === TokenType.C_SQR && prev && prev.type === TokenType.O_DECL_SQR) {
-            cur.type = TokenType.C_DECL_SQR;
-        }
-
 
         // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {
         //     tokens[i]!.type = TokenType.FUNC_CALL;

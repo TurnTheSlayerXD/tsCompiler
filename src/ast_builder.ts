@@ -34,7 +34,7 @@ export class AstNode {
         return root;
     }
 
-    eval(is_lvalue: boolean): Value {
+    eval({ is_lvalue, can_be_decl }: { is_lvalue: boolean, can_be_decl: boolean }): Value {
         const type = this.order.tok.type;
         const token = this.order.tok;
         const { context } = this;
@@ -43,42 +43,34 @@ export class AstNode {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for ASSIGNMENT OP`));
 
-            const r_value = this.right.eval(false);
-
-            let new_value;
-            if (!!(new_value = handle_declaration_case(this.left))) {
-                if (type !== TokenType.OP_ASSIGNMENT) {
-                    throwError(new TokenParserError(token, `Only basic assignment can be used with var type declaration`));
-                }
-                const l_value = new_value.type.asm_from_literal(context, new_value.name, null, this.left.order.tok.pos);
-                l_value.valueType.asm_copy(context, l_value, r_value);
-                context.addScopeValue(l_value)
-                return l_value;
-            }
-
-            const l_value = this.left.eval(true);
+            const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
             switch (token.type) {
                 case TokenType.OP_ASSIGNMENT_PLUS: {
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_plus(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MINUS: {
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_minus(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MULTIPLY: {
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_multiply(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_DIVIDE: {
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_divide(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT: {
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true });
                     l_value.valueType.asm_copy(context, l_value, r_value);
                     return r_value;
                 }
@@ -86,12 +78,34 @@ export class AstNode {
                     TODO();
             }
         }
+
+        let check_is_declaration = (): { name: string, type: ValueType } | null => {
+            let node: AstNode | null = this;
+            const toks: Token[] = [];
+            while (node && node.type !== TokenType.DECL_TYPENAME) {
+                toks.push(node.order.tok);
+                node = node.left;
+            }
+            if (node && node.type === TokenType.DECL_TYPENAME) {
+                toks.push(node.order.tok);
+                toks.reverse();
+                return parse_declaration_from_tokens(context, toks);
+            }
+            return null;
+        };
+        let res;
+        if (can_be_decl && (res = check_is_declaration())) {
+            const val = res.type.asm_from_literal(context, res.name, null, token.pos);
+            context.addScopeValue(val);
+            return val;
+        }
+
         if ([TokenType.OP_AND, TokenType.OP_OR,].includes(type)) {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for ASSIGNMENT OP`));
 
-            const left = this.left.eval(false);
-            const right = this.right.eval(false);
+            const left = this.left.eval({ is_lvalue: false, can_be_decl: true });
+            const right = this.right.eval({ is_lvalue: false, can_be_decl: true });
 
             const left_addr = left.valueType.asm_to_boolean(context, left).stack_addr(context);
             const right_addr = right.valueType.asm_to_boolean(context, right).stack_addr(context);
@@ -138,8 +152,8 @@ export class AstNode {
             TokenType.OP_COMP_LESS_EQ].includes(type)) {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for ASSIGNMENT OP`));
-            const left = this.left.eval(false);
-            const right = this.right.eval(false);
+            const left = this.left.eval({ is_lvalue: false, can_be_decl: true });
+            const right = this.right.eval({ is_lvalue: false, can_be_decl: true });
             switch (token!.type) {
                 case TokenType.OP_COMP_GREATER: return left.valueType.asm_cmp_greater(context, left, right);
                 case TokenType.OP_COMP_GREATER_EQ: return left.valueType.asm_cmp_greater_or_equal(context, left, right);
@@ -153,12 +167,12 @@ export class AstNode {
         if ([TokenType.OP_PLUS, TokenType.OP_MINUS].includes(type)) {
             if (!this.right)
                 throwError(new TokenParserError(token, `Expected at least right arg for PLUS-MINUS OP`));
-            let left: Value, right: Value = this.right.eval(false);
+            let left: Value, right: Value = this.right.eval({ is_lvalue: false, can_be_decl: true });
             if (!this.left) {
                 left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
             }
             else {
-                left = this.left.eval(false);
+                left = this.left.eval({ is_lvalue: false, can_be_decl: true });
             }
             return token.type === TokenType.OP_PLUS ? left.valueType.asm_from_plus(context, left, right) : left.valueType.asm_from_minus(context, left, right);
         }
@@ -166,30 +180,30 @@ export class AstNode {
         if ([TokenType.OP_MULTIPLY, TokenType.OP_DIVIDE].includes(type)) {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for MUL/DIV OP`));
-            const left = this.left.eval(false);
-            const right = this.right.eval(false);
+            const left = this.left.eval({ is_lvalue: false, can_be_decl: true });
+            const right = this.right.eval({ is_lvalue: false, can_be_decl: true });
 
             return token.type === TokenType.OP_DIVIDE ? left.valueType.asm_from_divide(context, left, right) : left.valueType.asm_from_multiply(context, left, right);
         }
         if ([TokenType.OP_PERCENT].includes(type)) {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for PERCENT OP`));
-            const left = this.left.eval(false);
-            const right = this.right.eval(false);
+            const left = this.left.eval({ is_lvalue: false, can_be_decl: true });
+            const right = this.right.eval({ is_lvalue: false, can_be_decl: true });
             return left.valueType.asm_from_percent(context, left, right);
         }
         if ([TokenType.OP_REFERENCE].includes(type)) {
             if (!this.right) {
                 throwError(new TokenParserError(token, `Expected right arg for REFERENCE OP`));
             }
-            const arg = this.right.eval(true);
+            const arg = this.right.eval({ is_lvalue: true, can_be_decl: true });
             return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
         }
         if ([TokenType.OP_DEREFERENCE].includes(type)) {
             if (!this.right) {
                 throwError(new TokenParserError(token, `Expected right arg for DEREFERENCE OP`));
             }
-            const arg = this.right.eval(false);
+            const arg = this.right.eval({ is_lvalue: false, can_be_decl: true });
             const ptr_type: PtrType = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
             return ptr_type.asm_dereference(context, '_temp', arg, is_lvalue);
         }
@@ -216,18 +230,18 @@ export class AstNode {
         if ([TokenType.O_PAREN].includes(type)) {
             //handle function call case
             if (this.left) {
-                const fun_obj = this.left.eval(false);
+                const fun_obj = this.left.eval({ is_lvalue: false, can_be_decl: true });
                 let params = [];
                 let comma_token: AstNode | null = this.right;
                 while (comma_token && comma_token.type === TokenType.COMMA) {
                     if (!comma_token.left) {
                         throwError(new TokenParserError(comma_token.order.tok, 'Expected expression before comma'));
                     }
-                    params.push(comma_token.left.eval(false));
+                    params.push(comma_token.left.eval({ is_lvalue: false, can_be_decl: true }));
                     comma_token = comma_token.right;
                 }
                 if (!!comma_token) {
-                    params.push(comma_token.eval(false));
+                    params.push(comma_token.eval({ is_lvalue: false, can_be_decl: true }));
                 }
                 const fun_name = fun_obj.name;
                 if (!(fun_obj.valueType instanceof FunctionType)) {
@@ -285,14 +299,14 @@ export class AstNode {
                 return new Value('_temp', VoidType.getInstance(), token.pos, null, AddrType.Stack);
             }
             //otherwise it is just for operation ordering
-            return this.right.eval(false);
+            return this.right.eval({ is_lvalue: false, can_be_decl: true });
         }
         if ([TokenType.O_SQR].includes(type)) {
             if (!this.left || !this.right) {
                 throwError(new TokenParserError(token, `OP square brackets requires both LEFT and right args`));
             }
-            const ind_val = this.right.eval(false);
-            const ptr_val = this.left.eval(false);
+            const ind_val = this.right.eval({ is_lvalue: false, can_be_decl: true });
+            const ptr_val = this.left.eval({ is_lvalue: false, can_be_decl: true });
             const applied = ptr_val.valueType.asm_from_plus(context, ptr_val, ind_val);
             const applied_type = applied.valueType as PtrType ?? throwError(new TokenParserError(token, 'Expected PTR type'));
             const res = applied_type.asm_dereference(context, '_temp', applied, is_lvalue);
@@ -305,11 +319,11 @@ export class AstNode {
                 if (!comma_token.left) {
                     throwError(new TokenParserError(comma_token.order.tok, 'Expected expression before comma'));
                 }
-                params.push(comma_token.left.eval(false));
+                params.push(comma_token.left.eval({ is_lvalue: false, can_be_decl: true }));
                 comma_token = comma_token.right;
             }
             if (!!comma_token) {
-                params.push(comma_token.eval(false));
+                params.push(comma_token.eval({ is_lvalue: false, can_be_decl: true }));
             }
             params.reverse();
             if (params.length > 0) {
@@ -449,19 +463,3 @@ function gather_nodes_in_order(root: AstNode): AstNode[] {
     return nodes;
 }
 
-export function handle_declaration_case(root: AstNode): { type: ValueType, name: string } | null {
-    let left: AstNode | null = root;
-    if (!!left && DECL_TOKENS.includes(root.type)) {
-        return null;
-    }
-    const toks: Token[] = [];
-    while (!!left && [TokenType.NAME, TokenType.DECL_PTR, TokenType.DECL_REF].includes(left.order.tok.type)) {
-        toks.push(left.order.tok);
-        left = left.left;
-    }
-    if (toks.length === 1) {
-        return null;
-    }
-    toks.reverse();
-    return parse_declaration_from_tokens(root.context, toks);
-}

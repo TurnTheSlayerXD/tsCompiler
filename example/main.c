@@ -84,7 +84,6 @@ int parse_int_from_str(char *str)
     int num = 0;
     while (begin != end)
     {
-        print_int(get_digit(*begin));
         num += power(10, end - begin - 1) * get_digit(*begin);
         begin += 1;
     }

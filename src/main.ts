@@ -51,6 +51,7 @@ const main = () => {
             }
 
             if (token.type == TokenType.O_PAREN) {
+                replace_ambigous_token_types(context, decl_tokens);
                 const return_decl = parse_declaration_from_tokens(context, decl_tokens);
                 const fun_name = return_decl.name;
                 const fun_return_type = return_decl.type;
