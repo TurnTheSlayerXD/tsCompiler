@@ -199,7 +199,7 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
                 cur.type = TokenType.DECL_PTR;
             }
             else if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
-                || i - 1 < 0 ) {
+                || i - 1 < 0) {
                 // then asterics is dereference
                 cur.type = TokenType.OP_DEREFERENCE;
             }
