@@ -589,7 +589,7 @@ export class VoidType implements ValueType {
 export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 
-    private constructor(public ptrTo: ValueType) { }
+    protected constructor(public ptrTo: ValueType) { }
     asm_from_percent(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
@@ -958,11 +958,14 @@ export class TypenameType implements ValueType {
 
 }
 
-export class ArrayType implements ValueType {
-    is_const: boolean = false;
+export class ArrayType extends PtrType {
+    override is_const: boolean = false;
     _array_size: number | null = null;
 
-    private constructor(public ptrTo: ValueType, array_size: number | null) { this._array_size = array_size; }
+    private constructor(ptrTo: ValueType, array_size: number | null) {
+        super(ptrTo);
+        this._array_size = array_size;
+    }
     get array_size(): number {
         return this._array_size ?? UNREACHABLE();
     }
@@ -971,68 +974,18 @@ export class ArrayType implements ValueType {
         this._array_size = array_size;
     }
 
-    toString: () => string = () => 'Array type';
-    isSameType(type: ValueType): boolean {
+    override toString: () => string = () => 'Array type';
+    override isSameType(type: ValueType): boolean {
         if ((type instanceof PtrType || type instanceof ArrayType) && type.ptrTo.isSameType(this.ptrTo)) {
             return true;
         }
         return false;
     }
 
-    static getInstance(ptrTo: ValueType, array_size: number | null = null) { return new ArrayType(ptrTo, array_size); }
-
-    get size(): number {
+    static override getInstance(ptrTo: ValueType, array_size: number | null = null) { return new ArrayType(ptrTo, array_size); }
+    override get size(): number {
         return 8;
     }
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_copy(context: Context, dst: Value, src: Value): void {
-        throw new Error('Method not implemented.');
-    }
-    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    asm_to_boolean(context: Context, self: Value): Value {
-        throw new Error('Method not implemented.');
-    }
-    get reg_i(): REG_I {
-        throw new Error('Method not implemented.');
-    }
-    get mov_i(): MOV_I {
-        throw new Error('Method not implemented.');
-    }
-
 }
 
 

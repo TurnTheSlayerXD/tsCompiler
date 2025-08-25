@@ -4,17 +4,23 @@ import { Context } from "./context";
 import { throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { TokenType } from "./token_type";
-import { ArrayType, PtrType, ValueType } from "./value_types";
+import { ArrayType, FunctionType, PtrType, ValueType } from "./value_types";
 
-export function parse_type_from_tokens(context: Context, root: AstNode): ValueType {
+export function parse_type_from_tokens(context: Context, root: AstNode): ValueType | { type: ValueType, name: string } {
     root.type === TokenType.DECL_TYPENAME || UNREACHABLE();
-
     let variable_name: string | undefined;
-    let final_type: ValueType = context.hasTypename(root.order.tok.text) ?? UNREACHABLE();
-    const recurs = (node: AstNode): ValueType => {
-        if (node.type === TokenType.OP_DEREFERENCE) {
-            final_type = PtrType.getInstance(final_type);
-        }
+    const nodes = collect_all_nodes_sorted_backwards(root);
+    if (nodes[0]!.type !== TokenType.DECL_TYPENAME) {
+        UNREACHABLE();
+    }
+    let final_type: ValueType = context.hasTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
+    if (nodes.at(-1)!.type === TokenType.NAME) {
+        variable_name = nodes.at(-1)!.order.tok.text;
+    }
+    let type_modifiers = nodes.slice(1, !!variable_name ? nodes.length - 1 : nodes.length);
+
+    for (let i = 0; i < type_modifiers.length; ++i) {
+        const node = type_modifiers[i]!;
         if (node.type === TokenType.O_SQR) {
             const bracket_node = node as AstBracketNode ?? UNREACHABLE();
             let array_size: number | null = null;
@@ -27,29 +33,52 @@ export function parse_type_from_tokens(context: Context, root: AstNode): ValueTy
                     throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
                 }
             }
-            if (!node.left) {
-                return ArrayType.getInstance(final_type, array_size);
+            final_type = ArrayType.getInstance(final_type, array_size);
+        }
+        if (node.type === TokenType.O_PAREN) {
+            const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+            if (bracket_node.middle) {
+                if (bracket_node.middle.type === TokenType.OP_DEREFERENCE) {
+                    if (i + 1 >= type_modifiers.length || type_modifiers[i + 1]!.type !== TokenType.O_PAREN) {
+                        throwError(new TokenParserError(bracket_node.order.tok, `Expected O_PAREN IN PTR TO FUNCTION TYPE DECLARATION`));
+                    }
+                    const fun_param_types: ValueType[] = [];
+
+                    final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
+                    TODO('PARSE FUNCTION\'s ARGS TYPES');
+
+                }
+                else {
+                    throwError(new TokenParserError(bracket_node.order.tok, `EXPECTED EXPR INSIDE BRACES`))
+                }
             }
-            return ArrayType.getInstance(recurs(node.left), array_size);
         }
         if (node.type === TokenType.OP_DEREFERENCE) {
-            if (!node.left) {
-                return PtrType.getInstance(final_type);
-            }
+            final_type = PtrType.getInstance(final_type);
         }
+    }
 
-        if (!node.left && !node.right) {
-            return;
-        }
-        TODO(`Type parsing ${node.order}`);
-    };
-
-
-
-
-    return type;
+    return final_type;
 }
 
-export function parse_declaration_from_tokens(context: Context, tokens: Token[]): { type: ValueType, name: string } {
+export function parse_declaration_from_tokens(context: Context, root: AstNode): { type: ValueType, name: string } {
+    const res = parse_declaration_from_tokens(context, root);
+    if (!!res.name) {
+        return res;
+    }
+    throwError(new TokenParserError(root.order.tok, `Expected Name after type declaration`));
+}
 
+function collect_all_nodes_sorted_backwards(root: AstNode): AstNode[] {
+    const nodes: AstNode[] = [];
+    const recurs = (node: AstNode | null) => {
+        if (node === null) {
+            return;
+        }
+        nodes.push(node);
+        recurs(node.left);
+        recurs(node.right);
+    };
+    nodes.sort((lhs, rhs) => lhs.order.pos < rhs.order.pos ? -1 : lhs.order.pos === rhs.order.pos ? 0 : 1);
+    return nodes;
 }
