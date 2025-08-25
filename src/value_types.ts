@@ -894,6 +894,147 @@ export class FunctionType implements ValueType {
     get size(): number { return 8; }
 }
 
+export class TypenameType implements ValueType {
+    is_const: boolean = false;
+    private constructor(public typevalue: ValueType) {
+
+    }
+
+    toString: () => string = () => "typename";
+    isSameType(type: ValueType): boolean {
+        throw new Error('Method not implemented.');
+    }
+    get size(): number {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_copy(context: Context, dst: Value, src: Value): void {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_to_boolean(context: Context, self: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    get reg_i(): REG_I {
+        throw new Error('Method not implemented.');
+    }
+    get mov_i(): MOV_I {
+        throw new Error('Method not implemented.');
+    }
+
+}
+
+export class ArrayType implements ValueType {
+    is_const: boolean = false;
+    _array_size: number | null = null;
+
+    private constructor(public ptrTo: ValueType, array_size: number | null) { this._array_size = array_size; }
+    get array_size(): number {
+        return this._array_size ?? UNREACHABLE();
+    }
+
+    set array_size(array_size: number) {
+        this._array_size = array_size;
+    }
+
+    toString: () => string = () => 'Array type';
+    isSameType(type: ValueType): boolean {
+        if ((type instanceof PtrType || type instanceof ArrayType) && type.ptrTo.isSameType(this.ptrTo)) {
+            return true;
+        }
+        return false;
+    }
+
+    static getInstance(ptrTo: ValueType, array_size: number | null = null) { return new ArrayType(ptrTo, array_size); }
+
+    get size(): number {
+        return 8;
+    }
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_copy(context: Context, dst: Value, src: Value): void {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    asm_to_boolean(context: Context, self: Value): Value {
+        throw new Error('Method not implemented.');
+    }
+    get reg_i(): REG_I {
+        throw new Error('Method not implemented.');
+    }
+    get mov_i(): MOV_I {
+        throw new Error('Method not implemented.');
+    }
+
+}
+
 
 export enum AddrType {
     TempStack,

@@ -1,54 +1,55 @@
+import { AstBracketNode } from "./ast_bracket_node";
+import { AstNode } from "./ast_node";
 import { Context } from "./context";
-import { throwError, TODO, TokenParserError } from "./helper";
+import { throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { TokenType } from "./token_type";
-import { PtrType, ValueType } from "./value_types";
+import { ArrayType, PtrType, ValueType } from "./value_types";
 
-export function parse_type_from_tokens(context: Context, tokens: Token[]): ValueType {
-    let type: ValueType | null;
-    let isConst = false;
-    const iter = tokens.values();
-    let iter_out: IteratorResult<Token>;
-    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-        isConst = true;
-    }
-    if (iter_out.done) {
-        throwError(new TokenParserError(tokens.at(-1)!, `No type declared except keyword CONST`));
-    }
-    if (!(type = context.hasTypename(iter_out.value.text))) {
-        throwError(new TokenParserError(iter_out.value, `Unknown VALUE TYPE: [${iter_out.value.text}]`));
-    }
-    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-        isConst = true;
-    }
-    type.is_const = isConst;
-    while (!iter_out.done && (iter_out.value.type === TokenType.DECL_PTR)) {
-        type = PtrType.getInstance(type);
-        while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-            type.is_const = true;
+export function parse_type_from_tokens(context: Context, root: AstNode): ValueType {
+    root.type === TokenType.DECL_TYPENAME || UNREACHABLE();
+
+    let variable_name: string | undefined;
+    let final_type: ValueType = context.hasTypename(root.order.tok.text) ?? UNREACHABLE();
+    const recurs = (node: AstNode): ValueType => {
+        if (node.type === TokenType.OP_DEREFERENCE) {
+            final_type = PtrType.getInstance(final_type);
         }
-    }
-    if (!iter_out.done) {
-        throwError(new TokenParserError(iter_out.value!, `Couldn't parse type declaration: ${tokens}`));
-    }
+        if (node.type === TokenType.O_SQR) {
+            const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+            let array_size: number | null = null;
+            if (bracket_node.middle) {
+                if (bracket_node.middle.type !== TokenType.NUM_INT) {
+                    throwError(new TokenParserError(bracket_node.order.tok, `Expected constant expression inside Array size qualifier. Found: ${bracket_node.middle.order.tok}`))
+                }
+                array_size = parseInt(bracket_node.middle.order.tok.text);
+                if (!Number.isFinite(array_size)) {
+                    throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
+                }
+            }
+            if (!node.left) {
+                return ArrayType.getInstance(final_type, array_size);
+            }
+            return ArrayType.getInstance(recurs(node.left), array_size);
+        }
+        if (node.type === TokenType.OP_DEREFERENCE) {
+            if (!node.left) {
+                return PtrType.getInstance(final_type);
+            }
+        }
+
+        if (!node.left && !node.right) {
+            return;
+        }
+        TODO(`Type parsing ${node.order}`);
+    };
+
+
+
+
     return type;
 }
 
 export function parse_declaration_from_tokens(context: Context, tokens: Token[]): { type: ValueType, name: string } {
-    if (tokens.length === 0) {
-        throwError(new Error('Expected lvalue expression'));
-    }
-    if (tokens.at(-1)!.type !== TokenType.NAME) {
-        throwError(new TokenParserError(tokens.at(-1)!, 'Expected variable name in lvalue expression'));
-    }
-    const value_name = tokens.at(-1)!.text;
-    if (tokens.length >= 2 && tokens[0]!.type === TokenType.DECL_TYPENAME) {
-        // then it is declaration of variable
-        if (!!context.hasValue(value_name)) {
-            throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));
-        }
-        const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
-        return { type: value_type, name: value_name };
-    }
-    TODO(`${tokens}`);
+
 }

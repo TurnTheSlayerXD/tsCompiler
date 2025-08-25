@@ -96,8 +96,8 @@ int main(int argc, char **argv)
 {
     char *str = "-1488";
     int res = parse_int_from_str(str);
-
-    if ((int x = 0) == 0)
+    print_int(res);
+    if ((int x = 1) == 0)
     {
         print_str("x is equal to 0");
     }
@@ -105,6 +105,5 @@ int main(int argc, char **argv)
     {
         print_str("x is not equal to 0");
     }
-
     print_int(res);
 }

@@ -769,31 +769,38 @@ main:
 .seh_proc main
 #__begin_scope_17
 #__init_scope_17
-subq $76, %rsp
-movl %ecx, 72(%rsp)
-movq %rdx, 64(%rsp)
-movb $0, 63(%rsp)
-movb $56, 62(%rsp)
-movb $56, 61(%rsp)
-movb $52, 60(%rsp)
-movb $49, 59(%rsp)
-movb $45, 58(%rsp)
-leaq  58(%rsp), %rdx
-movq %rdx, 50(%rsp)
-movq $0, 42(%rsp)
-movq  50(%rsp), %rdx
-movq %rdx, 42(%rsp)
-movq $0, 34(%rsp)
-movq  42(%rsp), %rdx
-movq %rdx, 34(%rsp)
+subq $81, %rsp
+movl %ecx, 77(%rsp)
+movq %rdx, 69(%rsp)
+movb $0, 68(%rsp)
+movb $56, 67(%rsp)
+movb $56, 66(%rsp)
+movb $52, 65(%rsp)
+movb $49, 64(%rsp)
+movb $45, 63(%rsp)
+leaq  63(%rsp), %rdx
+movq %rdx, 55(%rsp)
+movq $0, 47(%rsp)
+movq  55(%rsp), %rdx
+movq %rdx, 47(%rsp)
+movq $0, 39(%rsp)
+movq  47(%rsp), %rdx
+movq %rdx, 39(%rsp)
 #__parameter_offset_pass
-leaq  34(%rsp), %rcx
+leaq  39(%rsp), %rcx
 callq parse_int_from_str
-movl %eax, 30(%rsp)
-movl $0, 26(%rsp)
-movl  30(%rsp), %edx
-movl %edx, 26(%rsp)
-movl $0, 22(%rsp)
+movl %eax, 35(%rsp)
+movl $0, 31(%rsp)
+movl  35(%rsp), %edx
+movl %edx, 31(%rsp)
+movl $0, 27(%rsp)
+movl  31(%rsp), %edx
+movl %edx, 27(%rsp)
+#__parameter_offset_pass
+leaq  27(%rsp), %rcx
+callq print_int
+movb %al, 26(%rsp)
+movl $1, 22(%rsp)
 movl $0, 18(%rsp)
 movl  22(%rsp), %edx
 movl %edx, 18(%rsp)
@@ -886,14 +893,14 @@ jmp mark_32
 mark_34 :
 mark_32 :
 movl $0, 9(%rsp)
-movl  26(%rsp), %edx
+movl  31(%rsp), %edx
 movl %edx, 9(%rsp)
 #__parameter_offset_pass
 leaq  9(%rsp), %rcx
 callq print_int
 movb %al, 8(%rsp)
 #__clear_scope_17
-addq $76, %rsp
+addq $81, %rsp
 #__end_scope_17
 xor %rax, %rax
 retq
