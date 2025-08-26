@@ -78,10 +78,13 @@ export class AstNode {
                 case TokenType.OP_ASSIGNMENT: {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true, is_immediately_assigned: true });
                     const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
-                    if (l_value.valueType instanceof ArrayType &&
+                    console.log(l_value);
+                    console.log(r_value);
+                    if (
+                        l_value.valueType instanceof ArrayType &&
                         !l_value._address &&
                         r_value.valueType instanceof ArrayType &&
-                        !r_value.name &&
+                        r_value.name === '_temp' &&
                         r_value.valueType.array_size !== null) {
 
                         if (!l_value.valueType.array_size) {
@@ -90,12 +93,29 @@ export class AstNode {
                         }
                         else if (l_value.valueType.array_size >= r_value.valueType.array_size) {
                             const _temp = l_value.valueType.asm_from_literal(context, '_temp', null, l_value.pos, true);
-                            for (let i = 0; i < r_value.valueType.array_size; ++i){
-                                
-                                
-                            }
+                            const _temp_type = _temp.valueType as ArrayType ?? UNREACHABLE();
+                            for (let i = 0; i < r_value.valueType.array_size; ++i) {
+                                const from_plus = _temp_type
+                                    .asm_from_plus(context, _temp, IntType.getInstance()
+                                        .asm_from_literal(context, "_temp", String(i), l_value.pos, true));
+                                const deref = (from_plus.valueType as PtrType)?.asm_dereference(context, '_temp', from_plus, true);
 
+                                const r_value_from_plus = r_value.valueType
+                                    .asm_from_plus(context, r_value, IntType.getInstance()
+                                        .asm_from_literal(context, "_temp", String(i), r_value.pos, true));
+                                const r_value_deref = (r_value_from_plus.valueType as PtrType)?.asm_dereference(context, '_temp', r_value_from_plus, false);
+
+                                deref.valueType.asm_copy(context, deref, r_value_deref);
+                            }
+                            l_value._address = _temp._address;
+                            r_value._address = _temp._address;
                         }
+                        else {
+                            UNREACHABLE();
+                        }
+                    }
+                    else if (!l_value._address) {
+                        l_value._address = r_value._address;
                     }
                     else {
                         l_value.valueType.asm_copy(context, l_value, r_value);
@@ -106,7 +126,6 @@ export class AstNode {
                     TODO();
             }
         }
-
         if ([TokenType.DECL_TYPENAME].includes(type)) {
             if (!can_be_decl) {
                 throwError(new TokenParserError(token, `Assignment forbidden in expression`));
@@ -230,7 +249,7 @@ export class AstNode {
         }
         if ([TokenType.STRING_LITERAL].includes(type)) {
             this.context.addStringLiteral(token.text);
-            const new_value = PtrType.getInstance(CharType.getInstance()).asm_from_literal(this.context, '_temp', token.text, token.pos, true);
+            const new_value = ArrayType.getArrayInstance(CharType.getInstance(), null).asm_from_literal(this.context, '_temp', token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.CHAR_LITERAL].includes(type)) {

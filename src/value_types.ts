@@ -971,7 +971,7 @@ export class ArrayType extends PtrType {
         super(ptrTo);
     }
 
-    override toString: () => string = () => 'Array type';
+    override toString: () => string = () => `Array type, size=${this.array_size}`;
     override isSameType(type: ValueType): boolean {
         if ((type instanceof PtrType || type instanceof ArrayType) && type.ptrTo.isSameType(this.ptrTo)) {
             return true;
@@ -991,6 +991,26 @@ export class ArrayType extends PtrType {
                     this.ptrTo.asm_from_literal(context, '_temp', null, pos, true);
                 }
             }
+            else if (literal !== null) {
+                context.addAssembly(`
+                    \rmovb $0, ${context.pushStack(CharType.getInstance().size)}(%rsp)
+                `);
+                const codes = convert_string_to_char_codes(literal).reverse();
+                for (const c of codes) {
+                    context.addAssembly(`
+                    \rmovb $${c}, ${context.pushStack(CharType.getInstance().size)}(%rsp)
+                `);
+                }
+                context.addAssembly(`
+                    \rleaq ${context.stackPtr}(%rsp), %rdx
+                `);
+                context.addAssembly(`
+                    \rmovq %rdx, ${context.pushStack(this.size)}(%rsp) 
+                `);
+                this.array_size = codes.length;
+                return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+            }
+
             context.addAssembly(`
                 \rleaq ${context.stackPtr}(%rsp), %rdx
                 \rmovq %rdx, ${context.pushStack(this.size)}(%rsp)

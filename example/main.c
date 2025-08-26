@@ -14,10 +14,12 @@ void print_str(char *str)
     print(str, strlen(str));
 }
 
-
 int main(){
 
-    char[100] arr = "Hello";
+    char[10] arr = "hello";
+
+    arr[5] = 'F';
+    arr[6] = 'F';
 
     print_str(arr);
 }
