@@ -41,7 +41,7 @@ export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_T
                     throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
                 }
             }
-            final_type = ArrayType.getInstance(final_type, array_size);
+            final_type = ArrayType.getArrayInstance(final_type, array_size);
         }
         else if (node.type === TokenType.O_PAREN) {
             const bracket_node = node as AstBracketNode ?? UNREACHABLE();

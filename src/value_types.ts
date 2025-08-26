@@ -9,7 +9,7 @@ export interface ValueType {
     isSameType(type: ValueType): boolean;
     get size(): number;
 
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value;
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value;
     asm_copy(context: Context, dst: Value, src: Value): void;
 
     asm_from_plus(context: Context, self: Value, rhs: Value): Value;
@@ -320,12 +320,15 @@ export class IntType implements ValueType {
         return this.is_const ? "const int" : "int";
     }
 
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
-        context.pushStack(this.size);
-        context.addAssembly(`
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value {
+        if (should_alloc) {
+            context.pushStack(this.size);
+            context.addAssembly(`
             \rmovl $${literal ?? 0}, ${context.stackPtr}(%rsp)
             `);
-        return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+        }
+        return new Value(name, this, pos, null, AddrType.Stack);
     }
     asm_copy(context: Context, dst: Value, src: Value): void {
         dst.valueType.isSameType(this) || UNREACHABLE();
@@ -415,17 +418,20 @@ export class CharType implements ValueType {
         return asm_comp_action_b(context, self, rhs, JN_I.jg);
     }
 
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
-        context.pushStack(this.size);
-        const code: number[] = !!literal ? convert_string_to_char_codes(literal) : [0];
-        if (code.length > 1) {
-            throwError(new RulesError(pos, `Char type Literal [${literal}] cannot be multichracter`));
-        }
-        context.addAssembly(`
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value {
+        if (should_alloc) {
+            context.pushStack(this.size);
+            const code: number[] = !!literal ? convert_string_to_char_codes(literal) : [0];
+            if (code.length > 1) {
+                throwError(new RulesError(pos, `Char type Literal [${literal}] cannot be multichracter`));
+            }
+            context.addAssembly(`
             \rmovb $${code[0]!}, %ah
             \rmovb %ah, ${context.stackPtr}(%rsp)
             `);
-        return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+        }
+        return new Value(name, this, pos, null, AddrType.Stack);
     }
 
     asm_copy(context: Context, dst: Value, src: Value): void {
@@ -684,7 +690,7 @@ export class PtrType implements ValueType {
         return new Value('_temp', this.ptrTo, self.pos, context.stackPtr, AddrType.Stack);
     }
 
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position): Value {
+    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
             context.addAssembly(`
                     \rmovb $0, ${context.pushStack(CharType.getInstance().size)}(%rsp)
@@ -960,18 +966,9 @@ export class TypenameType implements ValueType {
 
 export class ArrayType extends PtrType {
     override is_const: boolean = false;
-    _array_size: number | null = null;
 
-    private constructor(ptrTo: ValueType, array_size: number | null) {
+    private constructor(ptrTo: ValueType, public array_size: number | null) {
         super(ptrTo);
-        this._array_size = array_size;
-    }
-    get array_size(): number {
-        return this._array_size ?? UNREACHABLE();
-    }
-
-    set array_size(array_size: number) {
-        this._array_size = array_size;
     }
 
     override toString: () => string = () => 'Array type';
@@ -982,9 +979,27 @@ export class ArrayType extends PtrType {
         return false;
     }
 
-    static override getInstance(ptrTo: ValueType, array_size: number | null = null) { return new ArrayType(ptrTo, array_size); }
+    static getArrayInstance(ptrTo: ValueType, array_size: number | null) { return new ArrayType(ptrTo, array_size); }
     override get size(): number {
         return 8;
+    }
+
+    override asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value {
+        if (should_alloc) {
+            if (this.array_size) {
+                for (let i = 0; i < this.array_size; ++i) {
+                    this.ptrTo.asm_from_literal(context, '_temp', null, pos, true);
+                }
+            }
+            context.addAssembly(`
+                \rleaq ${context.stackPtr}(%rsp), %rdx
+                \rmovq %rdx, ${context.pushStack(this.size)}(%rsp)
+            `);
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+        }
+        else {
+            return new Value(name, this, pos, null, AddrType.Stack);
+        }
     }
 }
 
@@ -998,7 +1013,7 @@ export enum AddrType {
 
 
 export class Value {
-    private _address: number | null = null;
+    public _address: number | null = null;
 
     constructor(public name: string, public valueType: ValueType, public pos: Position, address: number | null = null, public addr_type: AddrType) {
         this._address = address;
@@ -1019,6 +1034,8 @@ export class Value {
             return this.real_addr;
         }
     }
+
+
 
     get real_addr(): number {
         return this._address ?? throwError(new Error('Accessed before assigned'));

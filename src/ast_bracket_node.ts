@@ -4,7 +4,7 @@ import { Context } from "./context";
 import { convert_val_to_type, get_rax_i } from "./converter";
 import { throwError, TODO, TokenParserError } from "./helper";
 import { TokenType } from "./token_type";
-import { AddrType, FunctionType, IntType, MOV_I, PtrType, REG_I, TypenameType, Value, VoidType } from "./value_types";
+import { AddrType, ArrayType, FunctionType, IntType, MOV_I, PtrType, REG_I, TypenameType, Value, VoidType } from "./value_types";
 
 export class AstBracketNode extends AstNode {
     constructor(order: OrderedToken, public area: { l_b: number, r_b: number }, public middle: AstNode | null, left: AstNode | null, right: AstNode | null, context: Context) {
@@ -88,7 +88,7 @@ export class AstBracketNode extends AstNode {
                             throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
                         }
                         for (let i = 0; i < paramTypes.length; ++i) {
-                            in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos);
+                            in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos, true);
                             in_stack.valueType.asm_copy(context, in_stack, params[i]!);
                         }
                         if (params.length > 0) {
@@ -161,13 +161,13 @@ export class AstBracketNode extends AstNode {
                         \rleaq ${context.stackPtr}(%rsp), %rdx
                         \rmovq %rdx, ${context.pushStack(8)}(%rsp)
                     `);
-                const ret = new Value('_temp', PtrType.getInstance(valueType), params[0]!.pos, context.stackPtr, AddrType.Stack);
+                const ret = new Value('_temp', ArrayType.getArrayInstance(valueType, params.length), params[0]!.pos, context.stackPtr, AddrType.Stack);
                 return ret;
             }
             context.addAssembly(`
                     \rmovq $0, ${context.pushStack(8)}
                 `);
-            return new Value('_temp', PtrType.getInstance(IntType.getInstance()), params[0]!.pos, context.stackPtr, AddrType.Stack);
+            return new Value('_temp', ArrayType.getArrayInstance(IntType.getInstance(), 0), params[0]!.pos, context.stackPtr, AddrType.Stack);
         }
         TODO(`unhandeled: ${token}`);
 

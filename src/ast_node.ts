@@ -2,7 +2,7 @@ import { get_rax_i } from "./converter";
 import { UNREACHABLE, throwError, TokenParserError, TODO } from "./helper";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { Value, ValueType, CharType, AddrType, PtrType, IntType, FunctionType, VoidType, MOV_I, REG_I } from "./value_types";
+import { Value, ValueType, CharType, AddrType, PtrType, IntType, FunctionType, VoidType, MOV_I, REG_I, ArrayType } from "./value_types";
 import { Context } from "./context";
 import { OrderedToken } from "./ast_builder";
 import { Token } from "./lexer";
@@ -36,7 +36,7 @@ export class AstNode {
         }
     }
 
-    eval({ is_lvalue, can_be_decl }: { is_lvalue: boolean, can_be_decl: boolean }): Value {
+    eval({ is_lvalue, can_be_decl, is_immediately_assigned }: { is_lvalue: boolean, can_be_decl: boolean, is_immediately_assigned?: boolean }): Value {
         const type = this.order.tok.type;
         const token = this.order.tok;
         const { context } = this;
@@ -45,35 +45,61 @@ export class AstNode {
             if (!this.left || !this.right)
                 throwError(new TokenParserError(token, `Expected left and right args for ASSIGNMENT OP`));
 
-            const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
             switch (token.type) {
                 case TokenType.OP_ASSIGNMENT_PLUS: {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
+                    const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
+
                     const new_value = l_value.valueType.asm_from_plus(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MINUS: {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
+                    const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_minus(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_MULTIPLY: {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
+                    const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_multiply(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT_DIVIDE: {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
+                    const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
                     const new_value = l_value.valueType.asm_from_divide(context, l_value, r_value);
                     l_value.valueType.asm_copy(context, l_value, new_value);
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT: {
-                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true });
-                    l_value.valueType.asm_copy(context, l_value, r_value);
+                    const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true, is_immediately_assigned: true });
+                    const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
+                    if (l_value.valueType instanceof ArrayType &&
+                        !l_value._address &&
+                        r_value.valueType instanceof ArrayType &&
+                        !r_value.name &&
+                        r_value.valueType.array_size !== null) {
+
+                        if (!l_value.valueType.array_size) {
+                            l_value._address = r_value._address;
+                            return r_value;
+                        }
+                        else if (l_value.valueType.array_size >= r_value.valueType.array_size) {
+                            const _temp = l_value.valueType.asm_from_literal(context, '_temp', null, l_value.pos, true);
+                            for (let i = 0; i < r_value.valueType.array_size; ++i){
+                                
+                                
+                            }
+
+                        }
+                    }
+                    else {
+                        l_value.valueType.asm_copy(context, l_value, r_value);
+                    }
                     return r_value;
                 }
                 default:
@@ -82,8 +108,11 @@ export class AstNode {
         }
 
         if ([TokenType.DECL_TYPENAME].includes(type)) {
+            if (!can_be_decl) {
+                throwError(new TokenParserError(token, `Assignment forbidden in expression`));
+            }
             const { type, name } = parse_declaration_from_tokens(context, this);
-            const val = type.asm_from_literal(context, name, null, token.pos);
+            const val = type.asm_from_literal(context, name, null, token.pos, !is_immediately_assigned);
             context.addScopeValue(val);
             return val;
         }
@@ -157,7 +186,7 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected at least right arg for PLUS-MINUS OP`));
             let left: Value, right: Value = this.right.eval({ is_lvalue: false, can_be_decl: true });
             if (!this.left) {
-                left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos);
+                left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos, true);
             }
             else {
                 left = this.left.eval({ is_lvalue: false, can_be_decl: true });
@@ -196,17 +225,16 @@ export class AstNode {
             return ptr_type.asm_dereference(context, '_temp', arg, is_lvalue);
         }
         if ([TokenType.NUM_INT].includes(type)) {
-            const new_value = IntType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos);
+            const new_value = IntType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.STRING_LITERAL].includes(type)) {
             this.context.addStringLiteral(token.text);
-            const new_value = PtrType.getInstance(CharType.getInstance())
-                .asm_from_literal(this.context, '_temp', token.text, token.pos);
+            const new_value = PtrType.getInstance(CharType.getInstance()).asm_from_literal(this.context, '_temp', token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.CHAR_LITERAL].includes(type)) {
-            const new_value = CharType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos);
+            const new_value = CharType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.NAME].includes(type)) {
