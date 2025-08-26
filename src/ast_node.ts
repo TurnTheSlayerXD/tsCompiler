@@ -76,6 +76,7 @@ export class AstNode {
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT: {
+                    TODO("REPLACE ALL _TEMP NAMES");
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true, is_immediately_assigned: true });
                     const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
                     console.log(l_value);
