@@ -8,7 +8,7 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
         let prev = tokens[i - 1];
 
         if (cur.type === TokenType.OP_ASTERISK) {
-            if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
+            if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type) || prev.type == TokenType.DECL_TYPENAME))
                 || i - 1 < 0) {
                 // then asterics is dereference
                 cur.type = TokenType.OP_DEREFERENCE;

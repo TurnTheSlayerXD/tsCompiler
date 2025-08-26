@@ -10,14 +10,14 @@
           <span class="key">"order":</span> {
                     <span class="key">"depth":</span> <span class="number">0</span>,
                     <span class="key">"pos":</span> <span class="number">1</span>,
-                    <span class="key">"imp":</span> <span class="number">9</span>,
+                    <span class="key">"imp":</span> <span class="number">10</span>,
                     <span class="key">"exec_order":</span> <span class="string">"right"</span>,
                     <span class="key">"tok":</span> {
                               <span class="key">"instance_type":</span> <span class="string">"token"</span>,
                               <span class="key">"pos":</span> {
-                                        <span class="key">"row":</span> <span class="number">113</span>,
+                                        <span class="key">"row":</span> <span class="number">108</span>,
                                         <span class="key">"col":</span> <span class="number">13</span>,
-                                        <span class="key">"count":</span> <span class="number">1957</span>
+                                        <span class="key">"count":</span> <span class="number">1943</span>
                               },
                               <span class="key">"type":</span> <span class="number">4</span>,
                               <span class="key">"_text":</span> <span class="string">"("</span>
@@ -29,14 +29,14 @@
                     <span class="key">"order":</span> {
                               <span class="key">"depth":</span> <span class="number">0</span>,
                               <span class="key">"pos":</span> <span class="number">0</span>,
-                              <span class="key">"imp":</span> <span class="number">10</span>,
+                              <span class="key">"imp":</span> <span class="number">11</span>,
                               <span class="key">"exec_order":</span> <span class="string">"right"</span>,
                               <span class="key">"tok":</span> {
                                         <span class="key">"instance_type":</span> <span class="string">"token"</span>,
                                         <span class="key">"pos":</span> {
-                                                  <span class="key">"row":</span> <span class="number">113</span>,
+                                                  <span class="key">"row":</span> <span class="number">108</span>,
                                                   <span class="key">"col":</span> <span class="number">4</span>,
-                                                  <span class="key">"count":</span> <span class="number">1948</span>
+                                                  <span class="key">"count":</span> <span class="number">1934</span>
                                         },
                                         <span class="key">"type":</span> <span class="number">2</span>,
                                         <span class="key">"_text":</span> <span class="string">"print_int"</span>
@@ -48,16 +48,16 @@
                               <span class="key">"lexer":</span> {
                                         <span class="key">"type":</span> <span class="string">"lexer"</span>,
                                         <span class="key">"cursor":</span> {
-                                                  <span class="key">"row":</span> <span class="number">114</span>,
+                                                  <span class="key">"row":</span> <span class="number">109</span>,
                                                   <span class="key">"col":</span> <span class="number">1</span>,
-                                                  <span class="key">"count":</span> <span class="number">1966</span>
+                                                  <span class="key">"count":</span> <span class="number">1952</span>
                                         },
                                         <span class="key">"prev_cursor":</span> {
-                                                  <span class="key">"row":</span> <span class="number">114</span>,
+                                                  <span class="key">"row":</span> <span class="number">109</span>,
                                                   <span class="key">"col":</span> <span class="number">0</span>,
-                                                  <span class="key">"count":</span> <span class="number">1965</span>
+                                                  <span class="key">"count":</span> <span class="number">1951</span>
                                         },
-                                        <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n \n    print_int(res); \n \n \n     \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n \n    print_int(res); \n}"</span>
+                                        <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n    print_int(res); \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n    print_int(res); \n}"</span>
                               },
                               <span class="key">"BUILT_IN_TYPES":</span> {},
                               <span class="key">"cur_function":</span> {
@@ -321,8 +321,8 @@
                                                                       },
                                                                       <span class="key">"pos":</span> {
                                                                                 <span class="key">"row":</span> <span class="number">97</span>,
-                                                                                <span class="key">"col":</span> <span class="number">10</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1706</span>
+                                                                                <span class="key">"col":</span> <span class="number">4</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1700</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">319</span>
@@ -334,8 +334,8 @@
                                                                       },
                                                                       <span class="key">"pos":</span> {
                                                                                 <span class="key">"row":</span> <span class="number">98</span>,
-                                                                                <span class="key">"col":</span> <span class="number">8</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1730</span>
+                                                                                <span class="key">"col":</span> <span class="number">4</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1726</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">303</span>
@@ -346,9 +346,9 @@
                                                                                 <span class="key">"is_const":</span> <span class="boolean">false</span>
                                                                       },
                                                                       <span class="key">"pos":</span> {
-                                                                                <span class="key">"row":</span> <span class="number">104</span>,
-                                                                                <span class="key">"col":</span> <span class="number">13</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1808</span>
+                                                                                <span class="key">"row":</span> <span class="number">100</span>,
+                                                                                <span class="key">"col":</span> <span class="number">9</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1792</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">290</span>
@@ -367,16 +367,16 @@
                     <span class="key">"lexer":</span> {
                               <span class="key">"type":</span> <span class="string">"lexer"</span>,
                               <span class="key">"cursor":</span> {
-                                        <span class="key">"row":</span> <span class="number">114</span>,
+                                        <span class="key">"row":</span> <span class="number">109</span>,
                                         <span class="key">"col":</span> <span class="number">1</span>,
-                                        <span class="key">"count":</span> <span class="number">1966</span>
+                                        <span class="key">"count":</span> <span class="number">1952</span>
                               },
                               <span class="key">"prev_cursor":</span> {
-                                        <span class="key">"row":</span> <span class="number">114</span>,
+                                        <span class="key">"row":</span> <span class="number">109</span>,
                                         <span class="key">"col":</span> <span class="number">0</span>,
-                                        <span class="key">"count":</span> <span class="number">1965</span>
+                                        <span class="key">"count":</span> <span class="number">1951</span>
                               },
-                              <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n \n    print_int(res); \n \n \n     \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n \n    print_int(res); \n}"</span>
+                              <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n    print_int(res); \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n    print_int(res); \n}"</span>
                     },
                     <span class="key">"BUILT_IN_TYPES":</span> {},
                     <span class="key">"cur_function":</span> {
@@ -640,8 +640,8 @@
                                                             },
                                                             <span class="key">"pos":</span> {
                                                                       <span class="key">"row":</span> <span class="number">97</span>,
-                                                                      <span class="key">"col":</span> <span class="number">10</span>,
-                                                                      <span class="key">"count":</span> <span class="number">1706</span>
+                                                                      <span class="key">"col":</span> <span class="number">4</span>,
+                                                                      <span class="key">"count":</span> <span class="number">1700</span>
                                                             },
                                                             <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                             <span class="key">"_address":</span> <span class="number">319</span>
@@ -653,8 +653,8 @@
                                                             },
                                                             <span class="key">"pos":</span> {
                                                                       <span class="key">"row":</span> <span class="number">98</span>,
-                                                                      <span class="key">"col":</span> <span class="number">8</span>,
-                                                                      <span class="key">"count":</span> <span class="number">1730</span>
+                                                                      <span class="key">"col":</span> <span class="number">4</span>,
+                                                                      <span class="key">"count":</span> <span class="number">1726</span>
                                                             },
                                                             <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                             <span class="key">"_address":</span> <span class="number">303</span>
@@ -665,9 +665,9 @@
                                                                       <span class="key">"is_const":</span> <span class="boolean">false</span>
                                                             },
                                                             <span class="key">"pos":</span> {
-                                                                      <span class="key">"row":</span> <span class="number">104</span>,
-                                                                      <span class="key">"col":</span> <span class="number">13</span>,
-                                                                      <span class="key">"count":</span> <span class="number">1808</span>
+                                                                      <span class="key">"row":</span> <span class="number">100</span>,
+                                                                      <span class="key">"col":</span> <span class="number">9</span>,
+                                                                      <span class="key">"count":</span> <span class="number">1792</span>
                                                             },
                                                             <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                             <span class="key">"_address":</span> <span class="number">290</span>
@@ -688,14 +688,14 @@
                     <span class="key">"order":</span> {
                               <span class="key">"depth":</span> <span class="number">1</span>,
                               <span class="key">"pos":</span> <span class="number">2</span>,
-                              <span class="key">"imp":</span> <span class="number">10</span>,
+                              <span class="key">"imp":</span> <span class="number">11</span>,
                               <span class="key">"exec_order":</span> <span class="string">"right"</span>,
                               <span class="key">"tok":</span> {
                                         <span class="key">"instance_type":</span> <span class="string">"token"</span>,
                                         <span class="key">"pos":</span> {
-                                                  <span class="key">"row":</span> <span class="number">113</span>,
+                                                  <span class="key">"row":</span> <span class="number">108</span>,
                                                   <span class="key">"col":</span> <span class="number">14</span>,
-                                                  <span class="key">"count":</span> <span class="number">1958</span>
+                                                  <span class="key">"count":</span> <span class="number">1944</span>
                                         },
                                         <span class="key">"type":</span> <span class="number">2</span>,
                                         <span class="key">"_text":</span> <span class="string">"res"</span>
@@ -707,16 +707,16 @@
                               <span class="key">"lexer":</span> {
                                         <span class="key">"type":</span> <span class="string">"lexer"</span>,
                                         <span class="key">"cursor":</span> {
-                                                  <span class="key">"row":</span> <span class="number">114</span>,
+                                                  <span class="key">"row":</span> <span class="number">109</span>,
                                                   <span class="key">"col":</span> <span class="number">1</span>,
-                                                  <span class="key">"count":</span> <span class="number">1966</span>
+                                                  <span class="key">"count":</span> <span class="number">1952</span>
                                         },
                                         <span class="key">"prev_cursor":</span> {
-                                                  <span class="key">"row":</span> <span class="number">114</span>,
+                                                  <span class="key">"row":</span> <span class="number">109</span>,
                                                   <span class="key">"col":</span> <span class="number">0</span>,
-                                                  <span class="key">"count":</span> <span class="number">1965</span>
+                                                  <span class="key">"count":</span> <span class="number">1951</span>
                                         },
-                                        <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n \n    print_int(res); \n \n \n     \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n \n    print_int(res); \n}"</span>
+                                        <span class="key">"text":</span> <span class="string">"int strlen(char *s) \n{ \n    int len = 0; \n    while (*(s + len) != '\\0') \n    { \n        len += 1; \n    } \n    return len; \n} \n \nvoid print_int(int num) \n{ \n    char *s = \"\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\"; \n    if (num == 0) \n    { \n        print(\"0\", 1); \n    } \n    else \n    { \n        int c = 0; \n        int minus = 1; \n        if (num &lt; 0) \n        { \n            num *= -1; \n            minus = -1; \n        } \n        while (num &gt; 0) \n        { \n            int rest = num % 10; \n            num /= 10; \n            s[c] = '0' + rest; \n            c += 1; \n        } \n        if (minus == -1) \n        { \n            s[c] = '-'; \n        } \n        int len = strlen(s); \n        for (int i = 0; i &lt; len / 2; i += 1) \n        { \n            char buf = s[i]; \n            s[i] = s[len - 1 - i]; \n            s[len - 1 - i] = buf; \n        } \n        print(s, len); \n    } \n    print(\"\\n\", 1); \n} \nvoid print_str(char *str) \n{ \n    print(str, strlen(str)); \n    print(\"\\n\", 1); \n} \n \nint get_digit(char c) \n{ \n    return c - '0'; \n} \n \nint power(int a, int x) \n{ \n    int s = 1; \n    while (x &gt; 0) \n    { \n        s *= a; \n        x -= 1; \n    } \n    return s; \n} \n \nint parse_int_from_str(char *str) \n{ \n    int len = strlen(str); \n    if (len == 0) \n    { \n        return -1488; \n    } \n    char *begin = str; \n    char *end = str + len; \n    int minus = 1; \n    if (*begin == '-') \n    { \n        minus = -1; \n        begin += 1; \n    } \n    int num = 0; \n    while (begin != end) \n    { \n        num += power(10, end - begin - 1) * get_digit(*begin); \n        begin += 1; \n    } \n    return num * minus; \n} \n \nint main(int argc, char **argv) \n{ \n    char *str = \"-1488\"; \n    int res = parse_int_from_str(str); \n    print_int(res); \n    if ((int x = 1) == 0) \n    { \n        print_str(\"x is equal to 0\"); \n    } \n    else \n    { \n        print_str(\"x is not equal to 0\"); \n    } \n    print_int(res); \n}"</span>
                               },
                               <span class="key">"BUILT_IN_TYPES":</span> {},
                               <span class="key">"cur_function":</span> {
@@ -980,8 +980,8 @@
                                                                       },
                                                                       <span class="key">"pos":</span> {
                                                                                 <span class="key">"row":</span> <span class="number">97</span>,
-                                                                                <span class="key">"col":</span> <span class="number">10</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1706</span>
+                                                                                <span class="key">"col":</span> <span class="number">4</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1700</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">319</span>
@@ -993,8 +993,8 @@
                                                                       },
                                                                       <span class="key">"pos":</span> {
                                                                                 <span class="key">"row":</span> <span class="number">98</span>,
-                                                                                <span class="key">"col":</span> <span class="number">8</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1730</span>
+                                                                                <span class="key">"col":</span> <span class="number">4</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1726</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">303</span>
@@ -1005,9 +1005,9 @@
                                                                                 <span class="key">"is_const":</span> <span class="boolean">false</span>
                                                                       },
                                                                       <span class="key">"pos":</span> {
-                                                                                <span class="key">"row":</span> <span class="number">104</span>,
-                                                                                <span class="key">"col":</span> <span class="number">13</span>,
-                                                                                <span class="key">"count":</span> <span class="number">1808</span>
+                                                                                <span class="key">"row":</span> <span class="number">100</span>,
+                                                                                <span class="key">"col":</span> <span class="number">9</span>,
+                                                                                <span class="key">"count":</span> <span class="number">1792</span>
                                                                       },
                                                                       <span class="key">"addr_type":</span> <span class="number">1</span>,
                                                                       <span class="key">"_address":</span> <span class="number">290</span>

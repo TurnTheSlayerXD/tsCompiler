@@ -6,10 +6,18 @@ import { Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { ArrayType, FunctionType, PtrType, ValueType } from "./value_types";
 
-export function parse_type_from_tokens(context: Context, root: AstNode): ValueType | { type: ValueType, name: string } {
+type ONLY_TYPE = { has_name: false, type: ValueType };
+type WITH_NAME = { has_name: true, type: ValueType, name: string };
+
+type PARSE_TYPE_RES = ONLY_TYPE | WITH_NAME;
+
+export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_TYPE_RES {
     root.type === TokenType.DECL_TYPENAME || UNREACHABLE();
     let variable_name: string | undefined;
     const nodes = collect_all_nodes_sorted_backwards(root);
+    if (nodes.length === 0) {
+        UNREACHABLE();
+    }
     if (nodes[0]!.type !== TokenType.DECL_TYPENAME) {
         UNREACHABLE();
     }
@@ -35,7 +43,7 @@ export function parse_type_from_tokens(context: Context, root: AstNode): ValueTy
             }
             final_type = ArrayType.getInstance(final_type, array_size);
         }
-        if (node.type === TokenType.O_PAREN) {
+        else if (node.type === TokenType.O_PAREN) {
             const bracket_node = node as AstBracketNode ?? UNREACHABLE();
             if (bracket_node.middle) {
                 if (bracket_node.middle.type === TokenType.OP_DEREFERENCE) {
@@ -43,30 +51,40 @@ export function parse_type_from_tokens(context: Context, root: AstNode): ValueTy
                         throwError(new TokenParserError(bracket_node.order.tok, `Expected O_PAREN IN PTR TO FUNCTION TYPE DECLARATION`));
                     }
                     const fun_param_types: ValueType[] = [];
-
+                    let comma_node = (type_modifiers[i + 1]! as AstBracketNode ?? UNREACHABLE()).middle;
+                    while (comma_node && comma_node.type === TokenType.COMMA) {
+                        const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                        fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                        comma_node = comma_node.right;
+                    }
+                    if (comma_node) {
+                        const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                        fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                    }
                     final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
-                    TODO('PARSE FUNCTION\'s ARGS TYPES');
-
                 }
                 else {
                     throwError(new TokenParserError(bracket_node.order.tok, `EXPECTED EXPR INSIDE BRACES`))
                 }
             }
         }
-        if (node.type === TokenType.OP_DEREFERENCE) {
+        else if (node.type === TokenType.OP_DEREFERENCE) {
             final_type = PtrType.getInstance(final_type);
+        }
+        else {
+            TODO(`parse type: ${node.order.tok}`);
         }
     }
 
-    return final_type;
+    return variable_name ? { type: final_type, has_name: true, name: variable_name } : { type: final_type, has_name: false };
 }
 
 export function parse_declaration_from_tokens(context: Context, root: AstNode): { type: ValueType, name: string } {
-    const res = parse_declaration_from_tokens(context, root);
-    if (!!res.name) {
-        return res;
+    const res = parse_type_from_tokens(context, root);
+    if (!res.has_name) {
+        throwError(new TokenParserError(root.order.tok, `Expected Name after type declaration`));
     }
-    throwError(new TokenParserError(root.order.tok, `Expected Name after type declaration`));
+    return { type: res.type, name: res.name };
 }
 
 function collect_all_nodes_sorted_backwards(root: AstNode): AstNode[] {
@@ -79,6 +97,7 @@ function collect_all_nodes_sorted_backwards(root: AstNode): AstNode[] {
         recurs(node.left);
         recurs(node.right);
     };
+    recurs(root);
     nodes.sort((lhs, rhs) => lhs.order.pos < rhs.order.pos ? -1 : lhs.order.pos === rhs.order.pos ? 0 : 1);
     return nodes;
 }

@@ -81,24 +81,11 @@ export class AstNode {
             }
         }
 
-        let check_is_declaration = (): { name: string, type: ValueType } | null => {
-            let node: AstNode | null = this;
-            const toks: Token[] = [];
-            while (node && node.type !== TokenType.DECL_TYPENAME) {
-                toks.push(node.order.tok);
-                node = node.left;
-            }
-            if (node && node.type === TokenType.DECL_TYPENAME) {
-                toks.push(node.order.tok);
-                toks.reverse();
-                return parse_declaration_from_tokens(context, toks);
-            }
-            return null;
-        };
         if ([TokenType.DECL_TYPENAME].includes(type)) {
-            let res;
-            const val = res.type.asm_from_literal(context, res.name, null, token.pos);
+            const { type, name } = parse_declaration_from_tokens(context, this);
+            const val = type.asm_from_literal(context, name, null, token.pos);
             context.addScopeValue(val);
+            return val;
         }
 
         if ([TokenType.OP_AND, TokenType.OP_OR,].includes(type)) {
