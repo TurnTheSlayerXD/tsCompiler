@@ -972,7 +972,7 @@ export class ArrayType extends PtrType {
         super(ptrTo);
     }
 
-    override toString: () => string = () => `Array type, size=${this.array_size}`;
+    override toString: () => string = () => `(${this.ptrTo}) [], size=${this.array_size}`;
     override isSameType(type: ValueType): boolean {
         if ((type instanceof PtrType || type instanceof ArrayType) && type.ptrTo.isSameType(this.ptrTo)) {
             return true;
