@@ -27,54 +27,59 @@ export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_T
     }
     let type_modifiers = nodes.slice(1, !!variable_name ? nodes.length - 1 : nodes.length);
 
-    for (let i = 0; i < type_modifiers.length; ++i) {
-        const node = type_modifiers[i]!;
-        if (node.type === TokenType.O_SQR) {
-            const bracket_node = node as AstBracketNode ?? UNREACHABLE();
-            let array_size: number | null = null;
-            if (bracket_node.middle) {
-                if (bracket_node.middle.type !== TokenType.NUM_INT) {
-                    throwError(new TokenParserError(bracket_node.order.tok, `Expected constant expression inside Array size qualifier. Found: ${bracket_node.middle.order.tok}`))
+    function get_type(index: number) {
+        for (let i = index; i < type_modifiers.length; ++i) {
+            const node = type_modifiers[i]!;
+            if (node.type === TokenType.O_SQR) {
+                const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+                let array_size: number | null = null;
+                if (bracket_node.middle) {
+                    if (bracket_node.middle.type !== TokenType.NUM_INT) {
+                        throwError(new TokenParserError(bracket_node.order.tok, `Expected constant expression inside Array size qualifier. Found: ${bracket_node.middle.order.tok}`))
+                    }
+                    array_size = parseInt(bracket_node.middle.order.tok.text);
+                    if (!Number.isFinite(array_size)) {
+                        throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
+                    }
                 }
-                array_size = parseInt(bracket_node.middle.order.tok.text);
-                if (!Number.isFinite(array_size)) {
-                    throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
+                get_type(i + 1);
+                final_type = ArrayType.getArrayInstance(final_type, array_size);
+                return;
+            }
+            else if (node.type === TokenType.O_PAREN) {
+                const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+                if (bracket_node.middle) {
+                    if (bracket_node.middle.type === TokenType.OP_DEREFERENCE) {
+                        if (i + 1 >= type_modifiers.length || type_modifiers[i + 1]!.type !== TokenType.O_PAREN) {
+                            throwError(new TokenParserError(bracket_node.order.tok, `Expected O_PAREN IN PTR TO FUNCTION TYPE DECLARATION`));
+                        }
+                        const fun_param_types: ValueType[] = [];
+                        let comma_node = (type_modifiers[i + 1]! as AstBracketNode ?? UNREACHABLE()).middle;
+                        while (comma_node && comma_node.type === TokenType.COMMA) {
+                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                            comma_node = comma_node.right;
+                        }
+                        if (comma_node) {
+                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                        }
+                        final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
+                    }
+                    else {
+                        throwError(new TokenParserError(bracket_node.order.tok, `EXPECTED EXPR INSIDE BRACES`))
+                    }
                 }
             }
-            final_type = ArrayType.getArrayInstance(final_type, array_size);
-        }
-        else if (node.type === TokenType.O_PAREN) {
-            const bracket_node = node as AstBracketNode ?? UNREACHABLE();
-            if (bracket_node.middle) {
-                if (bracket_node.middle.type === TokenType.OP_DEREFERENCE) {
-                    if (i + 1 >= type_modifiers.length || type_modifiers[i + 1]!.type !== TokenType.O_PAREN) {
-                        throwError(new TokenParserError(bracket_node.order.tok, `Expected O_PAREN IN PTR TO FUNCTION TYPE DECLARATION`));
-                    }
-                    const fun_param_types: ValueType[] = [];
-                    let comma_node = (type_modifiers[i + 1]! as AstBracketNode ?? UNREACHABLE()).middle;
-                    while (comma_node && comma_node.type === TokenType.COMMA) {
-                        const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
-                        fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
-                        comma_node = comma_node.right;
-                    }
-                    if (comma_node) {
-                        const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
-                        fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
-                    }
-                    final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
-                }
-                else {
-                    throwError(new TokenParserError(bracket_node.order.tok, `EXPECTED EXPR INSIDE BRACES`))
-                }
+            else if (node.type === TokenType.OP_DEREFERENCE) {
+                final_type = PtrType.getInstance(final_type);
             }
-        }
-        else if (node.type === TokenType.OP_DEREFERENCE) {
-            final_type = PtrType.getInstance(final_type);
-        }
-        else {
-            TODO(`parse type: ${node.order.tok}`);
+            else {
+                TODO(`parse type: ${node.order.tok}`);
+            }
         }
     }
+    get_type(0);
 
     return variable_name ? { type: final_type, has_name: true, name: variable_name } : { type: final_type, has_name: false };
 }

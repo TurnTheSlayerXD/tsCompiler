@@ -1,11 +1,12 @@
 import { get_rax_i } from "./converter";
-import { UNREACHABLE, throwError, TokenParserError, TODO } from "./helper";
+import { UNREACHABLE, throwError, TokenParserError, TODO, TEMP_NAME } from "./helper";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { Value, ValueType, CharType, AddrType, PtrType, IntType, FunctionType, VoidType, MOV_I, REG_I, ArrayType } from "./value_types";
+import { ValueType, CharType, AddrType, PtrType, IntType, FunctionType, VoidType, MOV_I, REG_I, ArrayType } from "./value_types";
 import { Context } from "./context";
 import { OrderedToken } from "./ast_builder";
 import { Token } from "./lexer";
+import { temp_t, Value } from "./value";
 
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
@@ -76,16 +77,13 @@ export class AstNode {
                     return new_value;
                 }
                 case TokenType.OP_ASSIGNMENT: {
-                    TODO("REPLACE ALL _TEMP NAMES");
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: true, is_immediately_assigned: true });
                     const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
-                    console.log(l_value);
-                    console.log(r_value);
                     if (
                         l_value.valueType instanceof ArrayType &&
                         !l_value._address &&
                         r_value.valueType instanceof ArrayType &&
-                        r_value.name === '_temp' &&
+                        r_value.name === TEMP_NAME &&
                         r_value.valueType.array_size !== null) {
 
                         if (!l_value.valueType.array_size) {
@@ -93,23 +91,26 @@ export class AstNode {
                             return r_value;
                         }
                         else if (l_value.valueType.array_size >= r_value.valueType.array_size) {
-                            const _temp = l_value.valueType.asm_from_literal(context, '_temp', null, l_value.pos, true);
+                            const _temp = l_value.valueType.asm_from_literal(context, temp_t.t, null, l_value.pos, true);
                             const _temp_type = _temp.valueType as ArrayType ?? UNREACHABLE();
                             for (let i = 0; i < r_value.valueType.array_size; ++i) {
                                 const from_plus = _temp_type
                                     .asm_from_plus(context, _temp, IntType.getInstance()
-                                        .asm_from_literal(context, "_temp", String(i), l_value.pos, true));
-                                const deref = (from_plus.valueType as PtrType)?.asm_dereference(context, '_temp', from_plus, true);
+                                        .asm_from_literal(context, temp_t.t, String(i), l_value.pos, true));
+                                const deref = (from_plus.valueType as PtrType)?.asm_dereference(context, temp_t.t, from_plus, true);
 
                                 const r_value_from_plus = r_value.valueType
                                     .asm_from_plus(context, r_value, IntType.getInstance()
-                                        .asm_from_literal(context, "_temp", String(i), r_value.pos, true));
-                                const r_value_deref = (r_value_from_plus.valueType as PtrType)?.asm_dereference(context, '_temp', r_value_from_plus, false);
+                                        .asm_from_literal(context, temp_t.t, String(i), r_value.pos, true));
+                                const r_value_deref = (r_value_from_plus.valueType as PtrType)?.asm_dereference(context, temp_t.t, r_value_from_plus, false);
 
                                 deref.valueType.asm_copy(context, deref, r_value_deref);
                             }
                             l_value._address = _temp._address;
                             r_value._address = _temp._address;
+                        }
+                        else if (l_value.valueType.array_size < r_value.valueType.array_size) {
+                            throwError(new TokenParserError(token, "Expected array size to be greater or equal than array size it is assigned to"))
                         }
                         else {
                             UNREACHABLE();
@@ -177,7 +178,7 @@ export class AstNode {
                     break;
                 }
             }
-            return new Value('_temp', CharType.getInstance(), left.pos, res_addr, AddrType.Stack);
+            return new Value(temp_t.t, CharType.getInstance(), left.pos, res_addr, AddrType.Stack);
         }
 
         if ([
@@ -206,7 +207,7 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected at least right arg for PLUS-MINUS OP`));
             let left: Value, right: Value = this.right.eval({ is_lvalue: false, can_be_decl: true });
             if (!this.left) {
-                left = right.valueType.asm_from_literal(context, '_temp', '0', token.pos, true);
+                left = right.valueType.asm_from_literal(context, temp_t.t, '0', token.pos, true);
             }
             else {
                 left = this.left.eval({ is_lvalue: false, can_be_decl: true });
@@ -234,7 +235,7 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected right arg for REFERENCE OP`));
             }
             const arg = this.right.eval({ is_lvalue: true, can_be_decl: true });
-            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, '_temp', arg);
+            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
         }
         if ([TokenType.OP_DEREFERENCE].includes(type)) {
             if (!this.right) {
@@ -242,19 +243,19 @@ export class AstNode {
             }
             const arg = this.right.eval({ is_lvalue: false, can_be_decl: true });
             const ptr_type: PtrType = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
-            return ptr_type.asm_dereference(context, '_temp', arg, is_lvalue);
+            return ptr_type.asm_dereference(context, temp_t.t, arg, is_lvalue);
         }
         if ([TokenType.NUM_INT].includes(type)) {
-            const new_value = IntType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos, true);
+            const new_value = IntType.getInstance().asm_from_literal(this.context, temp_t.t, token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.STRING_LITERAL].includes(type)) {
             this.context.addStringLiteral(token.text);
-            const new_value = ArrayType.getArrayInstance(CharType.getInstance(), null).asm_from_literal(this.context, '_temp', token.text, token.pos, true);
+            const new_value = ArrayType.getArrayInstance(CharType.getInstance(), null).asm_from_literal(this.context, temp_t.t, token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.CHAR_LITERAL].includes(type)) {
-            const new_value = CharType.getInstance().asm_from_literal(this.context, '_temp', token.text, token.pos, true);
+            const new_value = CharType.getInstance().asm_from_literal(this.context, temp_t.t, token.text, token.pos, true);
             return new_value;
         }
         if ([TokenType.NAME].includes(type)) {

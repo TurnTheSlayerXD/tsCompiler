@@ -12,14 +12,20 @@ int strlen(char *s)
 void print_str(char *str)
 {
     print(str, strlen(str));
+    print("\n", 1);
 }
 
-int main(){
 
-    char[10] arr = "hello";
+int main(int argc, char **argv)
+{
 
-    arr[5] = 'F';
-    arr[6] = 'F';
+    char[3][] arr;
 
-    print_str(arr);
+    arr[0] = "hello";
+    arr[1] = "world";
+    arr[2] = "again";
+
+    print_str(arr[0]);
+    print_str(arr[1]);
+    print_str(arr[2]);
 }

@@ -4,7 +4,8 @@ import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserEr
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 import { TokenType } from "./token_type";
-import { FunctionType, MOV_I, REG_I, Value } from "./value_types";
+import { Value } from "./value";
+import { FunctionType, MOV_I, REG_I } from "./value_types";
 
 export class CurlExpressionParser {
 

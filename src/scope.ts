@@ -1,5 +1,6 @@
 import { throwError, UNREACHABLE } from "./helper";
-import { Value, ValueType } from "./value_types";
+import { Value } from "./value";
+import { ValueType } from "./value_types";
 
 export class Scope {
     private _used_space: number = 8;

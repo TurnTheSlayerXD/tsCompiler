@@ -14,6 +14,7 @@ export function throwError(error: any | undefined = undefined): never {
     }
 }
 
+export const TEMP_NAME = "_temp";
 
 export class LexerError extends Error {
     constructor(lexer: Lexer, msg: string) {

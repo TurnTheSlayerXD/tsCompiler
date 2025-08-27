@@ -2,9 +2,10 @@ import { OrderedToken } from "./ast_builder";
 import { AstNode } from "./ast_node";
 import { Context } from "./context";
 import { convert_val_to_type, get_rax_i } from "./converter";
-import { throwError, TODO, TokenParserError } from "./helper";
+import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { TokenType } from "./token_type";
-import { AddrType, ArrayType, FunctionType, IntType, MOV_I, PtrType, REG_I, TypenameType, Value, VoidType } from "./value_types";
+import { temp_t, Value } from "./value";
+import { AddrType, ArrayType, FunctionType, IntType, MOV_I, PtrType, REG_I, TypenameType, VoidType } from "./value_types";
 
 export class AstBracketNode extends AstNode {
     constructor(order: OrderedToken, public area: { l_b: number, r_b: number }, public middle: AstNode | null, left: AstNode | null, right: AstNode | null, context: Context) {
@@ -71,18 +72,18 @@ export class AstBracketNode extends AstNode {
                         \rleaq ${context.stackPtr}(%rsp), %r9
                     `);
                         context.addAssembly(`
-                        \rmovq  ${params[0]!.stack_addr(context)}(%rsp), %rdx
+                        \rmovq  ${params[0]?.stack_addr(context) ?? 'Expected first param for built-in PRINT function'}(%rsp), %rdx
                     `);
                         context.addAssembly(`
-                        \rmovl  ${params[1]!.stack_addr(context)}(%rsp), %r8d
+                        \rmovl  ${params[1]?.stack_addr(context) ?? 'Expected second param for built-in PRINT function'}(%rsp), %r8d
                     `);
                         context.addAssembly(`
                         \rcallq	 *__imp_WriteConsoleA(%rip)
                     `);
-                        return new Value('_temp', VoidType.getInstance(), token.pos, null, AddrType.Indirect);
+                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Indirect);
                     }
                     else {
-                        let in_stack: Value;
+                        let in_stack: Value | undefined;
                         const { paramTypes } = fun_obj.valueType;
                         if (paramTypes.length !== params.length) {
                             throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
@@ -94,7 +95,7 @@ export class AstBracketNode extends AstNode {
                         if (params.length > 0) {
                             context.addAssembly(`
                         \r#__parameter_offset_pass
-                        \rleaq ${in_stack!.stack_addr(context)}(%rsp), %rcx
+                        \rleaq ${!in_stack ? UNREACHABLE() : in_stack.stack_addr(context)}(%rsp), %rcx
                     `);
                         }
                         context.addAssembly(`
@@ -104,7 +105,7 @@ export class AstBracketNode extends AstNode {
                         context.addAssembly(`   
                         \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_obj.valueType.returnType.size)}(%rsp)
                     `);
-                        return new Value('_temp', fun_obj.valueType.returnType, token.pos, context.stackPtr, AddrType.Stack);
+                        return new Value(temp_t.t, fun_obj.valueType.returnType, token.pos, context.stackPtr, AddrType.Stack);
                     }
                 }
 
@@ -124,7 +125,7 @@ export class AstBracketNode extends AstNode {
                 return this.middle.eval({ is_lvalue: false, can_be_decl: true });
             }
             //otherwise it is just for operation ordering
-            return new Value("_temp", VoidType.getInstance(), token.pos, null, AddrType.Stack);
+            return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
         }
         if ([TokenType.O_SQR].includes(type)) {
             if (!this.middle || !this.left) {
@@ -134,7 +135,7 @@ export class AstBracketNode extends AstNode {
             const ptr_val = this.left.eval({ is_lvalue: false, can_be_decl: true });
             const applied = ptr_val.valueType.asm_from_plus(context, ptr_val, ind_val);
             const applied_type = applied.valueType as PtrType ?? throwError(new TokenParserError(token, 'Expected PTR type'));
-            const res = applied_type.asm_dereference(context, '_temp', applied, is_lvalue);
+            const res = applied_type.asm_dereference(context, temp_t.t, applied, is_lvalue);
             return res;
         }
         if ([TokenType.O_CURL].includes(type)) {
@@ -154,20 +155,20 @@ export class AstBracketNode extends AstNode {
             if (params.length > 0) {
                 const valueType = params[0]!.valueType;
                 for (const src of params) {
-                    const dst = new Value('_temp', valueType, src.pos, context.pushStack(valueType.size), AddrType.Stack);
+                    const dst = new Value(temp_t.t, valueType, src.pos, context.pushStack(valueType.size), AddrType.Stack);
                     valueType.asm_copy(context, dst, src);
                 }
                 context.addAssembly(`
                         \rleaq ${context.stackPtr}(%rsp), %rdx
                         \rmovq %rdx, ${context.pushStack(8)}(%rsp)
                     `);
-                const ret = new Value('_temp', ArrayType.getArrayInstance(valueType, params.length), params[0]!.pos, context.stackPtr, AddrType.Stack);
+                const ret = new Value(temp_t.t, ArrayType.getArrayInstance(valueType, params.length), params[0]!.pos, context.stackPtr, AddrType.Stack);
                 return ret;
             }
             context.addAssembly(`
                     \rmovq $0, ${context.pushStack(8)}
                 `);
-            return new Value('_temp', ArrayType.getArrayInstance(IntType.getInstance(), 0), params[0]!.pos, context.stackPtr, AddrType.Stack);
+            return new Value(temp_t.t, ArrayType.getArrayInstance(IntType.getInstance(), 0), params[0]!.pos, context.stackPtr, AddrType.Stack);
         }
         TODO(`unhandeled: ${token}`);
 

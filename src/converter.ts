@@ -1,6 +1,7 @@
 import { Context } from "./context";
 import { TODO } from "./helper";
-import { AddrType, CharType, IntType, MOV_I, PtrType, REG_I, Value, ValueType } from "./value_types";
+import { Value } from "./value";
+import { AddrType, CharType, IntType, MOV_I, PtrType, REG_I, ValueType } from "./value_types";
 
 type ConversionResult = { ok: boolean, left: Value, right: Value };
 

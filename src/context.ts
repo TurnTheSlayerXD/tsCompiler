@@ -1,9 +1,10 @@
 import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
-import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
+import { CharType, FunctionType, IntType, PtrType, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
 import { AddrType } from "./value_types"
 import { Scope } from "./scope";
+import { Value } from "./value";
 
 export class Context {
 

@@ -5,9 +5,10 @@ import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError,
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I, Value } from "./value_types";
+import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I } from "./value_types";
 import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 import { AstBuilder } from "./ast_builder";
+import { Value } from "./value";
 
 
 const main = () => {
@@ -23,8 +24,6 @@ const main = () => {
 
     let token: Token | null;
     let prev;
-    let i = 0;
-
 
     const context = new Context(lexer);
 
