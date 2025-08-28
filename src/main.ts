@@ -5,10 +5,15 @@ import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError,
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I } from "./value_types";
 import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 import { AstBuilder } from "./ast_builder";
 import { Value } from "./value";
+import { CharType } from "./value_types/char_type";
+import { FunctionType } from "./value_types/function_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { TypeofScope } from "./scope";
 
 
 const main = () => {
@@ -41,12 +46,12 @@ const main = () => {
         if (token.type === TokenType.NAME) {
             const decl_tokens = [token];
 
-            while (!!(token = lexer.next_token()) && token.type === TokenType.NAME) {
+            while (!!(token = lexer.next_token()) && (token.type === TokenType.NAME || token.type === TokenType.OP_ASTERISK )) {
                 decl_tokens.push(token);
             }
 
             if (!token || (token.type !== TokenType.O_PAREN && token.type !== TokenType.SEMICOLON)) {
-                throw new ParserError(lexer, 'Unknown expression type');
+                throw new ParserError(lexer, `Unknown expression type: ${token}`);
             }
 
             if (token.type == TokenType.O_PAREN) {
@@ -73,7 +78,7 @@ const main = () => {
                                      \r.seh_proc ${fun_value.name}
                                      \r`);
                 context.addGlobalValue(fun_value);
-                context.pushScope();
+                context.pushScope(TypeofScope.FUN_SCOPE);
                 if (fun_value.name === 'main' && fun_params.length > 0) {
                     if (fun_params.length !== 2
                         || !fun_params[0]!.type.isSameType(IntType.getInstance())

@@ -8,7 +8,8 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
         let prev = tokens[i - 1];
 
         if (cur.type === TokenType.OP_ASTERISK) {
-            if ((prev && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type) || prev.type == TokenType.DECL_TYPENAME))
+            if ((prev && (is_op_token_type(prev.type) ||
+                [TokenType.DECL_TYPENAME, TokenType.COMMA, ...O_BRACES].includes(prev.type)))
                 || i - 1 < 0) {
                 // then asterics is dereference
                 cur.type = TokenType.OP_DEREFERENCE;
@@ -21,7 +22,8 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
 
         else if (cur.type === TokenType.OP_AMPERSAND) {
             if ((prev
-                && (is_op_token_type(prev.type) || O_BRACES.includes(prev.type)))
+                && (is_op_token_type(prev.type) ||
+                    [TokenType.COMMA, ...O_BRACES].includes(prev.type)))
                 || i - 1 < 0) {
                 // then ampersand is dereference
                 cur.type = TokenType.OP_REFERENCE;

@@ -1,7 +1,7 @@
 import { Context } from "./context";
 import { TEMP_NAME, throwError, UNREACHABLE } from "./helper";
 import { Position } from "./lexer";
-import { AddrType, REG_I, ValueType } from "./value_types";
+import { ValueType, AddrType, REG_I } from "./value_types/value_type";
 
 
 export enum temp_t { t };
@@ -19,7 +19,7 @@ export class Value {
     }
 
     public toString = (): string => {
-        return `Value {\n\rName: [${this.name}]\n\rType: [${this.valueType.toString()}]\n\rAddress: ${this.real_addr}(%rsp)\n\raddr_type: ${AddrType[this.addr_type]}\n\r}`
+        return `Value {\n\r\tName: [${this.name}]\n\r\tType: [${this.valueType.toString()}]\n\r\tAddress: ${this.real_addr}(%rsp)\n\r\taddr_type: ${AddrType[this.addr_type]}\n\r}\n`
     }
     stack_addr(context: Context): number {
         if (this.addr_type === AddrType.Indirect) {

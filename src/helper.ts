@@ -178,6 +178,12 @@ function syntaxHighlight(json: any): string {
     });
 }
 
+export function* toReversed<T>(arr: T[]): Generator<T> {
+    for (let i = arr.length - 1; i > -1; --i) {
+        yield arr[i]!;
+    }
+}
+
 import * as fs from 'fs';
 export function prettyHtml(json: any) {
     const str = syntaxHighlight(json);

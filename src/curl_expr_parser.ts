@@ -3,9 +3,11 @@ import { convert_val_to_type, get_rax_i } from "./converter";
 import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
+import { Scope, TypeofScope } from "./scope";
 import { TokenType } from "./token_type";
 import { Value } from "./value";
-import { FunctionType, MOV_I, REG_I } from "./value_types";
+import { FunctionType } from "./value_types/function_type";
+import { MOV_I, REG_I } from "./value_types/value_type";
 
 export class CurlExpressionParser {
 
@@ -37,7 +39,7 @@ export class CurlExpressionParser {
                         \rje ${mark_if_false}
                 `);
             }
-            context.pushScope();
+            context.pushScope(TypeofScope.IF_SCOPE);
             let o_curl_pos = c_paren_pos + 1, c_curl_pos;
             if (o_curl_pos >= tokens.length
                 || tokens[o_curl_pos]!.type !== TokenType.O_CURL
@@ -69,7 +71,7 @@ export class CurlExpressionParser {
             }
 
 
-            context.pushScope();
+            context.pushScope(TypeofScope.CYCLE_SCOPE);
             if (splitted[0]!.length > 0) {
                 new SemicolonExprParser(context, splitted[0]!).parse_with_ast(false, true);
             }
@@ -124,7 +126,7 @@ export class CurlExpressionParser {
             }
 
             const condition_tokens = tokens.slice(o_paren_pos + 1, c_paren_pos);
-            context.pushScope();
+            context.pushScope(TypeofScope.CYCLE_SCOPE);
 
             if (!condition_tokens.length) {
                 throwError(new TokenParserError(tokens[i]!, 'Expected expression inside WHILE braces'));
@@ -206,11 +208,24 @@ export class CurlExpressionParser {
                 i = parse_WHILE_expr(i);
             }
             else if (tokens[i]!.type === TokenType.KWD_BREAK) {
+                const gen = context.asm_pop_scope();
+                while (true) {
+                    if ((gen.next().value as Scope ?? UNREACHABLE()).typeofScope === TypeofScope.CYCLE_SCOPE) {
+                        gen.next();
+                        break;
+                    }
+                }
                 context.addAssembly(`
                         \rjmp ${this.parent_cycle_end_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD BREAK can be used only inside CYCLE'))}
                     `);
             }
             else if (tokens[i]!.type === TokenType.KWD_CONTINUE) {
+                const gen = context.asm_pop_scope();
+                while (true) {
+                    if ((gen.next().value as Scope ?? UNREACHABLE()).typeofScope === TypeofScope.CYCLE_SCOPE) {
+                        break;
+                    }
+                }
                 context.addAssembly(`
                         \rjmp ${this.parent_cycle_begin_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD CONTINUE can be used only inside CYCLE'))}
                     `);

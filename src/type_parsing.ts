@@ -4,7 +4,10 @@ import { Context } from "./context";
 import { throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { TokenType } from "./token_type";
-import { ArrayType, FunctionType, PtrType, ValueType } from "./value_types";
+import { ArrayType } from "./value_types/array_type";
+import { FunctionType } from "./value_types/function_type";
+import { PtrType } from "./value_types/ptr_type";
+import { ValueType } from "./value_types/value_type";
 
 type ONLY_TYPE = { has_name: false, type: ValueType };
 type WITH_NAME = { has_name: true, type: ValueType, name: string };

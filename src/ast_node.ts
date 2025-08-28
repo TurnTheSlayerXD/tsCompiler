@@ -2,11 +2,15 @@ import { get_rax_i } from "./converter";
 import { UNREACHABLE, throwError, TokenParserError, TODO, TEMP_NAME } from "./helper";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { ValueType, CharType, AddrType, PtrType, IntType, FunctionType, VoidType, MOV_I, REG_I, ArrayType } from "./value_types";
 import { Context } from "./context";
 import { OrderedToken } from "./ast_builder";
 import { Token } from "./lexer";
 import { temp_t, Value } from "./value";
+import { ArrayType } from "./value_types/array_type";
+import { CharType } from "./value_types/char_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { AddrType } from "./value_types/value_type";
 
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
@@ -116,10 +120,15 @@ export class AstNode {
                             UNREACHABLE();
                         }
                     }
-                    else if (!l_value._address) {
+                    else if (!l_value._address && l_value.valueType.isSameType(r_value.valueType)) {
                         l_value._address = r_value._address;
                     }
                     else {
+                        if (!l_value._address) {
+                            const l_value_alloc = l_value.valueType.asm_from_literal(context, l_value.name, null, l_value.pos, true);
+                            l_value._address = l_value_alloc._address;
+                            l_value.addr_type = l_value_alloc.addr_type;
+                        }
                         l_value.valueType.asm_copy(context, l_value, r_value);
                     }
                     return r_value;

@@ -1,7 +1,10 @@
 import { Context } from "./context";
 import { TODO } from "./helper";
-import { Value } from "./value";
-import { AddrType, CharType, IntType, MOV_I, PtrType, REG_I, ValueType } from "./value_types";
+import { temp_t, Value } from "./value";
+import { CharType } from "./value_types/char_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { AddrType, ValueType, REG_I, MOV_I } from "./value_types/value_type";
 
 type ConversionResult = { ok: boolean, left: Value, right: Value };
 
@@ -16,7 +19,7 @@ export function convert_values(context: Context, lhs: Value, rhs: Value): Conver
                     \rmovsbl ${to_convert.stack_addr(context)}(%rsp), %edx
                     \rmovl %edx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
                 `);
-        const new_value = new Value('_temp', IntType.getInstance(), lhs.pos, context.stackPtr, AddrType.Stack);
+        const new_value = new Value(temp_t.t, IntType.getInstance(), lhs.pos, context.stackPtr, AddrType.Stack);
         return lhs.valueType instanceof CharType ? { ok: false, left: new_value, right: rhs } : { ok: false, left: lhs, right: new_value };
     }
 
@@ -76,7 +79,7 @@ export function convert_val_to_type(context: Context, val: Value, type: ValueTyp
                     \rmovsbl ${val.stack_addr(context)}(%rsp), %edx
                     \rmovl %edx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
                 `);
-        const new_value = new Value('_temp', IntType.getInstance(), val.pos, context.stackPtr, AddrType.Stack);
+        const new_value = new Value(temp_t.t, IntType.getInstance(), val.pos, context.stackPtr, AddrType.Stack);
         return new_value;
     }
     TODO();

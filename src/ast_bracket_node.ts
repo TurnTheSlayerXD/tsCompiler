@@ -5,7 +5,13 @@ import { convert_val_to_type, get_rax_i } from "./converter";
 import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { TokenType } from "./token_type";
 import { temp_t, Value } from "./value";
-import { AddrType, ArrayType, FunctionType, IntType, MOV_I, PtrType, REG_I, TypenameType, VoidType } from "./value_types";
+import { TypenameType } from "./value_types";
+import { ArrayType } from "./value_types/array_type";
+import { FunctionType } from "./value_types/function_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { VoidType } from "./value_types/void_type";
 
 export class AstBracketNode extends AstNode {
     constructor(order: OrderedToken, public area: { l_b: number, r_b: number }, public middle: AstNode | null, left: AstNode | null, right: AstNode | null, context: Context) {
@@ -89,7 +95,7 @@ export class AstBracketNode extends AstNode {
                             throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
                         }
                         for (let i = 0; i < paramTypes.length; ++i) {
-                            in_stack = paramTypes[i]!.asm_from_literal(context, '_param', null, params[i]!.pos, true);
+                            in_stack = paramTypes[i]!.asm_from_literal(context, temp_t.t, null, params[i]!.pos, true);
                             in_stack.valueType.asm_copy(context, in_stack, params[i]!);
                         }
                         if (params.length > 0) {
