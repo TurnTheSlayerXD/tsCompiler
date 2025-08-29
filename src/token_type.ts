@@ -74,8 +74,6 @@ export enum TokenType {
     KWD_BREAK,
     KWD_CONTINUE,
 
-    DECL_PTR,
-    DECL_REF,
     DECL_TYPENAME,
 }
 
@@ -118,7 +116,6 @@ export const VALUE_TOKENS = [
 
 export const O_BRACES = [TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR];
 export const C_BRACES = [TokenType.C_PAREN, TokenType.C_CURL, TokenType.C_SQR];
-export const DECL_TOKENS = [TokenType.DECL_PTR, TokenType.DECL_REF];
 
 export function is_op_token_type(type: TokenType) {
     return OP_TOKENS.includes(type);

@@ -1,54 +1,111 @@
+import { AstBracketNode } from "./ast_bracket_node";
+import { AstNode } from "./ast_node";
 import { Context } from "./context";
-import { throwError, TODO, TokenParserError } from "./helper";
+import { throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Token } from "./lexer";
 import { TokenType } from "./token_type";
-import { PtrType, ValueType } from "./value_types";
+import { ArrayType } from "./value_types/array_type";
+import { FunctionType } from "./value_types/function_type";
+import { PtrType } from "./value_types/ptr_type";
+import { ValueType } from "./value_types/value_type";
 
-export function parse_type_from_tokens(context: Context, tokens: Token[]): ValueType {
-    let type: ValueType | null;
-    let isConst = false;
-    const iter = tokens.values();
-    let iter_out: IteratorResult<Token>;
-    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-        isConst = true;
+type ONLY_TYPE = { has_name: false, type: ValueType };
+type WITH_NAME = { has_name: true, type: ValueType, name: string };
+
+type PARSE_TYPE_RES = ONLY_TYPE | WITH_NAME;
+
+export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_TYPE_RES {
+    root.type === TokenType.DECL_TYPENAME || UNREACHABLE();
+    let variable_name: string | undefined;
+    const nodes = collect_all_nodes_sorted_backwards(root);
+    if (nodes.length === 0) {
+        UNREACHABLE();
     }
-    if (iter_out.done) {
-        throwError(new TokenParserError(tokens.at(-1)!, `No type declared except keyword CONST`));
+    if (nodes[0]!.type !== TokenType.DECL_TYPENAME) {
+        UNREACHABLE();
     }
-    if (!(type = context.hasTypename(iter_out.value.text))) {
-        throwError(new TokenParserError(iter_out.value, `Unknown VALUE TYPE: [${iter_out.value.text}]`));
+    let final_type: ValueType = context.hasTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
+    if (nodes.at(-1)!.type === TokenType.NAME) {
+        variable_name = nodes.at(-1)!.order.tok.text;
     }
-    while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-        isConst = true;
-    }
-    type.is_const = isConst;
-    while (!iter_out.done && (iter_out.value.type === TokenType.DECL_PTR)) {
-        type = PtrType.getInstance(type);
-        while (!(iter_out = iter.next()).done && iter_out.value.type === TokenType.KWD_CONST) {
-            type.is_const = true;
+    let type_modifiers = nodes.slice(1, !!variable_name ? nodes.length - 1 : nodes.length);
+
+    function get_type(index: number) {
+        for (let i = index; i < type_modifiers.length; ++i) {
+            const node = type_modifiers[i]!;
+            if (node.type === TokenType.O_SQR) {
+                const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+                let array_size: number | null = null;
+                if (bracket_node.middle) {
+                    if (bracket_node.middle.type !== TokenType.NUM_INT) {
+                        throwError(new TokenParserError(bracket_node.order.tok, `Expected constant expression inside Array size qualifier. Found: ${bracket_node.middle.order.tok}`))
+                    }
+                    array_size = parseInt(bracket_node.middle.order.tok.text);
+                    if (!Number.isFinite(array_size)) {
+                        throwError(new TokenParserError(bracket_node.middle.order.tok, `Expected Integer expression`));
+                    }
+                }
+                get_type(i + 1);
+                final_type = ArrayType.getArrayInstance(final_type, array_size);
+                return;
+            }
+            else if (node.type === TokenType.O_PAREN) {
+                const bracket_node = node as AstBracketNode ?? UNREACHABLE();
+                if (bracket_node.middle) {
+                    if (bracket_node.middle.type === TokenType.OP_DEREFERENCE) {
+                        if (i + 1 >= type_modifiers.length || type_modifiers[i + 1]!.type !== TokenType.O_PAREN) {
+                            throwError(new TokenParserError(bracket_node.order.tok, `Expected O_PAREN IN PTR TO FUNCTION TYPE DECLARATION`));
+                        }
+                        const fun_param_types: ValueType[] = [];
+                        let comma_node = (type_modifiers[i + 1]! as AstBracketNode ?? UNREACHABLE()).middle;
+                        while (comma_node && comma_node.type === TokenType.COMMA) {
+                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                            comma_node = comma_node.right;
+                        }
+                        if (comma_node) {
+                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                        }
+                        final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
+                    }
+                    else {
+                        throwError(new TokenParserError(bracket_node.order.tok, `EXPECTED EXPR INSIDE BRACES`))
+                    }
+                }
+            }
+            else if (node.type === TokenType.OP_DEREFERENCE) {
+                final_type = PtrType.getInstance(final_type);
+            }
+            else {
+                TODO(`parse type: ${node.order.tok}`);
+            }
         }
     }
-    if (!iter_out.done) {
-        throwError(new TokenParserError(iter_out.value!, `Couldn't parse type declaration: ${tokens}`));
-    }
-    return type;
+    get_type(0);
+
+    return variable_name ? { type: final_type, has_name: true, name: variable_name } : { type: final_type, has_name: false };
 }
 
-export function parse_declaration_from_tokens(context: Context, tokens: Token[]): { type: ValueType, name: string } {
-    if (tokens.length === 0) {
-        throwError(new Error('Expected lvalue expression'));
+export function parse_declaration_from_tokens(context: Context, root: AstNode): { type: ValueType, name: string } {
+    const res = parse_type_from_tokens(context, root);
+    if (!res.has_name) {
+        throwError(new TokenParserError(root.order.tok, `Expected Name after type declaration`));
     }
-    if (tokens.at(-1)!.type !== TokenType.NAME) {
-        throwError(new TokenParserError(tokens.at(-1)!, 'Expected variable name in lvalue expression'));
-    }
-    const value_name = tokens.at(-1)!.text;
-    if (tokens.length >= 2 && tokens[0]!.type === TokenType.DECL_TYPENAME) {
-        // then it is declaration of variable
-        if (!!context.hasValue(value_name)) {
-            throwError(new TokenParserError(tokens.at(-1)!, `Redeclaration of variable with name ${value_name}`));
+    return { type: res.type, name: res.name };
+}
+
+function collect_all_nodes_sorted_backwards(root: AstNode): AstNode[] {
+    const nodes: AstNode[] = [];
+    const recurs = (node: AstNode | null) => {
+        if (node === null) {
+            return;
         }
-        const value_type = parse_type_from_tokens(context, tokens.slice(0, tokens.length - 1));
-        return { type: value_type, name: value_name };
-    }
-    TODO(`${tokens}`);
+        nodes.push(node);
+        recurs(node.left);
+        recurs(node.right);
+    };
+    recurs(root);
+    nodes.sort((lhs, rhs) => lhs.order.pos < rhs.order.pos ? -1 : lhs.order.pos === rhs.order.pos ? 0 : 1);
+    return nodes;
 }

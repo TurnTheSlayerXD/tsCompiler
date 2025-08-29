@@ -1,9 +1,14 @@
-import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, UNREACHABLE } from "./helper";
+import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, toReversed, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
-import { CharType, FunctionType, IntType, PtrType, Value, ValueType, VoidType } from "./value_types";
 import * as fs from 'fs';
-import { AddrType } from "./value_types"
-import { Scope } from "./scope";
+import { Scope, TypeofScope } from "./scope";
+import { Value } from "./value";
+import { CharType } from "./value_types/char_type";
+import { FunctionType } from "./value_types/function_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { ValueType, AddrType } from "./value_types/value_type";
+import { VoidType } from "./value_types/void_type";
 
 export class Context {
 
@@ -82,17 +87,17 @@ export class Context {
         throw new ParserError(this.lexer, `Unknown type: [${typename}]`);
     }
 
-    pushScope() {
+    pushScope(typeof_scope: TypeofScope) {
         if (this.scopes.length > 0) {
             this.addAssembly(`
                 \r#__end_${this.scopes.at(-1)!.scopeName}
             `);
         }
         if (this.scopes.length > 0) {
-            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, this.scopes.at(-1)!));
+            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, this.scopes.at(-1)!, typeof_scope));
         }
         else {
-            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, null));
+            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, null, typeof_scope));
         }
         this.addAssembly(`
                 \r#__begin_${this.scopes.at(-1)!.scopeName}
@@ -110,19 +115,35 @@ export class Context {
         }
     }
 
-    popScope() {
+    *asm_pop_scope(): Generator<Scope> {
+        for (const scope of toReversed(this.scopes)) {
+            yield scope;
+            this.addAssembly(`
+                \r#__clear_${scope.scopeName}
+                \raddq $${this.init_stack_offset}, %rsp
+                \r#__end_${scope.scopeName}
+            `);
+        }
+    }
+
+    popScope(): Scope {
         this.addAssembly(`
             \r#__clear_${this.scopes.at(-1)!.scopeName}
             \raddq $${this.init_stack_offset}, %rsp
             \r#__end_${this.scopes.at(-1)!.scopeName}
         `);
-        const popped = this.scopes.pop()!;
+        const popped: Scope = this.scopes.pop() ?? UNREACHABLE();
         this.dead_scopes.set(popped.scopeName, popped);
         if (this.scopes.length > 0) {
             this.addAssembly(`
                 \r#__begin_${this.scopes.at(-1)!.scopeName}
             `);
         }
+        return popped;
+    }
+
+    curScope(): Scope {
+        return this.scopes.at(-1) ?? UNREACHABLE();
     }
 
     *iter_scopes(lines: string[]): Generator<{ scope: Scope, begin: number, end: number }> {
@@ -161,7 +182,7 @@ export class Context {
     optimize_stack_space() {
         const lines = this.asm.split('\n');
         const mapped_rsp_scope = new Map<number, Scope>();
-        const mapped_rsp_loc = new Map<number, { own_offset?: number, size: number }>();
+        const mapped_rsp_loc = new Map<number, { own_offset: number | undefined, size: number }>();
         for (const { scope, begin, end } of this.iter_scopes(lines)) {
             lines.slice(begin, end)
                 .filter(l => l.includes('(%rsp)'))
@@ -180,7 +201,7 @@ export class Context {
             if (l.includes('(%rsp)')) {
                 ptr = Context.parse_rsp_ptr_from_line(l);
                 if (ptr < lowest_ptr) {
-                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr });
+                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr, own_offset: undefined });
                     lowest_ptr = ptr;
                 }
             }
@@ -193,17 +214,22 @@ export class Context {
                     const ptr_scope = mapped_rsp_scope.get(ptr) ?? UNREACHABLE();
                     const loc = mapped_rsp_loc.get(ptr) ?? UNREACHABLE();
                     if (ptr_scope == scope) {
-                        if (!loc.own_offset) {
+                        if (loc.own_offset === undefined) {
                             scope.cur_offset -= loc.size;
                             loc.own_offset = scope.cur_offset;
                         }
                         [1, 4, 8].includes(loc.size) || UNREACHABLE();
+                        if (loc.own_offset < 0) {
+                            UNREACHABLE();
+                        }
                         Context.replace_rsp_ptr_in_line(lines, l, loc.own_offset);
                     }
                     else {
                         const dist = scope.get_distance_to(ptr_scope);
-                        (!!loc.own_offset && loc.own_offset >= 0) || UNREACHABLE();
-                        Context.replace_rsp_ptr_in_line(lines, l, dist + (loc.own_offset ?? UNREACHABLE()))
+                        if (loc.own_offset === undefined || dist + loc.own_offset < 0) {
+                            UNREACHABLE();
+                        }
+                        Context.replace_rsp_ptr_in_line(lines, l, dist + loc.own_offset)
                     }
                 }
             }

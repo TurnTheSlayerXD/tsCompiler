@@ -1,12 +1,19 @@
 import { readFileSync } from "fs";
 import { Context } from "./context";
 import { CurlExpressionParser } from "./curl_expr_parser";
-import { iterUntilMatchingBracket, LexerError, ParserError, replace_ambigous_token_types, splitBy, throwError, TODO } from "./helper";
+import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO } from "./helper";
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_tokens } from "./type_parsing";
-import { AddrType, CharType, FunctionType, IntType, MOV_I, PtrType, REG_I, Value } from "./value_types";
 import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
+import { AstBuilder } from "./ast_builder";
+import { Value } from "./value";
+import { CharType } from "./value_types/char_type";
+import { FunctionType } from "./value_types/function_type";
+import { IntType } from "./value_types/int_type";
+import { PtrType } from "./value_types/ptr_type";
+import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { TypeofScope } from "./scope";
 
 
 const main = () => {
@@ -22,8 +29,6 @@ const main = () => {
 
     let token: Token | null;
     let prev;
-    let i = 0;
-
 
     const context = new Context(lexer);
 
@@ -41,18 +46,17 @@ const main = () => {
         if (token.type === TokenType.NAME) {
             const decl_tokens = [token];
 
-            while (!!(token = lexer.next_token()) && token.type === TokenType.NAME) {
+            while (!!(token = lexer.next_token()) && (token.type === TokenType.NAME || token.type === TokenType.OP_ASTERISK )) {
                 decl_tokens.push(token);
             }
 
-
             if (!token || (token.type !== TokenType.O_PAREN && token.type !== TokenType.SEMICOLON)) {
-                throw new ParserError(lexer, 'Unknown expression type');
+                throw new ParserError(lexer, `Unknown expression type: ${token}`);
             }
 
             if (token.type == TokenType.O_PAREN) {
-                replace_ambigous_token_types(context, decl_tokens);
-                const return_decl = parse_declaration_from_tokens(context, decl_tokens);
+                const ast = new AstBuilder(decl_tokens, context).build();
+                const return_decl = parse_declaration_from_tokens(context, ast);
                 const fun_name = return_decl.name;
                 const fun_return_type = return_decl.type;
 
@@ -60,11 +64,11 @@ const main = () => {
                 let splitted_params: Token[][] = [];
                 if (token_params.length > 0) {
                     splitted_params = splitBy(token_params, t => t.type === TokenType.COMMA);
-                    for (const p of splitted_params) {
-                        replace_ambigous_token_types(context, p);
-                    }
                 }
-                const fun_params = splitted_params.map(p => parse_declaration_from_tokens(context, p));
+                const fun_params = splitted_params.map(p => {
+                    const ast = new AstBuilder(p, context).build();
+                    return parse_declaration_from_tokens(context, ast);
+                });
                 const fun_value = new Value(fun_name, FunctionType.getInstance(fun_return_type, fun_params.map(v => v.type)), token.pos, -100, AddrType.Stack);
 
                 context.addAssembly(`\r.def	${fun_value.name};
@@ -74,7 +78,7 @@ const main = () => {
                                      \r.seh_proc ${fun_value.name}
                                      \r`);
                 context.addGlobalValue(fun_value);
-                context.pushScope();
+                context.pushScope(TypeofScope.FUN_SCOPE);
                 if (fun_value.name === 'main' && fun_params.length > 0) {
                     if (fun_params.length !== 2
                         || !fun_params[0]!.type.isSameType(IntType.getInstance())

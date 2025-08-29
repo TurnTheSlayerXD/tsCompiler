@@ -1,14 +1,24 @@
 import { throwError, UNREACHABLE } from "./helper";
-import { Value, ValueType } from "./value_types";
+import { Value } from "./value";
+import { ValueType } from "./value_types/value_type";
+
+
+export enum TypeofScope {
+    CYCLE_SCOPE,
+    IF_SCOPE,
+    FUN_SCOPE,
+}
 
 export class Scope {
-    private _used_space: number = 8;
-    public cur_offset = 8;
+    private _used_space: number = 0;
+    public cur_offset = 0;
     constructor(
         public scopeName: string,
         public parentScope: Scope | null,
+        public typeofScope: TypeofScope,
+
         public scopeValues: Value[] = [],
-        public scopeTypes: ValueType[] = [],
+        public scopeValueTypes: ValueType[] = [],
     ) {
     }
 
