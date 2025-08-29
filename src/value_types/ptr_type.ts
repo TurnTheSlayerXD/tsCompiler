@@ -7,6 +7,7 @@ import { CharType } from "./char_type";
 import { IntType } from "./int_type";
 import { ValueType, REG_I, MOV_I, CMP_I, AddrType, asm_comp_action_q, asm_to_boolean, JN_I } from "./value_type";
 import { TypeError } from "../helper";
+import { VoidType } from "./void_type";
 export class PtrType implements ValueType {
     private static instances: PtrType[] = [];
 

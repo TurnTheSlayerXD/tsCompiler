@@ -1,7 +1,7 @@
 import { get_rax_i } from "./converter";
 import { UNREACHABLE, throwError, TokenParserError, TODO, TEMP_NAME } from "./helper";
 import { TokenType } from "./token_type";
-import { parse_declaration_from_tokens } from "./type_parsing";
+import { parse_declaration_from_ast_node } from "./type_parsing";
 import { Context } from "./context";
 import { OrderedToken } from "./ast_builder";
 import { Token } from "./lexer";
@@ -141,7 +141,7 @@ export class AstNode {
             if (!can_be_decl) {
                 throwError(new TokenParserError(token, `Assignment forbidden in expression`));
             }
-            const { type, name } = parse_declaration_from_tokens(context, this);
+            const { type, name } = parse_declaration_from_ast_node(context, this);
             const val = type.asm_from_literal(context, name, null, token.pos, !is_immediately_assigned);
             context.addScopeValue(val);
             return val;

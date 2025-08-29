@@ -4,7 +4,7 @@ import { CurlExpressionParser } from "./curl_expr_parser";
 import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO } from "./helper";
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
-import { parse_declaration_from_tokens } from "./type_parsing";
+import { parse_declaration_from_ast_node, parse_type_from_ast_node } from "./type_parsing";
 import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 import { AstBuilder } from "./ast_builder";
 import { Value } from "./value";
@@ -56,7 +56,7 @@ const main = () => {
 
             if (token.type == TokenType.O_PAREN) {
                 const ast = new AstBuilder(decl_tokens, context).build();
-                const return_decl = parse_declaration_from_tokens(context, ast);
+                const return_decl = parse_declaration_from_ast_node(context, ast);
                 const fun_name = return_decl.name;
                 const fun_return_type = return_decl.type;
 
@@ -67,7 +67,7 @@ const main = () => {
                 }
                 const fun_params = splitted_params.map(p => {
                     const ast = new AstBuilder(p, context).build();
-                    return parse_declaration_from_tokens(context, ast);
+                    return parse_declaration_from_ast_node(context, ast);
                 });
                 const fun_value = new Value(fun_name, FunctionType.getInstance(fun_return_type, fun_params.map(v => v.type)), token.pos, -100, AddrType.Stack);
 

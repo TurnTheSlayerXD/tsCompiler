@@ -39,6 +39,7 @@ char *num_to_str(char *dst, int num)
             dst[len - 1 - i] = buf;
         }
     }
+
     return dst + strlen(dst);
 }
 
