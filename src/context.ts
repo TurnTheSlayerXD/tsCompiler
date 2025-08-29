@@ -182,7 +182,7 @@ export class Context {
     optimize_stack_space() {
         const lines = this.asm.split('\n');
         const mapped_rsp_scope = new Map<number, Scope>();
-        const mapped_rsp_loc = new Map<number, { own_offset?: number, size: number }>();
+        const mapped_rsp_loc = new Map<number, { own_offset: number | undefined, size: number }>();
         for (const { scope, begin, end } of this.iter_scopes(lines)) {
             lines.slice(begin, end)
                 .filter(l => l.includes('(%rsp)'))
@@ -201,7 +201,7 @@ export class Context {
             if (l.includes('(%rsp)')) {
                 ptr = Context.parse_rsp_ptr_from_line(l);
                 if (ptr < lowest_ptr) {
-                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr });
+                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr, own_offset: undefined });
                     lowest_ptr = ptr;
                 }
             }
@@ -214,17 +214,22 @@ export class Context {
                     const ptr_scope = mapped_rsp_scope.get(ptr) ?? UNREACHABLE();
                     const loc = mapped_rsp_loc.get(ptr) ?? UNREACHABLE();
                     if (ptr_scope == scope) {
-                        if (!loc.own_offset) {
+                        if (loc.own_offset === undefined) {
                             scope.cur_offset -= loc.size;
                             loc.own_offset = scope.cur_offset;
                         }
                         [1, 4, 8].includes(loc.size) || UNREACHABLE();
+                        if (loc.own_offset < 0) {
+                            UNREACHABLE();
+                        }
                         Context.replace_rsp_ptr_in_line(lines, l, loc.own_offset);
                     }
                     else {
                         const dist = scope.get_distance_to(ptr_scope);
-                        (!!loc.own_offset && loc.own_offset >= 0) || UNREACHABLE();
-                        Context.replace_rsp_ptr_in_line(lines, l, dist + (loc.own_offset ?? UNREACHABLE()))
+                        if (loc.own_offset === undefined || dist + loc.own_offset < 0) {
+                            UNREACHABLE();
+                        }
+                        Context.replace_rsp_ptr_in_line(lines, l, dist + loc.own_offset)
                     }
                 }
             }

@@ -863,18 +863,6 @@ addq %rdx, %rax
 movq %rax, 362(%rsp)
 movq 362(%rsp), %rdx
 movq %rdx, 600(%rsp)
-movb $0, 361(%rsp)
-movb $115, 360(%rsp)
-movb $37, 359(%rsp)
-leaq 359(%rsp), %rdx
-movq %rdx, 351(%rsp)
-movq $0, 343(%rsp)
-movq 351(%rsp), %rdx
-movq %rdx, 343(%rsp)
-#__parameter_offset_pass
-leaq 343(%rsp), %rcx
-callq print_str
-movb %al, 342(%rsp)
 #__clear_scope_16
 addq $1000, %rsp
 #__end_scope_16
@@ -888,32 +876,32 @@ addq $1000, %rsp
 #__begin_scope_15
 jmp mark_33
 mark_32 :
-movb $0, 341(%rsp)
-movb $100, 340(%rsp)
-movb $37, 339(%rsp)
-leaq 339(%rsp), %rdx
-movq %rdx, 331(%rsp)
-movq $0, 323(%rsp)
+movb $0, 361(%rsp)
+movb $100, 360(%rsp)
+movb $37, 359(%rsp)
+leaq 359(%rsp), %rdx
+movq %rdx, 351(%rsp)
+movq $0, 343(%rsp)
 movq 600(%rsp), %rdx
-movq %rdx, 323(%rsp)
-movq $0, 315(%rsp)
-movq 331(%rsp), %rdx
-movq %rdx, 315(%rsp)
+movq %rdx, 343(%rsp)
+movq $0, 335(%rsp)
+movq 351(%rsp), %rdx
+movq %rdx, 335(%rsp)
 #__parameter_offset_pass
-leaq 315(%rsp), %rcx
+leaq 335(%rsp), %rcx
 callq starts_with
-movl %eax, 311(%rsp)
-movl $1, 307(%rsp)
-movl 311(%rsp), %eax
-movl 307(%rsp), %ebx
-movb $1, 306(%rsp)
+movl %eax, 331(%rsp)
+movl $1, 327(%rsp)
+movl 331(%rsp), %eax
+movl 327(%rsp), %ebx
+movb $1, 326(%rsp)
 cmpl %eax, %ebx
 je mark_36
-movb $0, 306(%rsp)
+movb $0, 326(%rsp)
 mark_36 :
 #IF
 xor %edx, %edx
-movb 306(%rsp), %dh
+movb 326(%rsp), %dh
 cmpb $0, %dh
 je mark_35
 #__end_scope_15
@@ -924,40 +912,40 @@ movslq 476(%rsp), %rdx
 imulq $8, %rdx
 movq 608(%rsp), %rax
 addq %rdx, %rax
-movq %rax, 298(%rsp)
-movq 298(%rsp), %rax
+movq %rax, 318(%rsp)
+movq 318(%rsp), %rax
 movq (%rax), %rdx
-movq %rdx, 290(%rsp)
-movq 290(%rsp), %rax
+movq %rdx, 310(%rsp)
+movq 310(%rsp), %rax
 movb (%rax), %dh
-movb %dh, 289(%rsp)
-movq $0, 281(%rsp)
+movb %dh, 309(%rsp)
+movq $0, 301(%rsp)
 movq 484(%rsp), %rdx
-movq %rdx, 281(%rsp)
-movl $0, 277(%rsp)
-movsbl 289(%rsp), %edx
-movl %edx, 273(%rsp)
-movl 273(%rsp), %edx
-movl %edx, 277(%rsp)
+movq %rdx, 301(%rsp)
+movl $0, 297(%rsp)
+movsbl 309(%rsp), %edx
+movl %edx, 293(%rsp)
+movl 293(%rsp), %edx
+movl %edx, 297(%rsp)
 #__parameter_offset_pass
-leaq 277(%rsp), %rcx
+leaq 297(%rsp), %rcx
 callq num_to_str
-movq %rax, 265(%rsp)
-movq 265(%rsp), %rdx
+movq %rax, 285(%rsp)
+movq 285(%rsp), %rdx
 movq %rdx, 484(%rsp)
-movl $1, 261(%rsp)
+movl $1, 281(%rsp)
 movl 476(%rsp), %edx
-addl 261(%rsp), %edx
-movl %edx, 257(%rsp)
-movl 257(%rsp), %edx
+addl 281(%rsp), %edx
+movl %edx, 277(%rsp)
+movl 277(%rsp), %edx
 movl %edx, 476(%rsp)
-movl $2, 253(%rsp)
-movslq 253(%rsp), %rdx
+movl $2, 273(%rsp)
+movslq 273(%rsp), %rdx
 imulq $1, %rdx
 movq 600(%rsp), %rax
 addq %rdx, %rax
-movq %rax, 245(%rsp)
-movq 245(%rsp), %rdx
+movq %rax, 265(%rsp)
+movq 265(%rsp), %rdx
 movq %rdx, 600(%rsp)
 #__clear_scope_17
 addq $1000, %rsp
@@ -982,25 +970,25 @@ mark_29 :
 mark_30 :
 movq 600(%rsp), %rax
 movb (%rax), %dh
-movb %dh, 244(%rsp)
+movb %dh, 264(%rsp)
 movq 484(%rsp), %rax
-movb 244(%rsp), %dh
+movb 264(%rsp), %dh
 movb %dh, (%rax)
-movl $1, 240(%rsp)
-movslq 240(%rsp), %rdx
+movl $1, 260(%rsp)
+movslq 260(%rsp), %rdx
 imulq $1, %rdx
 movq 484(%rsp), %rax
 addq %rdx, %rax
-movq %rax, 232(%rsp)
-movq 232(%rsp), %rdx
+movq %rax, 252(%rsp)
+movq 252(%rsp), %rdx
 movq %rdx, 484(%rsp)
-movl $1, 228(%rsp)
-movslq 228(%rsp), %rdx
+movl $1, 248(%rsp)
+movslq 248(%rsp), %rdx
 imulq $1, %rdx
 movq 600(%rsp), %rax
 addq %rdx, %rax
-movq %rax, 220(%rsp)
-movq 220(%rsp), %rdx
+movq %rax, 240(%rsp)
+movq 240(%rsp), %rdx
 movq %rdx, 600(%rsp)
 jmp mark_26
 mark_27 :
@@ -1008,13 +996,13 @@ mark_27 :
 addq $1000, %rsp
 #__end_scope_14
 #__begin_scope_13
-movq $0, 212(%rsp)
+movq $0, 232(%rsp)
 movq 492(%rsp), %rdx
-movq %rdx, 212(%rsp)
+movq %rdx, 232(%rsp)
 #__parameter_offset_pass
-leaq 212(%rsp), %rcx
+leaq 232(%rsp), %rcx
 callq print_str
-movb %al, 211(%rsp)
+movb %al, 231(%rsp)
 #__clear_scope_13
 addq $1000, %rsp
 #__end_scope_13
@@ -1028,88 +1016,77 @@ main:
 #__begin_scope_18
 #__init_scope_18
 subq $1000, %rsp
-movl %ecx, 207(%rsp)
-movq %rdx, 199(%rsp)
-movl $127, 195(%rsp)
+movl %ecx, 227(%rsp)
+movq %rdx, 219(%rsp)
+movl $11, 215(%rsp)
 movb $0, %ah
-movb %ah, 194(%rsp)
-movb 195(%rsp), %dh
-movb %dh, 194(%rsp)
-leaq 194(%rsp), %rdx
-movq %rdx, 186(%rsp)
-movb $0, 185(%rsp)
-movb $110, 184(%rsp)
-movb $105, 183(%rsp)
-movb $97, 182(%rsp)
-movb $103, 181(%rsp)
-movb $97, 180(%rsp)
-leaq 180(%rsp), %rdx
-movq %rdx, 172(%rsp)
-movq 172(%rsp), %rdx
-movq %rdx, 164(%rsp)
-movq 186(%rsp), %rdx
-movq %rdx, 156(%rsp)
-leaq 156(%rsp), %rdx
-movq %rdx, 148(%rsp)
-movq $0, 140(%rsp)
-movq $0, 132(%rsp)
-leaq 132(%rsp), %rdx
+movb %ah, 214(%rsp)
+movb 215(%rsp), %dh
+movb %dh, 214(%rsp)
+movb $0, 213(%rsp)
+movb $115, 212(%rsp)
+movb $37, 211(%rsp)
+movb $32, 210(%rsp)
+movb $44, 209(%rsp)
+movb $115, 208(%rsp)
+movb $37, 207(%rsp)
+movb $32, 206(%rsp)
+movb $44, 205(%rsp)
+movb $115, 204(%rsp)
+movb $37, 203(%rsp)
+movb $32, 202(%rsp)
+movb $44, 201(%rsp)
+movb $115, 200(%rsp)
+movb $37, 199(%rsp)
+leaq 199(%rsp), %rdx
+movq %rdx, 191(%rsp)
+movb $0, 190(%rsp)
+movb $111, 189(%rsp)
+movb $108, 188(%rsp)
+movb $108, 187(%rsp)
+movb $101, 186(%rsp)
+movb $72, 185(%rsp)
+leaq 185(%rsp), %rdx
+movq %rdx, 177(%rsp)
+movb $0, 176(%rsp)
+movb $100, 175(%rsp)
+movb $108, 174(%rsp)
+movb $114, 173(%rsp)
+movb $111, 172(%rsp)
+movb $87, 171(%rsp)
+leaq 171(%rsp), %rdx
+movq %rdx, 163(%rsp)
+movb $0, 162(%rsp)
+movb $114, 161(%rsp)
+movb $117, 160(%rsp)
+leaq 160(%rsp), %rdx
+movq %rdx, 152(%rsp)
+movb $0, 151(%rsp)
+movb $109, 150(%rsp)
+movb $111, 149(%rsp)
+movb $109, 148(%rsp)
+leaq 148(%rsp), %rdx
+movq %rdx, 140(%rsp)
+movq 140(%rsp), %rdx
+movq %rdx, 132(%rsp)
+movq 152(%rsp), %rdx
 movq %rdx, 124(%rsp)
-movl $0, 120(%rsp)
-movslq 120(%rsp), %rdx
-imulq $8, %rdx
-movq 124(%rsp), %rax
-addq %rdx, %rax
-movq %rax, 112(%rsp)
-movl $0, 108(%rsp)
-movslq 108(%rsp), %rdx
-imulq $8, %rdx
-movq 148(%rsp), %rax
-addq %rdx, %rax
-movq %rax, 100(%rsp)
-movq 100(%rsp), %rax
-movq (%rax), %rdx
+movq 163(%rsp), %rdx
+movq %rdx, 116(%rsp)
+movq 177(%rsp), %rdx
+movq %rdx, 108(%rsp)
+leaq 108(%rsp), %rdx
+movq %rdx, 100(%rsp)
+movq $0, 92(%rsp)
+movq 191(%rsp), %rdx
 movq %rdx, 92(%rsp)
-movq 112(%rsp), %rax
-movq 92(%rsp), %rdx
-movq %rdx, (%rax)
-movl $1, 88(%rsp)
-movslq 88(%rsp), %rdx
-imulq $8, %rdx
-movq 124(%rsp), %rax
-addq %rdx, %rax
-movq %rax, 80(%rsp)
-movl $1, 76(%rsp)
-movslq 76(%rsp), %rdx
-imulq $8, %rdx
-movq 148(%rsp), %rax
-addq %rdx, %rax
-movq %rax, 68(%rsp)
-movq 68(%rsp), %rax
-movq (%rax), %rdx
-movq %rdx, 60(%rsp)
-movq 80(%rsp), %rax
-movq 60(%rsp), %rdx
-movq %rdx, (%rax)
-movb $0, 59(%rsp)
-movb $115, 58(%rsp)
-movb $37, 57(%rsp)
-movb $32, 56(%rsp)
-movb $44, 55(%rsp)
-movb $100, 54(%rsp)
-movb $37, 53(%rsp)
-leaq 53(%rsp), %rdx
-movq %rdx, 45(%rsp)
-movq $0, 37(%rsp)
-movq 45(%rsp), %rdx
-movq %rdx, 37(%rsp)
-movq $0, 29(%rsp)
-movq 124(%rsp), %rdx
-movq %rdx, 29(%rsp)
+movq $0, 84(%rsp)
+movq 100(%rsp), %rdx
+movq %rdx, 84(%rsp)
 #__parameter_offset_pass
-leaq 29(%rsp), %rcx
+leaq 84(%rsp), %rcx
 callq printf
-movb %al, 28(%rsp)
+movb %al, 83(%rsp)
 #__clear_scope_18
 addq $1000, %rsp
 #__end_scope_18

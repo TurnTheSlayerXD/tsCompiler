@@ -10,8 +10,8 @@ export enum TypeofScope {
 }
 
 export class Scope {
-    private _used_space: number = 8;
-    public cur_offset = 8;
+    private _used_space: number = 0;
+    public cur_offset = 0;
     constructor(
         public scopeName: string,
         public parentScope: Scope | null,
