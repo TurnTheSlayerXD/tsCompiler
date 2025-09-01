@@ -67,7 +67,7 @@ char *write_to(char *dst, char *src)
     return dst;
 }
 
-void printf(char *fmt, char **args)
+void printf(char *fmt, void **args)
 {
 
     char[100] buf;
@@ -87,7 +87,7 @@ void printf(char *fmt, char **args)
             }
             else if (starts_with(fmt, "%d") == 1)
             {
-                iter = num_to_str(iter, *args[argc]);
+                iter = num_to_str(iter, *(int*)args[argc]);
                 argc += 1;
                 fmt += 2;
                 continue;
@@ -102,6 +102,13 @@ void printf(char *fmt, char **args)
 
 int main(int argc, char **argv)
 {
-    char num = 11;
-    printf("%s, %s, %s, %s", {"Hello", "World", "ur", "mom"});
+    int num = 1488;
+
+    for(int i = 0; i < 3; i += 1){
+        for(int i = 0; i < 3; i += 1){
+            printf("%d", {&j});
+        }
+    }
+
+    printf("%s, %d, %s, %s", {"Hello", &num, "ur", "mom"});
 }

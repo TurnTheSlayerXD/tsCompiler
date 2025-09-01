@@ -18,7 +18,6 @@ export class Scope {
         public typeofScope: TypeofScope,
 
         public scopeValues: Value[] = [],
-        public scopeValueTypes: ValueType[] = [],
     ) {
     }
 

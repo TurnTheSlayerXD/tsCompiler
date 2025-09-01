@@ -8,7 +8,7 @@ import { ValueType, AddrType } from "./value_type";
 
 export class ArrayType extends PtrType {
     override is_const: boolean = false;
-
+    private static _instances: ArrayType[] = [];
     private constructor(ptrTo: ValueType, public array_size: number | null) {
         super(ptrTo);
     }
@@ -21,9 +21,16 @@ export class ArrayType extends PtrType {
         return false;
     }
 
-    static getArrayInstance(ptrTo: ValueType, array_size: number | null) { return new ArrayType(ptrTo, array_size); }
+    static getArrayInstance(ptrTo: ValueType, array_size: number | null): ArrayType {
+        let inst: ArrayType | undefined = this._instances.find(i => i.ptrTo.isSameType(ptrTo) && i.array_size === array_size);
+        if (!inst) {
+            inst = new ArrayType(ptrTo, array_size);
+            this._instances.push(inst);
+        }
+        return inst;
+    }
     override get size(): number {
-        return 8;
+        return this.array_size ?? 8;
     }
 
     override asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {

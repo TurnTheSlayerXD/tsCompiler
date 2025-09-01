@@ -31,8 +31,13 @@ export function get_token_category(type: TokenType): Category | null {
     if ([TokenType.OP_REFERENCE, TokenType.OP_DEREFERENCE].includes(type)) return { exec_order: 'left', imp: _inc };
 
     inc();
-    if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.OP_DOT].includes(type)) return { exec_order: 'right', imp: _inc };
+
+
     inc();
-    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL].includes(type)) return { exec_order: 'right', imp: _inc };
+    if ([TokenType.O_PAREN, TokenType.O_CURL, TokenType.O_SQR].includes(type)) return { exec_order: 'left', imp: _inc };
+
+    inc();
+    if ([TokenType.NAME, TokenType.NUM_INT, TokenType.NUM_FLOAT, TokenType.CHAR_LITERAL, TokenType.STRING_LITERAL, TokenType.KWD_NULLPTR].includes(type)) return { exec_order: 'right', imp: _inc };
     return null;
 }

@@ -81,10 +81,8 @@ export enum CMP_I {
 }
 
 export enum AddrType {
-    TempStack,
     Stack,
     Indirect,
-    Register,
 }
 
 

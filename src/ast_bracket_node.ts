@@ -4,6 +4,7 @@ import { Context } from "./context";
 import { convert_val_to_type, get_rax_i } from "./converter";
 import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { TokenType } from "./token_type";
+import { parse_type_from_ast_node } from "./type_parsing";
 import { temp_t, Value } from "./value";
 import { TypenameType } from "./value_types";
 import { ArrayType } from "./value_types/array_type";
@@ -44,15 +45,27 @@ export class AstBracketNode extends AstNode {
         }
     }
 
-    override eval({ is_lvalue, can_be_decl }: { is_lvalue: boolean; can_be_decl: boolean; }): Value {
+    override eval({ is_lvalue, can_be_decl }: { is_lvalue: boolean; can_be_decl: boolean; is_immediately_assigned?: boolean }): Value {
 
         const type = this.order.tok.type;
         const token = this.order.tok;
         const { context } = this;
 
         if ([TokenType.O_PAREN].includes(type)) {
+            //handle type conversion case
+            if (this.middle && this.middle.type === TokenType.DECL_TYPENAME) {
+                const res = parse_type_from_ast_node(context, this.middle);
+                if (res.has_name) {
+                    throwError(new TokenParserError(token, `Didn't expect name in Type Conversion`));
+                }
+                if (!this.right) {
+                    throwError(new TokenParserError(token, `Expected value to convert on right in Type Conversion`));
+                }
+                const val = this.right.eval({ is_lvalue, can_be_decl: true, is_immediately_assigned: false });
+                return convert_val_to_type(context, val, res.type);
+            }
             //handle function call case
-            if (this.left) {
+            else if (this.left) {
                 const fun_obj = this.left.eval({ is_lvalue: false, can_be_decl: true });
                 if (fun_obj.valueType instanceof FunctionType) {
                     let params = [];
@@ -127,8 +140,9 @@ export class AstBracketNode extends AstNode {
                 }
                 TODO(`Unexpected expression: ${this.middle}`)
             }
+            // then it is just for ordering
             if (this.middle) {
-                return this.middle.eval({ is_lvalue: false, can_be_decl: true });
+                return this.middle.eval({ is_lvalue: is_lvalue, can_be_decl: true });
             }
             //otherwise it is just for operation ordering
             return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
