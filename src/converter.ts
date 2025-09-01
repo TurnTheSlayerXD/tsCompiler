@@ -40,7 +40,7 @@ export function are_converible_types(lhs: ValueType, rhs: ValueType): boolean {
         while (lhs instanceof PtrType && rhs instanceof PtrType) {
             lhs = lhs.ptrTo;
             rhs = rhs.ptrTo;
-            if (!(lhs instanceof PtrType) && !(rhs instanceof PtrType) && (lhs instanceof VoidType || rhs instanceof VoidType)) {
+            if ((!(lhs instanceof PtrType) && !(rhs instanceof PtrType) && (lhs instanceof VoidType || rhs instanceof VoidType)) || lhs.isSameType(rhs)) {
                 return true;
             }
         }

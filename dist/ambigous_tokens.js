@@ -31,7 +31,7 @@ function replace_ambigous_token_types(context, tokens) {
                 cur.type = token_type_1.TokenType.OP_LOGICAL_PLUS;
             }
         }
-        else if (cur.type === token_type_1.TokenType.NAME && context.hasTypename(cur.text)) {
+        else if (cur.type === token_type_1.TokenType.NAME && context.hasTypeAsBool(cur.text)) {
             cur.type = token_type_1.TokenType.DECL_TYPENAME;
         }
         // if (i + 1 < tokens.length && tokens[i]!.type === TokenType.NAME && tokens[i + 1]!.type === TokenType.O_PAREN) {

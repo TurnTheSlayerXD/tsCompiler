@@ -109,8 +109,24 @@ int factorial(int s)
     return factorial(s - 1) * s;
 }
 
+struct Node
+{
+    Node *left;
+    Node *right;
+    int val;
+};
+
+
 int main(int argc, char **argv)
 {
-    int res = factorial(10);
-    printf("Result: %d", {&res});
+
+    Node node;
+
+    node.val = 1488;
+
+    Node *ptr = &node;
+
+    (*ptr).val = 1489;
+
+    printf("ptr.val = %d", {&node.val});
 }

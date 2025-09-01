@@ -17,7 +17,7 @@ function parse_type_from_ast_node(context, root) {
     if (nodes[0].type !== token_type_1.TokenType.DECL_TYPENAME) {
         (0, helper_1.UNREACHABLE)();
     }
-    let final_type = context.hasTypename(nodes[0].order.tok.text) ?? (0, helper_1.UNREACHABLE)();
+    let final_type = context.getTypeFromTypename(nodes[0].order.tok.text) ?? (0, helper_1.UNREACHABLE)();
     if (nodes.at(-1).type === token_type_1.TokenType.NAME) {
         variable_name = nodes.at(-1).order.tok.text;
     }

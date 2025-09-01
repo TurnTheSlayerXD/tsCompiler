@@ -61,7 +61,7 @@ export class AstBracketNode extends AstNode {
                 if (!this.right) {
                     throwError(new TokenParserError(token, `Expected value to convert on right in Type Conversion`));
                 }
-                const val = this.right.eval({ is_lvalue: false, can_be_decl: true, is_immediately_assigned: false });
+                const val = this.right.eval({ is_lvalue, can_be_decl: true, is_immediately_assigned: false });
                 return convert_val_to_type(context, val, res.type);
             }
             //handle function call case
@@ -140,8 +140,9 @@ export class AstBracketNode extends AstNode {
                 }
                 TODO(`Unexpected expression: ${this.middle}`)
             }
+            // then it is just for ordering
             if (this.middle) {
-                return this.middle.eval({ is_lvalue: false, can_be_decl: true });
+                return this.middle.eval({ is_lvalue: is_lvalue, can_be_decl: true });
             }
             //otherwise it is just for operation ordering
             return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);

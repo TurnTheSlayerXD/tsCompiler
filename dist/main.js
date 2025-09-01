@@ -16,6 +16,7 @@ const int_type_1 = require("./value_types/int_type");
 const ptr_type_1 = require("./value_types/ptr_type");
 const value_type_1 = require("./value_types/value_type");
 const scope_1 = require("./scope");
+const struct_type_1 = require("./value_types/struct_type");
 const main = () => {
     const main_c = process.argv.slice(2)[0] ?? (0, helper_1.throwError)(new Error('No input file provided'));
     let text;
@@ -35,6 +36,9 @@ const main = () => {
             throw new helper_1.LexerError(lexer, `REPETITION: cur=[${cur}] prev=[${prev}])`);
         }
         prev = cur;
+        if (token.type === token_type_1.TokenType.SEMICOLON) {
+            continue;
+        }
         if (token.type === token_type_1.TokenType.PREPROCESSOR) {
             continue;
         }
@@ -45,13 +49,25 @@ const main = () => {
             }
             const after_name = lexer.next_token_or_throw();
             if (after_name.type === token_type_1.TokenType.O_CURL) {
+                // then it is struct declaration
                 const inside_tokens = (0, helper_1.iterUntilMatchingBracket)(lexer, after_name, token_type_1.TokenType.O_CURL, token_type_1.TokenType.C_CURL);
                 const splitted = (0, helper_1.splitBy)(inside_tokens, t => t.type === token_type_1.TokenType.SEMICOLON);
+                const fields = [];
+                const struct_type = struct_type_1.StructType.getInstance(struct_name.text);
+                context.addGlobalStructType(struct_type);
                 for (const gr of splitted) {
                     const ast = new ast_builder_1.AstBuilder(gr, context).build();
-                    const { type, name } = (0, type_parsing_1.parse_declaration_from_ast_node)(context, ast);
+                    fields.push((0, type_parsing_1.parse_declaration_from_ast_node)(context, ast));
                 }
-                // then it is struct declaration
+                let offset = 0;
+                for (const f of fields) {
+                    struct_type.fields.push({ name: f.name, type: f.type, offset });
+                    offset += f.type.size;
+                }
+                struct_type._size = offset;
+            }
+            else {
+                (0, helper_1.TODO)();
             }
         }
         else if (token.type === token_type_1.TokenType.NAME) {

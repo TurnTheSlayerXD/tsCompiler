@@ -11,6 +11,8 @@ import { CharType } from "./value_types/char_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
 import { AddrType } from "./value_types/value_type";
+import { StructType } from "./value_types/struct_type";
+import { VoidType } from "./value_types/void_type";
 
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
@@ -250,6 +252,9 @@ export class AstNode {
             if (!this.right) {
                 throwError(new TokenParserError(token, `Expected right arg for DEREFERENCE OP`));
             }
+            if (this.left) {
+                throwError(new TokenParserError(token, `Unexpected left arg for DEREFERENCE OP`));
+            }
             const arg = this.right.eval({ is_lvalue: false, can_be_decl: true });
             const ptr_type: PtrType = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
             return ptr_type.asm_dereference(context, temp_t.t, arg, is_lvalue);
@@ -272,6 +277,27 @@ export class AstNode {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
             return this.context.hasValue(token.text) ?? throwError(new TokenParserError(token, `Using undeclared var name [${token.text}]`));
+        }
+        if ([TokenType.KWD_NULLPTR].includes(type)) {
+            if (this.left || this.right) {
+                TODO(`UNKNOWN EXPR: ${this}`);
+            }
+            return PtrType.getInstance(VoidType.getInstance()).asm_from_literal(context, temp_t.t, null, token.pos, true);
+        }
+        if ([TokenType.OP_DOT].includes(type)) {
+            if (!this.left || !this.right) {
+                TODO(`UNKNOWN EXPR: ${this}`);
+            }
+            const src = this.left.eval({ is_lvalue, can_be_decl, is_immediately_assigned: false });
+            const field = this.right;
+            if (field.left || field.right) {
+                throwError(new TokenParserError(field.order.tok, `Struct field cannot have subtokens\nNode: ${field}`));
+            }
+            if (!(src.valueType instanceof StructType)) {
+                throwError(new TokenParserError(this.left.order.tok, `Expected struct entity before OP_DOT\nNode: ${src}`));
+            }
+            const field_name = field.order.tok;
+            return src.valueType.asm_from_dot(context, src, field_name);
         }
         TODO(`unhandeled: ${token}`);
     }

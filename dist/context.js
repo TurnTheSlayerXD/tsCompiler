@@ -51,6 +51,7 @@ class Context {
         int: int_type_1.IntType.constructor,
         char: char_type_1.CharType.constructor,
     };
+    custom_types = [];
     cur_function = null;
     literals = [];
     asm = '';
@@ -92,19 +93,29 @@ class Context {
         fs.writeFileSync(filename, this.asm);
         console.log(`Out: ${filename}`);
     }
-    hasTypename(typename) {
+    getTypeFromTypename(typename) {
         switch (typename) {
             case 'int': return int_type_1.IntType.getInstance();
             case 'char': return char_type_1.CharType.getInstance();
             case 'void': return void_type_1.VoidType.getInstance();
-            default: return null;
+            default: {
+                let struct_type;
+                if (struct_type = this.custom_types.find(v => v.struct_name === typename)) {
+                    return struct_type ?? null;
+                }
+                return null;
+            }
         }
     }
-    hasTypenameOrThrow(typename) {
-        if (typename in this.BUILT_IN_TYPES) {
-            return this.BUILT_IN_TYPES[typename]();
+    hasTypeAsBool(typename) {
+        switch (typename) {
+            case 'int': return true;
+            case 'char': return true;
+            case 'void': return true;
+            default: {
+                return !!this.custom_types.find(v => v.struct_name === typename);
+            }
         }
-        throw new helper_1.ParserError(this.lexer, `Unknown type: [${typename}]`);
     }
     pushScope(typeof_scope) {
         if (this.scopes.length > 0) {
@@ -256,8 +267,11 @@ class Context {
         }
         this.asm = lines.join('\n');
     }
-    addScopeType() {
-        (0, helper_1.TODO)();
+    addGlobalStructType(type) {
+        if (this.custom_types.find(t => t.struct_name === type.struct_name)) {
+            (0, helper_1.throwError)(new Error(`Redefinition of type that already exists\nType: ${type}`));
+        }
+        this.custom_types.push(type);
     }
     addAssembly(asm) {
         this.asm += asm;

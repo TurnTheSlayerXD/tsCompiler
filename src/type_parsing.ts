@@ -24,7 +24,7 @@ export function parse_type_from_ast_node(context: Context, root: AstNode): PARSE
     if (nodes[0]!.type !== TokenType.DECL_TYPENAME) {
         UNREACHABLE();
     }
-    let final_type: ValueType = context.hasTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
+    let final_type: ValueType = context.getTypeFromTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
     if (nodes.at(-1)!.type === TokenType.NAME) {
         variable_name = nodes.at(-1)!.order.tok.text;
     }

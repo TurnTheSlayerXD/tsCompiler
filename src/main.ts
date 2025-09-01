@@ -40,6 +40,9 @@ const main = () => {
         }
         prev = cur;
 
+        if (token.type === TokenType.SEMICOLON) {
+            continue;
+        }
         if (token.type === TokenType.PREPROCESSOR) {
             continue;
         }
@@ -50,17 +53,28 @@ const main = () => {
             }
             const after_name = lexer.next_token_or_throw();
             if (after_name.type === TokenType.O_CURL) {
+                // then it is struct declaration
                 const inside_tokens = iterUntilMatchingBracket(lexer, after_name, TokenType.O_CURL, TokenType.C_CURL);
-                const splitted = splitBy(inside_tokens, t => t.type === TokenType.SEMICOLON);
                 const fields: { name: string, type: ValueType }[] = [];
+
+                const struct_type = StructType.getInstance(struct_name.text);
+                context.addGlobalStructType(struct_type);
+
+                const splitted = splitBy(inside_tokens, t => t.type === TokenType.SEMICOLON).filter(gr => gr.length > 0);
                 for (const gr of splitted) {
                     const ast = new AstBuilder(gr, context).build();
                     fields.push(parse_declaration_from_ast_node(context, ast));
                 }
-                StructType.getInstance(struct_name.text, fields);
-
-                context.addScopeType();
-                // then it is struct declaration
+                let offset = 0;
+                for (const f of fields) {
+                    struct_type.fields.push({ name: f.name, type: f.type, offset });
+                    offset += f.type.size;
+                }
+                struct_type._size = offset;
+                console.log('struct_type', struct_type);
+            }
+            else {
+                TODO();
             }
         }
         else if (token.type === TokenType.NAME) {

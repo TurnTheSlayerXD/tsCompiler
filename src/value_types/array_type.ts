@@ -30,7 +30,7 @@ export class ArrayType extends PtrType {
         return inst;
     }
     override get size(): number {
-        return 8;
+        return this.array_size ?? 8;
     }
 
     override asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {

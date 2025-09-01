@@ -1,38 +1,35 @@
 import { Context } from "../context";
-import { throwError } from "../helper";
-import { Position } from "../lexer";
+import { throwError, TokenParserError, UNREACHABLE } from "../helper";
+import { Position, Token } from "../lexer";
+import { TokenType } from "../token_type";
 import { temp_t, Value } from "../value";
-import { MOV_I, REG_I, ValueType } from "./value_type";
+import { AddrType, MOV_I, REG_I, ValueType } from "./value_type";
 
 
 
 export class StructType implements ValueType {
     private static _instances: StructType[] = [];
     is_const: boolean = false;
-    private constructor(public fields: { name: string, type: ValueType }[], public struct_name: string) {
+    public fields: { name: string, type: ValueType, offset: number }[];
+
+    public _size: number | null;
+    private constructor(public struct_name: string) {
+        this.fields = [];
+        this._size = null;
     }
 
     toString: () => string = (): string => {
-        return `struct ${this.fields.join('')}`
+        return `[struct ${this.struct_name}]`
     };
     isSameType(type: ValueType): boolean {
         if (!(type instanceof StructType)) {
             return false;
         }
-        if (type.struct_name === this.struct_name) {
-            const min_len = this.fields.length < type.fields.length ? this.fields.length : type.fields.length;
-            for (let i = 0; i < min_len; ++i) {
-                if (!this.fields[i]!.type.isSameType(type.fields[i]!.type)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
+        return type.struct_name === this.struct_name;
     }
 
-    static getInstance(struct_name: string, fields: { name: string, type: ValueType }[]): StructType {
-        const new_type = new StructType(fields, struct_name);
+    static getInstance(struct_name: string): StructType {
+        const new_type = new StructType(struct_name);
         let old_type;
         if ((old_type = StructType._instances.find(v => v.isSameType(new_type)))) {
             return old_type;
@@ -43,11 +40,33 @@ export class StructType implements ValueType {
 
 
     get size(): number {
-        throw new Error("Method not implemented.");
+        return this._size ?? UNREACHABLE();
     }
     asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {
-        throw new Error("Method not implemented.");
+        if (should_alloc) {
+            for (let _ = 0; _ < this.size; ++_) {
+                context.addAssembly(`
+                    \rmovq $0, ${context.pushStack(1)}(%rsp)
+                `);
+            }
+            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+        }
+        return new Value(name, this, pos, null, AddrType.Stack);
     }
+    asm_from_dot(context: Context, src: Value, field_name: Token): Value {
+        src.valueType.isSameType(this) && field_name.type === TokenType.NAME || UNREACHABLE();
+
+        const struct_field = this.fields.find(f => f.name === field_name.text) ?? throwError(new TokenParserError(field_name, `No field [${field_name.text} on struct ${this.struct_name}]`));
+
+        if (src.addr_type == AddrType.Indirect) {
+            context.addAssembly(`
+                    \raddq $${struct_field.offset}, ${src._address}(%rsp)
+                `);
+            return new Value(temp_t.t, struct_field.type, field_name.pos, src._address, AddrType.Indirect);
+        }
+        return new Value(temp_t.t, struct_field.type, field_name.pos, (src._address ?? UNREACHABLE()) + struct_field.offset, AddrType.Stack);
+    }
+
     asm_copy(context: Context, dst: Value, src: Value): void {
         throw new Error("Method not implemented.");
     }

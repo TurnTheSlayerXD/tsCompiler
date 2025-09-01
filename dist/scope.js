@@ -13,15 +13,13 @@ class Scope {
     parentScope;
     typeofScope;
     scopeValues;
-    scopeValueTypes;
     _used_space = 0;
     cur_offset = 0;
-    constructor(scopeName, parentScope, typeofScope, scopeValues = [], scopeValueTypes = []) {
+    constructor(scopeName, parentScope, typeofScope, scopeValues = []) {
         this.scopeName = scopeName;
         this.parentScope = parentScope;
         this.typeofScope = typeofScope;
         this.scopeValues = scopeValues;
-        this.scopeValueTypes = scopeValueTypes;
     }
     get used_space() {
         return this._used_space;

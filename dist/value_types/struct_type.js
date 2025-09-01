@@ -1,14 +1,38 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StructType = void 0;
+const helper_1 = require("../helper");
 class StructType {
-    is_const;
-    toString;
+    struct_name;
+    static _instances = [];
+    is_const = false;
+    fields;
+    _size;
+    constructor(struct_name) {
+        this.struct_name = struct_name;
+        this.fields = [];
+        this._size = null;
+    }
+    toString = () => {
+        return `struct ${this.struct_name}: { ${this.fields.join('; ')} }`;
+    };
     isSameType(type) {
-        throw new Error("Method not implemented.");
+        if (!(type instanceof StructType)) {
+            return false;
+        }
+        return type.struct_name === this.struct_name;
+    }
+    static getInstance(struct_name) {
+        const new_type = new StructType(struct_name);
+        let old_type;
+        if ((old_type = StructType._instances.find(v => v.isSameType(new_type)))) {
+            return old_type;
+        }
+        StructType._instances.push(new_type);
+        return new_type;
     }
     get size() {
-        throw new Error("Method not implemented.");
+        return this._size ?? (0, helper_1.UNREACHABLE)();
     }
     asm_from_literal(context, name, literal, pos, should_alloc) {
         throw new Error("Method not implemented.");

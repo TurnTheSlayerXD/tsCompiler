@@ -89,7 +89,7 @@ export class PtrType implements ValueType {
                     \rmovq %rdx, ${context.pushStack(this.size)}(%rsp)
                 `);
         }
-        const val = new Value(name, this, arg.pos, context.stackPtr, AddrType.TempStack);
+        const val = new Value(name, this, arg.pos, context.stackPtr, AddrType.Stack);
         return val;
     }
 
@@ -106,7 +106,7 @@ export class PtrType implements ValueType {
         return new Value(temp_t.t, this.ptrTo, self.pos, context.stackPtr, AddrType.Stack);
     }
 
-    asm_from_literal(context: Context, name: string, literal: string | null, pos: Position, should_alloc: boolean): Value {
+    asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {
         if (this.ptrTo.isSameType(CharType.getInstance()) && !!literal) {
             context.addAssembly(`
                     \rmovb $0, ${context.pushStack(CharType.getInstance().size)}(%rsp)
