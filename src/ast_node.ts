@@ -246,7 +246,10 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected right arg for REFERENCE OP`));
             }
             const arg = this.right.eval({ is_lvalue: true, can_be_decl: true });
-            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
+            console.log('arg', arg);
+            const res = PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
+            console.log('res', res);
+            return res;
         }
         if ([TokenType.OP_DEREFERENCE].includes(type)) {
             if (!this.right) {
@@ -293,10 +296,17 @@ export class AstNode {
             if (field.left || field.right) {
                 throwError(new TokenParserError(field.order.tok, `Struct field cannot have subtokens\nNode: ${field}`));
             }
+            const field_name = field.order.tok;
+
+            if (src.valueType instanceof PtrType && src.valueType.ptrTo instanceof StructType) {
+                const struct_ref = src.valueType.asm_dereference(context, temp_t.t, src, is_lvalue);
+                const res = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                return res;
+            }
+
             if (!(src.valueType instanceof StructType)) {
                 throwError(new TokenParserError(this.left.order.tok, `Expected struct entity before OP_DOT\nNode: ${src}`));
             }
-            const field_name = field.order.tok;
             return src.valueType.asm_from_dot(context, src, field_name);
         }
         TODO(`unhandeled: ${token}`);

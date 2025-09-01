@@ -79,7 +79,7 @@ export class PtrType implements ValueType {
 
         if (arg.addr_type === AddrType.Indirect) {
             context.addAssembly(`
-                \rmovq ${arg.real_addr}(%rsp), %rax
+                \rmovq ${arg._address}(%rsp), %rax
                 \rleaq (%rax), %rdx
                 \rmovq %rdx, ${context.pushStack(this.size)}(%rsp)
             `);

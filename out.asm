@@ -1077,9 +1077,53 @@ main:
 .seh_proc main
 #__begin_scope_20
 #__init_scope_20
-subq $118, %rsp
-movl %ecx, 114(%rsp)
-movq %rdx, 106(%rsp)
+subq $162, %rsp
+movl %ecx, 158(%rsp)
+movq %rdx, 150(%rsp)
+movq $0, 149(%rsp)
+movq $0, 148(%rsp)
+movq $0, 147(%rsp)
+movq $0, 146(%rsp)
+movq $0, 145(%rsp)
+movq $0, 144(%rsp)
+movq $0, 143(%rsp)
+movq $0, 142(%rsp)
+movq $0, 141(%rsp)
+movq $0, 140(%rsp)
+movq $0, 139(%rsp)
+movq $0, 138(%rsp)
+movq $0, 137(%rsp)
+movq $0, 136(%rsp)
+movq $0, 135(%rsp)
+movq $0, 134(%rsp)
+movq $0, 133(%rsp)
+movq $0, 132(%rsp)
+movq $0, 131(%rsp)
+movq $0, 130(%rsp)
+movq $0, 129(%rsp)
+movq $0, 128(%rsp)
+movq $0, 127(%rsp)
+movq $0, 126(%rsp)
+movq $0, 125(%rsp)
+movq $0, 124(%rsp)
+movq $0, 123(%rsp)
+movq $0, 122(%rsp)
+movq $0, 121(%rsp)
+movq $0, 120(%rsp)
+movq $0, 119(%rsp)
+movq $0, 118(%rsp)
+movq $0, 117(%rsp)
+movq $0, 116(%rsp)
+movq $0, 115(%rsp)
+movq $0, 114(%rsp)
+movq $0, 113(%rsp)
+movq $0, 112(%rsp)
+movq $0, 111(%rsp)
+movq $0, 110(%rsp)
+movq $0, 109(%rsp)
+movq $0, 108(%rsp)
+movq $0, 107(%rsp)
+movq $0, 106(%rsp)
 movq $0, 105(%rsp)
 movq $0, 104(%rsp)
 movq $0, 103(%rsp)
@@ -1096,21 +1140,25 @@ movq $0, 93(%rsp)
 movq $0, 92(%rsp)
 movq $0, 91(%rsp)
 movq $0, 90(%rsp)
-movq $0, 89(%rsp)
-movq $0, 88(%rsp)
-movq $0, 87(%rsp)
-movq $0, 86(%rsp)
-movl $1488, 82(%rsp)
-movl  82(%rsp), %edx
-movl %edx, 102(%rsp)
-movq $0, 74(%rsp)
-leaq  86(%rsp), %rdx
-movq %rdx, 66(%rsp)
-movq  66(%rsp), %rdx
-movq %rdx, 74(%rsp)
-addq $16, 74(%rsp)
-movl $1489, 62(%rsp)
-movq  74(%rsp), %rax
+movl $1488, 86(%rsp)
+movl  86(%rsp), %edx
+movl %edx, 146(%rsp)
+leaq  110(%rsp), %rdx
+movq %rdx, 78(%rsp)
+movq  78(%rsp), %rdx
+movq %rdx, 130(%rsp)
+leaq  90(%rsp), %rdx
+movq %rdx, 70(%rsp)
+movq  70(%rsp), %rdx
+movq %rdx, 138(%rsp)
+addq $16, 130(%rsp)
+movl $1489, 66(%rsp)
+movq  130(%rsp), %rax
+movl  66(%rsp), %edx
+movl %edx, (%rax)
+addq $16, 138(%rsp)
+movl $1450, 62(%rsp)
+movq  138(%rsp), %rax
 movl  62(%rsp), %edx
 movl %edx, (%rax)
 movb $0, 61(%rsp)
@@ -1128,7 +1176,9 @@ movb $116, 50(%rsp)
 movb $112, 49(%rsp)
 leaq  49(%rsp), %rdx
 movq %rdx, 41(%rsp)
-leaq  102(%rsp), %rdx
+addq $16, 130(%rsp)
+movq  130(%rsp), %rax
+leaq (%rax), %rdx
 movq %rdx, 33(%rsp)
 movq  33(%rsp), %rdx
 movq %rdx, 25(%rsp)
@@ -1145,7 +1195,7 @@ leaq  1(%rsp), %rcx
 callq printf
 movb %al, 0(%rsp)
 #__clear_scope_20
-addq $118, %rsp
+addq $162, %rsp
 #__end_scope_20
 xor %rax, %rax
 retq

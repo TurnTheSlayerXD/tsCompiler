@@ -116,17 +116,18 @@ struct Node
     int val;
 };
 
-
 int main(int argc, char **argv)
 {
 
     Node node;
+    Node left;
+    Node right;
 
     node.val = 1488;
+    node.left = &left;
+    node.right = &right;
+    node.left.val = 1489;
+    node.right.val = 1450;
 
-    Node *ptr = &node;
-
-    (*ptr).val = 1489;
-
-    printf("ptr.val = %d", {&node.val});
+    printf("ptr.val = %d", {&node.left.val});
 }
