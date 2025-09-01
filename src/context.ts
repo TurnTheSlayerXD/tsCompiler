@@ -68,7 +68,8 @@ export class Context {
 
         this.optimize_stack_space();
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
-        fs.writeFileSync('./v2.asm', this.asm);
+        fs.writeFileSync(filename, this.asm);
+        console.log(`Out: ${filename}`);
     }
 
     hasTypename(typename: string): ValueType | null {

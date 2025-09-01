@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "run-compiler",
+            "command": "npm run compile", // Could be any other shell command
+            "args": [
+            ],
+            "type": "shell"
+        }
+    ]
+}

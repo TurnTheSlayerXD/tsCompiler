@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { Context } from "./context";
 import { CurlExpressionParser } from "./curl_expr_parser";
-import { iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO } from "./helper";
+import { getMatchingBracket, iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO, TokenParserError } from "./helper";
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_ast_node, parse_type_from_ast_node } from "./type_parsing";
@@ -12,8 +12,9 @@ import { CharType } from "./value_types/char_type";
 import { FunctionType } from "./value_types/function_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { AddrType, MOV_I, REG_I, ValueType } from "./value_types/value_type";
 import { TypeofScope } from "./scope";
+import { StructType } from "./value_types/struct_type";
 
 
 const main = () => {
@@ -42,11 +43,30 @@ const main = () => {
         if (token.type === TokenType.PREPROCESSOR) {
             continue;
         }
+        if (token.type === TokenType.KWD_STRUCT) {
+            const struct_name = lexer.next_token_or_throw();
+            if (struct_name.type !== TokenType.NAME) {
+                throwError(new TokenParserError(struct_name ?? token, `Expected STRUCT name after kwd struct`));
+            }
+            const after_name = lexer.next_token_or_throw();
+            if (after_name.type === TokenType.O_CURL) {
+                const inside_tokens = iterUntilMatchingBracket(lexer, after_name, TokenType.O_CURL, TokenType.C_CURL);
+                const splitted = splitBy(inside_tokens, t => t.type === TokenType.SEMICOLON);
+                const fields: { name: string, type: ValueType }[] = [];
+                for (const gr of splitted) {
+                    const ast = new AstBuilder(gr, context).build();
+                    fields.push(parse_declaration_from_ast_node(context, ast));
+                }
+                StructType.getInstance(struct_name.text, fields);
 
-        if (token.type === TokenType.NAME) {
+                context.addScopeType();
+                // then it is struct declaration
+            }
+        }
+        else if (token.type === TokenType.NAME) {
             const decl_tokens = [token];
 
-            while (!!(token = lexer.next_token()) && (token.type === TokenType.NAME || token.type === TokenType.OP_ASTERISK )) {
+            while (!!(token = lexer.next_token()) && (token.type === TokenType.NAME || token.type === TokenType.OP_ASTERISK)) {
                 decl_tokens.push(token);
             }
 

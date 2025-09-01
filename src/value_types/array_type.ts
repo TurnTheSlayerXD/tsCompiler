@@ -8,7 +8,7 @@ import { ValueType, AddrType } from "./value_type";
 
 export class ArrayType extends PtrType {
     override is_const: boolean = false;
-    static _instances: ArrayType[] = [];
+    private static _instances: ArrayType[] = [];
     private constructor(ptrTo: ValueType, public array_size: number | null) {
         super(ptrTo);
     }
