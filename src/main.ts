@@ -20,6 +20,7 @@ import { ArrayType } from "./value_types/array_type";
 
 const main = () => {
     const main_c = process.argv.slice(2)[0] ?? throwError(new Error('No input file provided'));
+    const out_asm = process.argv.slice(3)[0] ?? throwError(new Error('No output file provided'));
     let text;
     try {
         text = readFileSync(main_c).toString();
@@ -182,7 +183,7 @@ const main = () => {
         }
     }
     // console.log(context.getAsm());
-    context.asmToFile('out.asm');
+    context.asmToFile(out_asm);
 };
 
 
