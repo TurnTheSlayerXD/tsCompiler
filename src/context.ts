@@ -233,7 +233,7 @@ export class Context {
                             scope.cur_offset -= loc.size;
                             loc.own_offset = scope.cur_offset;
                         }
-                        // [1, 4, 8].includes(loc.size) || UNREACHABLE();
+                        [1, 4, 8].includes(loc.size) || UNREACHABLE();
                         if (loc.own_offset < 0) {
                             UNREACHABLE();
                         }

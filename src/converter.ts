@@ -24,8 +24,20 @@ export function convert_values(context: Context, lhs: Value, rhs: Value): Conver
         const new_value = new Value(temp_t.t, IntType.getInstance(), lhs.pos, context.stackPtr, AddrType.Stack);
         return lhs.valueType instanceof CharType ? { ok: false, left: new_value, right: rhs } : { ok: false, left: lhs, right: new_value };
     }
+    if (lhs.valueType instanceof PtrType && rhs.valueType instanceof PtrType) {
+        let lhs_type: ValueType = lhs.valueType;
+        let rhs_type: ValueType = rhs.valueType;
+        while (lhs_type instanceof PtrType && rhs_type instanceof PtrType) {
+            lhs_type = lhs_type.ptrTo;
+            rhs_type = rhs_type.ptrTo;
+        }
+        if (!(lhs_type instanceof PtrType) && !(rhs_type instanceof PtrType) && (lhs_type instanceof VoidType || rhs_type instanceof VoidType)) {
+            return { ok: true, left: lhs, right: rhs };
+        }
+        throwError(new TypeError(lhs.pos, `Unable to convert ptr of type ${lhs.valueType} to ptr of type ${rhs}`))
+    }
 
-    TODO('CONVERTION');
+    TODO(`CONVERTION:\nlhs: ${lhs}\nrhs: ${rhs}`);
 }
 
 function is_numeric_type(type: ValueType): boolean {

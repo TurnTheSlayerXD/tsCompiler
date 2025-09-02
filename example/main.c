@@ -70,7 +70,7 @@ char *write_to(char *dst, char *src)
 void printf(char *fmt, void **args)
 {
 
-    char[100] buf;
+    char[20] buf;
     char *iter = buf;
     int count = 0;
     int argc = 0;
@@ -113,30 +113,42 @@ struct Node
 {
     Node *left;
     Node *right;
+    Node *par;
     int val;
+    int height;
+
+    int[1488] arr;
 };
+
+void print_tree(Node *v)
+{
+    if (v == nullptr)
+    {
+        return;
+    }
+    printf("v.val = %d", {&(v.val)});
+    print_tree(v.left);
+    print_tree(v.right);
+}
+
 
 int main(int argc, char **argv)
 {
+    Node[3] stack;
 
-    Node node;
-    Node left;
-    Node right;
-
-    node.val = 1488;
-    node.left = &left;
-    node.right = &right;
-    node.left.val = 1489;
-    node.right.val = 1450;
-
-    if (left.val == node.left.val)
+    for (int i = 1; i < 3; i += 1)
     {
-        printf("Nice", {&0});
-    }
-    else
-    {
-        printf("fuck", {&0});
+        stack[i].val = i;
+        stack[i - 1].left = stack + i;
     }
 
-    printf("ptr.val = %d", {&node.right.val});
+    print_tree(stack);
+
+    // root.val = 1;
+    // left.val = 2;
+    // right.val = 3;
+    //
+    // root.left = &left;
+    // root.right = &right;
+    //
 }

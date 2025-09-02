@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { Context } from "./context";
 import { CurlExpressionParser } from "./curl_expr_parser";
-import { getMatchingBracket, iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO, TokenParserError } from "./helper";
+import { getMatchingBracket, iterUntilMatchingBracket, LexerError, ParserError, splitBy, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_ast_node, parse_type_from_ast_node } from "./type_parsing";
@@ -15,6 +15,7 @@ import { PtrType } from "./value_types/ptr_type";
 import { AddrType, MOV_I, REG_I, ValueType } from "./value_types/value_type";
 import { TypeofScope } from "./scope";
 import { StructType } from "./value_types/struct_type";
+import { ArrayType } from "./value_types/array_type";
 
 
 const main = () => {
@@ -68,7 +69,12 @@ const main = () => {
                 let offset = 0;
                 for (const f of fields) {
                     struct_type.fields.push({ name: f.name, type: f.type, offset });
-                    offset += f.type.size;
+                    if (f.type instanceof ArrayType) {
+                        offset += f.type.array_size ?? throwError(new TokenParserError(after_name, `Expected size in array struct field.`));
+                    }
+                    else {
+                        offset += f.type.size;
+                    }
                 }
                 struct_type._size = offset;
                 console.log('struct_type', struct_type);

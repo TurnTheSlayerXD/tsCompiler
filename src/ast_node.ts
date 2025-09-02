@@ -10,7 +10,7 @@ import { ArrayType } from "./value_types/array_type";
 import { CharType } from "./value_types/char_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { AddrType } from "./value_types/value_type";
+import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
 import { StructType } from "./value_types/struct_type";
 import { VoidType } from "./value_types/void_type";
 import { abort } from "process";
@@ -298,11 +298,23 @@ export class AstNode {
             const field_name = field.order.tok;
 
             if (src.valueType instanceof PtrType && src.valueType.ptrTo instanceof StructType) {
-                const struct_ref = (src.valueType as PtrType).asm_dereference(context, temp_t.t, src, true);
-                const res = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
-                context.addAssembly(`#offset of struct PTR field: ${field_name.text}
+
+                if (is_lvalue) {
+                    const struct_ref = (src.valueType as PtrType).asm_dereference(context, temp_t.t, src, is_lvalue);
+                    const res = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                    context.addAssembly(`#offset of struct PTR field: ${field_name.text}
                     `);
-                return res;
+                    return res;
+                }
+                const struct_ref = new Value(temp_t.t, src.valueType.ptrTo, token.pos, src._address, AddrType.Indirect);
+                const ptr_to_field = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                const field_type = ptr_to_field.valueType;
+                context.addAssembly(`
+                    \rmovq ${ptr_to_field._address}(%rsp), %rax
+                    \r${MOV_I[field_type.mov_i]} (%rax), %${REG_I[field_type.reg_i]}
+                    \r${MOV_I[field_type.mov_i]} %${REG_I[field_type.reg_i]}, ${context.pushStack(field_type.size)}(%rsp)
+                `);
+                return new Value(temp_t.t, field_type, token.pos, context.stackPtr, AddrType.Stack);
             }
 
             if (!(src.valueType instanceof StructType)) {
