@@ -6,8 +6,6 @@ export enum TokenType {
     IN_TYPE,
     NAME,
 
-    KEYWORD,
-
     O_PAREN,
     C_PAREN,
 
@@ -73,6 +71,9 @@ export enum TokenType {
     KWD_WHILE,
     KWD_BREAK,
     KWD_CONTINUE,
+    KWD_STRUCT,
+    KWD_NULLPTR,
+
 
     DECL_TYPENAME,
 }
@@ -135,6 +136,8 @@ export type Keyword = {
     'const': TokenType,
     'break': TokenType,
     'continue': TokenType,
+    'struct': TokenType,
+    'nullptr': TokenType,
 };
 
 export const KEYWORDS: Keyword = {
@@ -146,6 +149,8 @@ export const KEYWORDS: Keyword = {
     'const': TokenType.KWD_CONST,
     'break': TokenType.KWD_BREAK,
     'continue': TokenType.KWD_CONTINUE,
+    'struct': TokenType.KWD_STRUCT,
+    'nullptr': TokenType.KWD_NULLPTR,
 };
 
 export const STOP_SYMBOLS = [' ', '!', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', '[', ']', ';', '=', '==', '<', '>', '&', '%', '"'];

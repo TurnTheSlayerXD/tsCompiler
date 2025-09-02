@@ -115,7 +115,7 @@ export class AstBuilder {
             root.insert_node(tok.is_bracket ? new AstBracketNode(tok, { l_b: tok.pos, r_b: tok.matching_br_pos ?? UNREACHABLE() }, null, null, null, this.context)
                 : new AstNode(tok, null, null, this.context));
         }
-        prettyHtml(root);
+        // prettyHtml(root);
         return root;
     }
 

@@ -7,16 +7,17 @@ class Position {
     row;
     col;
     count;
-    instance_type;
     constructor(row, col, count) {
         this.row = row;
         this.col = col;
         this.count = count;
-        this.instance_type = 'position';
     }
     toString = () => {
         return `${this.row}:${this.col}:${this.count}`;
     };
+    clone() {
+        return new Position(this.row, this.col, this.count);
+    }
 }
 exports.Position = Position;
 function equal(lhs, rhs) {
@@ -46,7 +47,9 @@ class Token {
         if (this.type !== token_type_1.TokenType.NAME
             && this.type !== token_type_1.TokenType.STRING_LITERAL
             && this.type !== token_type_1.TokenType.NUM_INT
-            && this.type !== token_type_1.TokenType.NUM_FLOAT) {
+            && this.type !== token_type_1.TokenType.NUM_FLOAT
+            && this.type !== token_type_1.TokenType.CHAR_LITERAL
+            && this.type !== token_type_1.TokenType.DECL_TYPENAME) {
             throw new TokenAccessException(this);
         }
         return this._text;
@@ -55,7 +58,7 @@ class Token {
         this._text = text;
     }
     toString = () => {
-        return `[${token_type_1.TokenType[this.type]}]  [${this.type === token_type_1.TokenType.NAME ? this.text : ''}]  [${this.pos}]\n`;
+        return `[${token_type_1.TokenType[this.type]}]  [${this.type === token_type_1.TokenType.NAME || this.type === token_type_1.TokenType.NUM_FLOAT || this.type === token_type_1.TokenType.STRING_LITERAL || this.type === token_type_1.TokenType.NUM_INT ? this.text : ''}]  [${this.pos}]\n`;
     };
 }
 exports.Token = Token;
@@ -124,23 +127,27 @@ class Lexer {
             (0, helper_1.throwError)(new helper_1.LexerError(this, "UNCHECKED BOUNDARIES")) :
             this.text[cursor.count];
     }
-    iter_while_not_equal(cursor, symbols) {
-        if (typeof symbols === "string") {
-            while (!this.iseof(cursor) && this.at(cursor) !== symbols) {
-                this.iter_cursor(cursor, 1);
-            }
+    slice(cursor, len) {
+        if (len === 1) {
+            return this.at(cursor);
         }
-        else if (Array.isArray(symbols)) {
-            while (!this.iseof(cursor) && !symbols.includes(this.at(cursor))) {
-                this.iter_cursor(cursor, 1);
-            }
+        return this.text.slice(cursor.count, cursor.count + len < this.text.length ? cursor.count + len : this.text.length);
+    }
+    iter_while_not_equal_one(cursor, str) {
+        while (!this.iseof(cursor) && this.slice(cursor, str.length) !== str) {
+            this.iter_cursor(cursor, 1);
+        }
+    }
+    iter_while_not_equal_arr(cursor, strs) {
+        while (!this.iseof(cursor) && !strs.some((s) => this.slice(this.cursor, s.length) === s)) {
+            this.iter_cursor(cursor, 1);
         }
     }
     is_correct_preprocessor(directive) {
         if (!["#include", "#define", "#if", "#else"].includes(directive)) {
             throw new helper_1.LexerError(this, `No such preprocessor directive: [${directive}]`);
         }
-        return new Token({ ...this.prev_cursor }, directive, token_type_1.TokenType.PREPROCESSOR);
+        return new Token(this.prev_cursor.clone(), directive, token_type_1.TokenType.PREPROCESSOR);
     }
     substr(prev_cursor, cursor) {
         return this.text.substring(prev_cursor.count, cursor.count);
@@ -154,42 +161,59 @@ class Lexer {
             console.warn(`WARNING: spotted unknown sequnce: ${this.substr(this.prev_cursor, this.cursor)}\n`);
             this.iter_cursor(this.cursor, 1);
         }
-        this.prev_cursor = { ...this.cursor };
+        this.prev_cursor = this.cursor.clone();
         if (this.iseof(this.cursor)) {
             return null;
         }
+        if (this.is_equal_to_expr(this.cursor, '//')) {
+            this.iter_while_not_equal_one(this.cursor, '\n');
+            return new Token(this.prev_cursor.clone(), '//', token_type_1.TokenType.PREPROCESSOR);
+        }
+        if (this.is_equal_to_expr(this.cursor, '/*')) {
+            this.iter_while_not_equal_one(this.cursor, '*/');
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '/**/', token_type_1.TokenType.PREPROCESSOR);
+        }
         if (this.at(this.cursor) === '#') {
-            this.iter_while_not_equal(this.cursor, ['\n']);
-            return new Token({ ...this.cursor }, this.substr(this.prev_cursor, this.cursor), token_type_1.TokenType.PREPROCESSOR);
+            this.iter_while_not_equal_one(this.cursor, '\n');
+            return new Token(this.prev_cursor.clone(), this.substr(this.prev_cursor, this.cursor), token_type_1.TokenType.PREPROCESSOR);
         }
         if (this.at(this.cursor) === '(') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '(', token_type_1.TokenType.O_PAREN);
+            return new Token(this.prev_cursor.clone(), '(', token_type_1.TokenType.O_PAREN);
         }
         if (this.at(this.cursor) === ')') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ')', token_type_1.TokenType.C_PAREN);
+            return new Token(this.prev_cursor.clone(), ')', token_type_1.TokenType.C_PAREN);
         }
         if (this.at(this.cursor) === '{') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '{', token_type_1.TokenType.O_CURL);
+            return new Token(this.prev_cursor.clone(), '{', token_type_1.TokenType.O_CURL);
         }
         if (this.at(this.cursor) === '}') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '}', token_type_1.TokenType.C_CURL);
+            return new Token(this.prev_cursor.clone(), '}', token_type_1.TokenType.C_CURL);
+        }
+        if (this.at(this.cursor) === '[') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '[', token_type_1.TokenType.O_SQR);
+        }
+        if (this.at(this.cursor) === ']') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), ']', token_type_1.TokenType.C_SQR);
         }
         if (this.at(this.cursor) === '"') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
+            this.iter_while_not_equal_one(this.cursor, '"');
             if (this.iseof(this.cursor)) {
                 throw new helper_1.LexerError(this, `Unmatched quota ["]`);
             }
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count + 1, this.cursor.count - 1), token_type_1.TokenType.STRING_LITERAL);
+            return new Token(this.prev_cursor.clone(), this.text.substring(this.prev_cursor.count + 1, this.cursor.count - 1), token_type_1.TokenType.STRING_LITERAL);
         }
         if (this.at(this.cursor) === '\'') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, '"');
+            this.iter_while_not_equal_one(this.cursor, '\'');
             if (this.iseof(this.cursor)) {
                 throw new helper_1.LexerError(this, `Unmatched quota [']`);
             }
@@ -197,93 +221,132 @@ class Lexer {
                 throw new helper_1.LexerError(this, `Char Quotas cannot contain underline string length less than 1 [${this.text.substring(this.prev_cursor.count, this.cursor.count + 1)}]`);
             }
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, this.text.substring(this.prev_cursor.count, this.cursor.count), token_type_1.TokenType.CHAR_LITERAL);
+            return new Token(this.prev_cursor.clone(), this.text.substring(this.prev_cursor.count + 1, this.cursor.count - 1), token_type_1.TokenType.CHAR_LITERAL);
         }
         if (this.is_equal_to_expr(this.cursor, '->')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '->', token_type_1.TokenType.OP_ARROW);
+            return new Token(this.prev_cursor.clone(), '->', token_type_1.TokenType.OP_ARROW);
         }
         if (this.is_equal_to_expr(this.cursor, '==')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '.', token_type_1.TokenType.OP_COMP_EQUAL);
+            return new Token(this.prev_cursor.clone(), '.', token_type_1.TokenType.OP_COMP_EQ);
+        }
+        if (this.is_equal_to_expr(this.cursor, '!=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '.', token_type_1.TokenType.OP_COMP_NOT_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '<=')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '.', token_type_1.TokenType.OP_COMP_LESS_EQ);
+            return new Token(this.prev_cursor.clone(), '.', token_type_1.TokenType.OP_COMP_LESS_EQ);
         }
         if (this.is_equal_to_expr(this.cursor, '>=')) {
             this.iter_cursor(this.cursor, 2);
-            return new Token({ ...this.prev_cursor }, '>=', token_type_1.TokenType.OP_COMP_GREATER_EQ);
+            return new Token(this.prev_cursor.clone(), '>=', token_type_1.TokenType.OP_COMP_GREATER_EQ);
+        }
+        if (this.is_equal_to_expr(this.cursor, '&&')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '&&', token_type_1.TokenType.OP_AND);
+        }
+        if (this.is_equal_to_expr(this.cursor, '||')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '||', token_type_1.TokenType.OP_OR);
+        }
+        if (this.is_equal_to_expr(this.cursor, '++')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '++', token_type_1.TokenType.OP_INCREMENT);
+        }
+        if (this.is_equal_to_expr(this.cursor, '--')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '||', token_type_1.TokenType.OP_DECREMENT);
+        }
+        if (this.is_equal_to_expr(this.cursor, '+=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', token_type_1.TokenType.OP_ASSIGNMENT_PLUS);
+        }
+        if (this.is_equal_to_expr(this.cursor, '-=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', token_type_1.TokenType.OP_ASSIGNMENT_MINUS);
+        }
+        if (this.is_equal_to_expr(this.cursor, '*=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', token_type_1.TokenType.OP_ASSIGNMENT_MULTIPLY);
+        }
+        if (this.is_equal_to_expr(this.cursor, '/=')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '=', token_type_1.TokenType.OP_ASSIGNMENT_DIVIDE);
+        }
+        if (this.is_equal_to_expr(this.cursor, '!')) {
+            this.iter_cursor(this.cursor, 2);
+            return new Token(this.prev_cursor.clone(), '&&', token_type_1.TokenType.OP_NEGATE);
         }
         if (this.at(this.cursor) === '+') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '+', token_type_1.TokenType.OP_PLUS);
+            return new Token(this.prev_cursor.clone(), '+', token_type_1.TokenType.OP_PLUS);
         }
         if (this.at(this.cursor) === '-') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '-', token_type_1.TokenType.OP_MINUS);
+            return new Token(this.prev_cursor.clone(), '-', token_type_1.TokenType.OP_MINUS);
         }
         if (this.at(this.cursor) === ';') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ';', token_type_1.TokenType.SEMICOLON);
+            return new Token(this.prev_cursor.clone(), ';', token_type_1.TokenType.SEMICOLON);
         }
         if (this.at(this.cursor) === '*') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '*', token_type_1.TokenType.OP_ASTERISK);
+            return new Token(this.prev_cursor.clone(), '*', token_type_1.TokenType.OP_ASTERISK);
         }
         if (this.at(this.cursor) === '/') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '/', token_type_1.TokenType.OP_DIVIDE);
+            return new Token(this.prev_cursor.clone(), '/', token_type_1.TokenType.OP_DIVIDE);
+        }
+        if (this.at(this.cursor) === '%') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '/', token_type_1.TokenType.OP_PERCENT);
         }
         if (this.at(this.cursor) === '.') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '.', token_type_1.TokenType.OP_DOT);
+            return new Token(this.prev_cursor.clone(), '.', token_type_1.TokenType.OP_DOT);
         }
         if (this.at(this.cursor) === ',') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, ',', token_type_1.TokenType.COMMA);
+            return new Token(this.prev_cursor.clone(), ',', token_type_1.TokenType.COMMA);
         }
         if (this.at(this.cursor) === '<') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '<', token_type_1.TokenType.OP_COMP_LESS);
+            return new Token(this.prev_cursor.clone(), '<', token_type_1.TokenType.OP_COMP_LESS);
         }
         if (this.at(this.cursor) === '>') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '>', token_type_1.TokenType.OP_COMP_GREATER);
+            return new Token(this.prev_cursor.clone(), '>', token_type_1.TokenType.OP_COMP_GREATER);
         }
         if (this.at(this.cursor) === '=') {
             this.iter_cursor(this.cursor, 1);
-            return new Token({ ...this.prev_cursor }, '=', token_type_1.TokenType.OP_ASSIGNMENT);
+            return new Token(this.prev_cursor.clone(), '=', token_type_1.TokenType.OP_ASSIGNMENT);
         }
-        const STOP_SYMBOLS = [' ', '\n', ',', '.', '+', '-', '*', '/', '(', ')', '{', '}', ';', '=', '==', '<', '>', '->'];
-        this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
+        if (this.at(this.cursor) === '&') {
+            this.iter_cursor(this.cursor, 1);
+            return new Token(this.prev_cursor.clone(), '&', token_type_1.TokenType.OP_AMPERSAND);
+        }
+        this.iter_while_not_equal_arr(this.cursor, token_type_1.STOP_SYMBOLS);
         const text = this.text.substring(this.prev_cursor.count, this.cursor.count);
         if (text.match(/^[+-]?\d+$/g) && !this.iseof(this.cursor) && this.at(this.cursor) === '.') {
             this.iter_cursor(this.cursor, 1);
-            this.iter_while_not_equal(this.cursor, STOP_SYMBOLS);
+            this.iter_while_not_equal_arr(this.cursor, token_type_1.STOP_SYMBOLS);
             const float_text = this.substr(this.prev_cursor, this.cursor);
             if (/^[+-]?\d+(\.\d+)?$/g.test(float_text)) {
-                return new Token({ ...this.prev_cursor }, float_text, token_type_1.TokenType.NUM_FLOAT);
+                return new Token(this.prev_cursor.clone(), float_text, token_type_1.TokenType.NUM_FLOAT);
             }
         }
         if (/^[+-]?\d+$/.test(text)) {
-            return new Token({ ...this.prev_cursor }, text, token_type_1.TokenType.NUM_INT);
+            return new Token(this.prev_cursor.clone(), text, token_type_1.TokenType.NUM_INT);
         }
-        const KEYWORDS = {
-            'return': token_type_1.TokenType.KWD_RETURN,
-            'if': token_type_1.TokenType.KWD_IF,
-            'else': token_type_1.TokenType.KWD_ELSE,
-            'for': token_type_1.TokenType.KWD_FOR,
-            'while': token_type_1.TokenType.KWD_WHILE,
-            'const': token_type_1.TokenType.KWD_CONST,
-        };
-        if (text in KEYWORDS) {
-            return new Token({ ...this.prev_cursor }, text, KEYWORDS[text]);
+        if (text in token_type_1.KEYWORDS) {
+            return new Token(this.prev_cursor.clone(), text, token_type_1.KEYWORDS[text]);
         }
-        if (!(/^[a-zA-Z]+[0-9]*$/.test(text))) {
-            (0, helper_1.throwError)(new helper_1.LexerError(this, `[${text}] - Incorrect variabler name`));
+        if (!(/^[a-zA-Z_]+[0-9]*$/.test(text))) {
+            (0, helper_1.throwError)(new helper_1.LexerError(this, `[${text}] - Incorrect variable name`));
         }
-        return new Token({ ...this.prev_cursor }, text, token_type_1.TokenType.NAME);
+        return new Token(this.prev_cursor.clone(), text, token_type_1.TokenType.NAME);
     }
 }
 exports.Lexer = Lexer;

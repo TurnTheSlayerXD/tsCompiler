@@ -1,7 +1,7 @@
 import { get_rax_i } from "./converter";
 import { UNREACHABLE, throwError, TokenParserError, TODO, TEMP_NAME } from "./helper";
 import { TokenType } from "./token_type";
-import { parse_declaration_from_tokens } from "./type_parsing";
+import { parse_declaration_from_ast_node } from "./type_parsing";
 import { Context } from "./context";
 import { OrderedToken } from "./ast_builder";
 import { Token } from "./lexer";
@@ -10,7 +10,10 @@ import { ArrayType } from "./value_types/array_type";
 import { CharType } from "./value_types/char_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { AddrType } from "./value_types/value_type";
+import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { StructType } from "./value_types/struct_type";
+import { VoidType } from "./value_types/void_type";
+import { abort } from "process";
 
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
@@ -141,7 +144,7 @@ export class AstNode {
             if (!can_be_decl) {
                 throwError(new TokenParserError(token, `Assignment forbidden in expression`));
             }
-            const { type, name } = parse_declaration_from_tokens(context, this);
+            const { type, name } = parse_declaration_from_ast_node(context, this);
             const val = type.asm_from_literal(context, name, null, token.pos, !is_immediately_assigned);
             context.addScopeValue(val);
             return val;
@@ -244,11 +247,15 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected right arg for REFERENCE OP`));
             }
             const arg = this.right.eval({ is_lvalue: true, can_be_decl: true });
-            return PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
+            const res = PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
+            return res;
         }
         if ([TokenType.OP_DEREFERENCE].includes(type)) {
             if (!this.right) {
                 throwError(new TokenParserError(token, `Expected right arg for DEREFERENCE OP`));
+            }
+            if (this.left) {
+                throwError(new TokenParserError(token, `Unexpected left arg for DEREFERENCE OP`));
             }
             const arg = this.right.eval({ is_lvalue: false, can_be_decl: true });
             const ptr_type: PtrType = arg.valueType instanceof PtrType ? arg.valueType as PtrType : throwError(new TokenParserError(token, `Trying to dereference Non-Pointer type ${arg.valueType}`));
@@ -272,6 +279,50 @@ export class AstNode {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
             return this.context.hasValue(token.text) ?? throwError(new TokenParserError(token, `Using undeclared var name [${token.text}]`));
+        }
+        if ([TokenType.KWD_NULLPTR].includes(type)) {
+            if (this.left || this.right) {
+                TODO(`UNKNOWN EXPR: ${this}`);
+            }
+            return PtrType.getInstance(VoidType.getInstance()).asm_from_literal(context, temp_t.t, null, token.pos, true);
+        }
+        if ([TokenType.OP_DOT].includes(type)) {
+            if (!this.left || !this.right) {
+                TODO(`UNKNOWN EXPR: ${this}`);
+            }
+            const src = this.left.eval({ is_lvalue, can_be_decl, is_immediately_assigned: false });
+            const field = this.right;
+            if (field.left || field.right) {
+                throwError(new TokenParserError(field.order.tok, `Struct field cannot have subtokens\nNode: ${field}`));
+            }
+            const field_name = field.order.tok;
+
+            if (src.valueType instanceof PtrType && src.valueType.ptrTo instanceof StructType) {
+
+                if (is_lvalue) {
+                    const struct_ref = (src.valueType as PtrType).asm_dereference(context, temp_t.t, src, is_lvalue);
+                    const res = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                    context.addAssembly(`#offset of struct PTR field: ${field_name.text}
+                    `);
+                    return res;
+                }
+                const struct_ref = new Value(temp_t.t, src.valueType.ptrTo, token.pos, src._address, AddrType.Indirect);
+                const ptr_to_field = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                const field_type = ptr_to_field.valueType;
+                context.addAssembly(`
+                    \rmovq ${ptr_to_field._address}(%rsp), %rax
+                    \r${MOV_I[field_type.mov_i]} (%rax), %${REG_I[field_type.reg_i]}
+                    \r${MOV_I[field_type.mov_i]} %${REG_I[field_type.reg_i]}, ${context.pushStack(field_type.size)}(%rsp)
+                `);
+                return new Value(temp_t.t, field_type, token.pos, context.stackPtr, AddrType.Stack);
+            }
+
+            if (!(src.valueType instanceof StructType)) {
+                throwError(new TokenParserError(this.left.order.tok, `Expected struct entity before OP_DOT\nNode: ${src}`));
+            }
+            context.addAssembly(`#offset of struct field: ${field_name.text}
+                `);
+            return src.valueType.asm_from_dot(context, src, field_name);
         }
         TODO(`unhandeled: ${token}`);
     }

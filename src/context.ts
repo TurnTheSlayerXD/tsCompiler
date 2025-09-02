@@ -1,4 +1,4 @@
-import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, toReversed, UNREACHABLE } from "./helper";
+import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, TokenParserError, toReversed, UNREACHABLE } from "./helper";
 import { Lexer, Position } from "./lexer";
 import * as fs from 'fs';
 import { Scope, TypeofScope } from "./scope";
@@ -9,6 +9,7 @@ import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
 import { ValueType, AddrType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
+import { StructType } from "./value_types/struct_type";
 
 export class Context {
 
@@ -16,6 +17,7 @@ export class Context {
         int: IntType.constructor,
         char: CharType.constructor,
     };
+    custom_types: StructType[] = [];
 
     public cur_function: Value | null = null;
 
@@ -62,29 +64,42 @@ export class Context {
         return this.asm;
     }
 
-    asmToFile(filename: string) {
+    asmToFile(filename: string, do_optimize: boolean = true) {
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
         fs.writeFileSync('./v1.asm', this.asm);
 
-        this.optimize_stack_space();
+        if (do_optimize) {
+            this.optimize_stack_space();
+        }
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
-        fs.writeFileSync('./v2.asm', this.asm);
+        fs.writeFileSync(filename, this.asm);
+        console.log(`Out: ${filename}`);
     }
 
-    hasTypename(typename: string): ValueType | null {
+    getTypeFromTypename(typename: string): ValueType | null {
         switch (typename) {
             case 'int': return IntType.getInstance();
             case 'char': return CharType.getInstance();
             case 'void': return VoidType.getInstance();
-            default: return null;
+            default: {
+                let struct_type;
+                if (struct_type = this.custom_types.find(v => v.struct_name === typename)) {
+                    return struct_type ?? null;
+                }
+                return null;
+            }
         }
     }
 
-    hasTypenameOrThrow(typename: string): ValueType {
-        if (typename in this.BUILT_IN_TYPES) {
-            return (this.BUILT_IN_TYPES[typename as keyof typeof this.BUILT_IN_TYPES] as Function)();
+    hasTypeAsBool(typename: string): boolean {
+        switch (typename) {
+            case 'int': return true;
+            case 'char': return true;
+            case 'void': return true;
+            default: {
+                return !!this.custom_types.find(v => v.struct_name === typename);
+            }
         }
-        throw new ParserError(this.lexer, `Unknown type: [${typename}]`);
     }
 
     pushScope(typeof_scope: TypeofScope) {
@@ -250,8 +265,11 @@ export class Context {
         this.asm = lines.join('\n');
     }
 
-    addScopeType() {
-        TODO();
+    addGlobalStructType(type: StructType) {
+        if (this.custom_types.find(t => t.struct_name === type.struct_name)) {
+            throwError(new Error(`Redefinition of type that already exists\nType: ${type}`));
+        }
+        this.custom_types.push(type);
     }
 
     addAssembly(asm: string) {

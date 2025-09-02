@@ -14,7 +14,7 @@ type WITH_NAME = { has_name: true, type: ValueType, name: string };
 
 type PARSE_TYPE_RES = ONLY_TYPE | WITH_NAME;
 
-export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_TYPE_RES {
+export function parse_type_from_ast_node(context: Context, root: AstNode): PARSE_TYPE_RES {
     root.type === TokenType.DECL_TYPENAME || UNREACHABLE();
     let variable_name: string | undefined;
     const nodes = collect_all_nodes_sorted_backwards(root);
@@ -24,7 +24,7 @@ export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_T
     if (nodes[0]!.type !== TokenType.DECL_TYPENAME) {
         UNREACHABLE();
     }
-    let final_type: ValueType = context.hasTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
+    let final_type: ValueType = context.getTypeFromTypename(nodes[0]!.order.tok.text) ?? UNREACHABLE();
     if (nodes.at(-1)!.type === TokenType.NAME) {
         variable_name = nodes.at(-1)!.order.tok.text;
     }
@@ -59,13 +59,13 @@ export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_T
                         const fun_param_types: ValueType[] = [];
                         let comma_node = (type_modifiers[i + 1]! as AstBracketNode ?? UNREACHABLE()).middle;
                         while (comma_node && comma_node.type === TokenType.COMMA) {
-                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
-                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                            const param_type = parse_type_from_ast_node(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? UNREACHABLE() : param_type.type);
                             comma_node = comma_node.right;
                         }
                         if (comma_node) {
-                            const param_type = parse_type_from_tokens(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
-                            fun_param_types.push(param_type.has_name ? throwError() : param_type.type);
+                            const param_type = parse_type_from_ast_node(context, comma_node.left ?? throwError(new TokenParserError(comma_node.order.tok, `Expected type`)));
+                            fun_param_types.push(param_type.has_name ? UNREACHABLE() : param_type.type);
                         }
                         final_type = PtrType.getInstance(FunctionType.getInstance(final_type, fun_param_types));
                     }
@@ -87,8 +87,8 @@ export function parse_type_from_tokens(context: Context, root: AstNode): PARSE_T
     return variable_name ? { type: final_type, has_name: true, name: variable_name } : { type: final_type, has_name: false };
 }
 
-export function parse_declaration_from_tokens(context: Context, root: AstNode): { type: ValueType, name: string } {
-    const res = parse_type_from_tokens(context, root);
+export function parse_declaration_from_ast_node(context: Context, root: AstNode): { type: ValueType, name: string } {
+    const res = parse_type_from_ast_node(context, root);
     if (!res.has_name) {
         throwError(new TokenParserError(root.order.tok, `Expected Name after type declaration`));
     }

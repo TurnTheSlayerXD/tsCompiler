@@ -42,13 +42,113 @@ char *num_to_str(char *dst, int num)
     return dst + strlen(dst);
 }
 
+int starts_with(char *to_search, char *pat)
+{
+    while (*pat != '\0' && *to_search == *pat)
+    {
+        to_search += 1;
+        pat += 1;
+    }
+    if (*pat != '\0')
+    {
+        return 0;
+    }
+    return 1;
+}
+
+char *write_to(char *dst, char *src)
+{
+    while (*src != '\0')
+    {
+        *dst = *src;
+        dst += 1;
+        src += 1;
+    }
+    return dst;
+}
+
+void printf(char *fmt, void **args)
+{
+
+    char[20] buf;
+    char *iter = buf;
+    int count = 0;
+    int argc = 0;
+    while (*fmt != '\0')
+    {
+        if (*(fmt + 1) != '\0')
+        {
+            if (starts_with(fmt, "%s") == 1)
+            {
+                iter = write_to(iter, args[argc]);
+                argc += 1;
+                fmt += 2;
+                continue;
+            }
+            else if (starts_with(fmt, "%d") == 1)
+            {
+                iter = num_to_str(iter, *(int *)args[argc]);
+                argc += 1;
+                fmt += 2;
+                continue;
+            }
+        }
+        *iter = *fmt;
+        iter += 1;
+        fmt += 1;
+    }
+    print_str(buf);
+}
+
+int factorial(int s)
+{
+    if (s == 0)
+    {
+        return 1;
+    }
+    return factorial(s - 1) * s;
+}
+
+struct Node
+{
+    Node *left;
+    Node *right;
+    Node *par;
+    int val;
+    int height;
+
+    int[1488] arr;
+};
+
+void print_tree(Node *v)
+{
+    if (v == nullptr)
+    {
+        return;
+    }
+    printf("v.val = %d", {&(v.val)});
+    print_tree(v.left);
+    print_tree(v.right);
+}
+
+
 int main(int argc, char **argv)
 {
-    for (int i = 0; i < 10; i += 1)
+    Node[3] stack;
+
+    for (int i = 1; i < 3; i += 1)
     {
-        if(i > 5)
-        {
-            print("Hello", 5);
-        }
+        stack[i].val = i;
+        stack[i - 1].left = stack + i;
     }
+
+    print_tree(stack);
+
+    // root.val = 1;
+    // left.val = 2;
+    // right.val = 3;
+    //
+    // root.left = &left;
+    // root.right = &right;
+    //
 }
