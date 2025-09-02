@@ -129,5 +129,14 @@ int main(int argc, char **argv)
     node.left.val = 1489;
     node.right.val = 1450;
 
-    printf("ptr.val = %d", {&node.left.val});
+    if (left.val == node.left.val)
+    {
+        printf("Nice", {&0});
+    }
+    else
+    {
+        printf("fuck", {&0});
+    }
+
+    printf("ptr.val = %d", {&node.right.val});
 }

@@ -188,7 +188,7 @@ export class AstBracketNode extends AstNode {
             context.addAssembly(`
                     \rmovq $0, ${context.pushStack(8)}
                 `);
-            return new Value(temp_t.t, ArrayType.getArrayInstance(IntType.getInstance(), 0), params[0]!.pos, context.stackPtr, AddrType.Stack);
+            return new Value(temp_t.t, ArrayType.getArrayInstance(IntType.getInstance(), 0), token.pos, context.stackPtr, AddrType.Stack);
         }
         TODO(`unhandeled: ${token}`);
 

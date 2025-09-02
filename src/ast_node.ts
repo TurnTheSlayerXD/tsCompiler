@@ -13,6 +13,7 @@ import { PtrType } from "./value_types/ptr_type";
 import { AddrType } from "./value_types/value_type";
 import { StructType } from "./value_types/struct_type";
 import { VoidType } from "./value_types/void_type";
+import { abort } from "process";
 
 export class AstNode {
     constructor(public order: OrderedToken, public left: AstNode | null, public right: AstNode | null, public context: Context) {
@@ -246,9 +247,7 @@ export class AstNode {
                 throwError(new TokenParserError(token, `Expected right arg for REFERENCE OP`));
             }
             const arg = this.right.eval({ is_lvalue: true, can_be_decl: true });
-            console.log('arg', arg);
             const res = PtrType.getInstance(arg.valueType).asm_take_reference_from(context, temp_t.t, arg);
-            console.log('res', res);
             return res;
         }
         if ([TokenType.OP_DEREFERENCE].includes(type)) {
@@ -299,14 +298,18 @@ export class AstNode {
             const field_name = field.order.tok;
 
             if (src.valueType instanceof PtrType && src.valueType.ptrTo instanceof StructType) {
-                const struct_ref = src.valueType.asm_dereference(context, temp_t.t, src, is_lvalue);
+                const struct_ref = (src.valueType as PtrType).asm_dereference(context, temp_t.t, src, true);
                 const res = (struct_ref.valueType as StructType).asm_from_dot(context, struct_ref, field_name);
+                context.addAssembly(`#offset of struct PTR field: ${field_name.text}
+                    `);
                 return res;
             }
 
             if (!(src.valueType instanceof StructType)) {
                 throwError(new TokenParserError(this.left.order.tok, `Expected struct entity before OP_DOT\nNode: ${src}`));
             }
+            context.addAssembly(`#offset of struct field: ${field_name.text}
+                `);
             return src.valueType.asm_from_dot(context, src, field_name);
         }
         TODO(`unhandeled: ${token}`);

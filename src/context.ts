@@ -64,11 +64,13 @@ export class Context {
         return this.asm;
     }
 
-    asmToFile(filename: string) {
+    asmToFile(filename: string, do_optimize: boolean = true) {
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
         fs.writeFileSync('./v1.asm', this.asm);
 
-        this.optimize_stack_space();
+        if (do_optimize) {
+            this.optimize_stack_space();
+        }
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
         fs.writeFileSync(filename, this.asm);
         console.log(`Out: ${filename}`);

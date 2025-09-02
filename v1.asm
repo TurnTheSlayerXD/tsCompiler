@@ -1140,60 +1140,165 @@ movq $0, 38(%rsp)
 movq $0, 37(%rsp)
 movq $0, 36(%rsp)
 movq $0, 35(%rsp)
+#offset of struct field: val
 movl $1488, 31(%rsp)
 movl 31(%rsp), %edx
 movl %edx, 91(%rsp)
+#offset of struct field: left
 leaq 55(%rsp), %rdx
 movq %rdx, 23(%rsp)
 movq 23(%rsp), %rdx
 movq %rdx, 75(%rsp)
+#offset of struct field: right
 leaq 35(%rsp), %rdx
 movq %rdx, 15(%rsp)
 movq 15(%rsp), %rdx
 movq %rdx, 83(%rsp)
-addq $16, 75(%rsp)
-movl $1489, 11(%rsp)
-movq 75(%rsp), %rax
-movl 11(%rsp), %edx
+#offset of struct field: left
+movq 75(%rsp), %rdx
+movq %rdx, 7(%rsp)
+addq $16, 7(%rsp)
+#offset of struct PTR field: val
+movl $1489, 3(%rsp)
+movq 7(%rsp), %rax
+movl 3(%rsp), %edx
 movl %edx, (%rax)
-addq $16, 83(%rsp)
-movl $1450, 7(%rsp)
-movq 83(%rsp), %rax
-movl 7(%rsp), %edx
+#offset of struct field: right
+movq 83(%rsp), %rdx
+movq %rdx, -5(%rsp)
+addq $16, -5(%rsp)
+#offset of struct PTR field: val
+movl $1450, -9(%rsp)
+movq -5(%rsp), %rax
+movl -9(%rsp), %edx
 movl %edx, (%rax)
-movb $0, 6(%rsp)
-movb $100, 5(%rsp)
-movb $37, 4(%rsp)
-movb $32, 3(%rsp)
-movb $61, 2(%rsp)
-movb $32, 1(%rsp)
-movb $108, 0(%rsp)
-movb $97, -1(%rsp)
-movb $118, -2(%rsp)
-movb $46, -3(%rsp)
-movb $114, -4(%rsp)
-movb $116, -5(%rsp)
-movb $112, -6(%rsp)
-leaq -6(%rsp), %rdx
-movq %rdx, -14(%rsp)
-addq $16, 75(%rsp)
-movq 75(%rsp), %rax
-leaq (%rax), %rdx
-movq %rdx, -22(%rsp)
-movq -22(%rsp), %rdx
-movq %rdx, -30(%rsp)
-leaq -30(%rsp), %rdx
-movq %rdx, -38(%rsp)
-movq $0, -46(%rsp)
-movq -14(%rsp), %rdx
-movq %rdx, -46(%rsp)
-movq $0, -54(%rsp)
-movq -38(%rsp), %rdx
-movq %rdx, -54(%rsp)
+#offset of struct field: val
+#offset of struct field: left
+movq 75(%rsp), %rdx
+movq %rdx, -17(%rsp)
+addq $16, -17(%rsp)
+#offset of struct PTR field: val
+movq -17(%rsp), %rax
+movl (%rax), %edx
+movl %edx, -22(%rsp)
+movl 71(%rsp), %eax
+movl -22(%rsp), %ebx
+movb $1, -18(%rsp)
+cmpl %eax, %ebx
+je mark_42
+movb $0, -18(%rsp)
+mark_42 :
+#IF
+xor %edx, %edx
+movb -18(%rsp), %dh
+cmpb $0, %dh
+je mark_40
+#__end_scope_20
+#__begin_scope_21
+#__init_scope_21
+subq $1000, %rsp
+movb $0, -23(%rsp)
+movb $101, -24(%rsp)
+movb $99, -25(%rsp)
+movb $105, -26(%rsp)
+movb $78, -27(%rsp)
+leaq -27(%rsp), %rdx
+movq %rdx, -35(%rsp)
+movl $0, -39(%rsp)
+leaq -39(%rsp), %rdx
+movq %rdx, -47(%rsp)
+movq -47(%rsp), %rdx
+movq %rdx, -55(%rsp)
+leaq -55(%rsp), %rdx
+movq %rdx, -63(%rsp)
+movq $0, -71(%rsp)
+movq -35(%rsp), %rdx
+movq %rdx, -71(%rsp)
+movq $0, -79(%rsp)
+movq -63(%rsp), %rdx
+movq %rdx, -79(%rsp)
 #__parameter_offset_pass
-leaq -54(%rsp), %rcx
+leaq -79(%rsp), %rcx
 callq printf
-movb %al, -55(%rsp)
+movb %al, -80(%rsp)
+#__clear_scope_21
+addq $1000, %rsp
+#__end_scope_21
+#__begin_scope_20
+jmp mark_41
+mark_40 :
+#__end_scope_20
+#__begin_scope_22
+#__init_scope_22
+subq $1000, %rsp
+movb $0, -81(%rsp)
+movb $107, -82(%rsp)
+movb $99, -83(%rsp)
+movb $117, -84(%rsp)
+movb $102, -85(%rsp)
+leaq -85(%rsp), %rdx
+movq %rdx, -93(%rsp)
+movl $0, -97(%rsp)
+leaq -97(%rsp), %rdx
+movq %rdx, -105(%rsp)
+movq -105(%rsp), %rdx
+movq %rdx, -113(%rsp)
+leaq -113(%rsp), %rdx
+movq %rdx, -121(%rsp)
+movq $0, -129(%rsp)
+movq -93(%rsp), %rdx
+movq %rdx, -129(%rsp)
+movq $0, -137(%rsp)
+movq -121(%rsp), %rdx
+movq %rdx, -137(%rsp)
+#__parameter_offset_pass
+leaq -137(%rsp), %rcx
+callq printf
+movb %al, -138(%rsp)
+#__clear_scope_22
+addq $1000, %rsp
+#__end_scope_22
+#__begin_scope_20
+jmp mark_41
+mark_43 :
+mark_41 :
+movb $0, -139(%rsp)
+movb $100, -140(%rsp)
+movb $37, -141(%rsp)
+movb $32, -142(%rsp)
+movb $61, -143(%rsp)
+movb $32, -144(%rsp)
+movb $108, -145(%rsp)
+movb $97, -146(%rsp)
+movb $118, -147(%rsp)
+movb $46, -148(%rsp)
+movb $114, -149(%rsp)
+movb $116, -150(%rsp)
+movb $112, -151(%rsp)
+leaq -151(%rsp), %rdx
+movq %rdx, -159(%rsp)
+#offset of struct field: right
+movq 83(%rsp), %rdx
+movq %rdx, -167(%rsp)
+addq $16, -167(%rsp)
+#offset of struct PTR field: val
+movq -167(%rsp), %rax
+leaq (%rax), %rdx
+movq %rdx, -175(%rsp)
+movq -175(%rsp), %rdx
+movq %rdx, -183(%rsp)
+leaq -183(%rsp), %rdx
+movq %rdx, -191(%rsp)
+movq $0, -199(%rsp)
+movq -159(%rsp), %rdx
+movq %rdx, -199(%rsp)
+movq $0, -207(%rsp)
+movq -191(%rsp), %rdx
+movq %rdx, -207(%rsp)
+#__parameter_offset_pass
+leaq -207(%rsp), %rcx
+callq printf
+movb %al, -208(%rsp)
 #__clear_scope_20
 addq $1000, %rsp
 #__end_scope_20

@@ -60,9 +60,11 @@ export class StructType implements ValueType {
 
         if (src.addr_type == AddrType.Indirect) {
             context.addAssembly(`
-                    \raddq $${struct_field.offset}, ${src._address}(%rsp)
+                    \rmovq ${src._address}(%rsp), %rdx
+                    \rmovq %rdx, ${context.pushStack(8)}(%rsp)
+                    \raddq $${struct_field.offset}, ${context.stackPtr}(%rsp)
                 `);
-            return new Value(temp_t.t, struct_field.type, field_name.pos, src._address, AddrType.Indirect);
+            return new Value(temp_t.t, struct_field.type, field_name.pos, context.stackPtr, AddrType.Indirect);
         }
         return new Value(temp_t.t, struct_field.type, field_name.pos, (src._address ?? UNREACHABLE()) + struct_field.offset, AddrType.Stack);
     }
