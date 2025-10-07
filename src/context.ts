@@ -10,6 +10,7 @@ import { PtrType } from "./value_types/ptr_type";
 import { ValueType, AddrType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { StructType } from "./value_types/struct_type";
+import { SCANF_DECL } from "./imp_scanf";
 
 export class Context {
 
@@ -72,7 +73,12 @@ export class Context {
             this.optimize_stack_space();
         }
         this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
+
+        this.asm += SCANF_DECL;
+
         fs.writeFileSync(filename, this.asm);
+
+
         console.log(`Out: ${filename}`);
     }
 
@@ -299,6 +305,11 @@ export class Context {
             return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
                 [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
         }
+        if (name === 'input') {
+            return new Value('input', FunctionType.getInstance(VoidType.getInstance(),
+                [PtrType.getInstance(CharType.getInstance())]), new Position(0, 0, 0), null, AddrType.Stack);
+        }
+
         const scopeValues = this.scopes.map(s => s.scopeValues);
         for (let i = scopeValues.length - 1; i > -1; --i) {
             const val = scopeValues[i]!.find(val => val.name === name);
