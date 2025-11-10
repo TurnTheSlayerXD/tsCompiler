@@ -19,7 +19,7 @@ export class Value {
     }
 
     public toString = (): string => {
-        return `Value {\n\r\tName: [${this.name}]\n\r\tType: [${this.valueType.toString()}]\n\r\tAddress: ${this.real_addr}(%rsp)\n\r\taddr_type: ${AddrType[this.addr_type]}\n\r}\n`
+        return `Value {\n\r\tName: [${this.name}]\n\r\tType: [${this.valueType.toString()}]\n\r\taddr_type: ${AddrType[this.addr_type]}\n\r}\n`
     }
     stack_addr(context: Context): number {
         if (this.addr_type === AddrType.Indirect) {
@@ -37,6 +37,6 @@ export class Value {
 
 
     get real_addr(): number {
-        return this._address ?? throwError(new Error('Accessed before assigned'));
+        return this._address ?? throwError(new Error(`Accessed before assigned, ${this}`));
     }
 }

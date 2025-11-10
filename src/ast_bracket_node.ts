@@ -2,12 +2,13 @@ import { OrderedToken } from "./ast_builder";
 import { AstNode } from "./ast_node";
 import { Context } from "./context";
 import { convert_val_to_type, get_rax_i } from "./converter";
-import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
+import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE, TypeError } from "./helper";
 import { TokenType } from "./token_type";
 import { parse_type_from_ast_node } from "./type_parsing";
 import { temp_t, Value } from "./value";
 import { TypenameType } from "./value_types";
 import { ArrayType } from "./value_types/array_type";
+import { CharType } from "./value_types/char_type";
 import { FunctionType } from "./value_types/function_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
@@ -99,7 +100,25 @@ export class AstBracketNode extends AstNode {
                         context.addAssembly(`
                         \rcallq	 *__imp_WriteConsoleA(%rip)
                     `);
-                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Indirect);
+                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
+                    }
+                    else if (fun_obj.name === 'input') {
+                        if (params.length > 1 || !params[0]?.valueType.isSameType(PtrType.getInstance(CharType.getInstance()))) {
+                            throw new TypeError(fun_obj.pos, `built-in "input" function can accept only one argument of type char*\nfound:${params.map(t => t.valueType)}`);
+                        }
+                        const param = params[0];
+                        context.addAssembly(`
+                            \rmovl $0, ${context.pushStack(4)}(%rsp)
+                        `);
+                        context.addAssembly(`
+                            \rmovq ${param.stack_addr(context)}(%rsp), %rdx
+                            \rleaq scanf_mark(%rip), %rcx
+                            \rmovq $0, %rax
+                        `);
+                        context.addAssembly(`
+                            \rcallq	scanf
+                        `);
+                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
                     }
                     else {
                         let in_stack: Value | undefined;
