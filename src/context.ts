@@ -1,16 +1,18 @@
 import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, TokenParserError, toReversed, UNREACHABLE } from "./helper";
-import { Lexer, Position } from "./lexer";
+import { Lexer } from "./lexer";
 import * as fs from 'fs';
 import { Scope, TypeofScope } from "./scope";
-import { Value } from "./value";
+import { NamedValue, Value } from "./value";
 import { CharType } from "./value_types/char_type";
 import { FunctionType } from "./value_types/function_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { ValueType, AddrType } from "./value_types/value_type";
+import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { StructType } from "./value_types/struct_type";
 import { SCANF_DECL } from "./imp_scanf";
+import { Instruction, MarkToJump } from "./instruction/instruction";
+import { StackLoc } from "./instruction/mem_location";
 
 export class Context {
 
@@ -20,67 +22,11 @@ export class Context {
     };
     custom_types: StructType[] = [];
 
-    public cur_function: Value | null = null;
-
     private literals: string[] = [];
-    private asm: string = '';
-    private dead_scopes = new Map<string, Scope>();
-    private mark_num = 0;
-    private scope_id: number = 0;
-
-    private globals: Value[] = [];
-
-    public subq_expr_stack_positions: number[] = [];
-    public init_stack_offset = 1000;
 
     scopes: Scope[] = [];
 
     constructor(public lexer: Lexer) { }
-
-    private _stackPtr: number = this.init_stack_offset;
-
-    get stackPtr(): number {
-        return this._stackPtr;
-    }
-
-    gen_scope_id(): number {
-        return this.scope_id++;
-    }
-
-
-
-    pushStack(size: number): number {
-        const scope = this.scopes.at(-1)!;
-        scope.used_space += size;
-        this._stackPtr -= size;
-        return this._stackPtr;
-    }
-
-    getLiteralsAsm() {
-        return this.literals.map((l, index) => `"_${index}_literal":
-                                            .asciz: "${l}"\n`).join('\n');
-    }
-
-    getAsm(): string {
-        return this.asm;
-    }
-
-    asmToFile(filename: string, do_optimize: boolean = true) {
-        this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
-        fs.writeFileSync('./v1.asm', this.asm);
-
-        if (do_optimize) {
-            this.optimize_stack_space();
-        }
-        this.asm = this.asm.replaceAll(/\s*\n\s*/g, '\n');
-
-        this.asm += SCANF_DECL;
-
-        fs.writeFileSync(filename, this.asm);
-
-
-        console.log(`Out: ${filename}`);
-    }
 
     getTypeFromTypename(typename: string): ValueType | null {
         switch (typename) {
@@ -97,178 +43,16 @@ export class Context {
         }
     }
 
-    hasTypeAsBool(typename: string): boolean {
-        switch (typename) {
-            case 'int': return true;
-            case 'char': return true;
-            case 'void': return true;
-            default: {
-                return !!this.custom_types.find(v => v.struct_name === typename);
-            }
-        }
-    }
+    pushScope(typeofScope: TypeofScope) {
 
-    pushScope(typeof_scope: TypeofScope) {
-        if (this.scopes.length > 0) {
-            this.addAssembly(`
-                \r#__end_${this.scopes.at(-1)!.scopeName}
-            `);
-        }
-        if (this.scopes.length > 0) {
-            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, this.scopes.at(-1)!, typeof_scope));
-        }
-        else {
-            this.scopes.push(new Scope(`scope_${this.gen_scope_id()}`, null, typeof_scope));
-        }
-        this.addAssembly(`
-                \r#__begin_${this.scopes.at(-1)!.scopeName}
-                \r#__init_${this.scopes.at(-1)!.scopeName}
-                \rsubq $${this.init_stack_offset}, %rsp
-            `);
-    }
-
-    clearAllStacks() {
-        for (let i = this.scopes.length - 1; i > -1; --i) {
-            this.addAssembly(`
-            \r#__clear_${this.scopes[i]!.scopeName}
-            \raddq $${this.init_stack_offset}, %rsp
-        `);
-        }
-    }
-
-    *asm_pop_scope(): Generator<Scope> {
-        for (const scope of toReversed(this.scopes)) {
-            yield scope;
-            this.addAssembly(`
-                \r#__clear_${scope.scopeName}
-                \raddq $${this.init_stack_offset}, %rsp
-                \r#__end_${scope.scopeName}
-            `);
-        }
     }
 
     popScope(): Scope {
-        this.addAssembly(`
-            \r#__clear_${this.scopes.at(-1)!.scopeName}
-            \raddq $${this.init_stack_offset}, %rsp
-            \r#__end_${this.scopes.at(-1)!.scopeName}
-        `);
-        const popped: Scope = this.scopes.pop() ?? UNREACHABLE();
-        this.dead_scopes.set(popped.scopeName, popped);
-        if (this.scopes.length > 0) {
-            this.addAssembly(`
-                \r#__begin_${this.scopes.at(-1)!.scopeName}
-            `);
-        }
-        return popped;
+
     }
 
-    curScope(): Scope {
+    getCurrentScope(): Scope {
         return this.scopes.at(-1) ?? UNREACHABLE();
-    }
-
-    *iter_scopes(lines: string[]): Generator<{ scope: Scope, begin: number, end: number }> {
-        let begin, prev = 0;
-        while ((begin = findIndex(lines, l => l.startsWith('#__begin_'), prev)) !== -1) {
-            let end = findIndex(lines, l => l.startsWith('#__end_'), begin);
-            prev = end + 1;
-            const scope_id = lines[begin]!.split('#__begin_', 2)[1]!;
-            const cur_scope = this.dead_scopes.get(scope_id) ?? UNREACHABLE();
-            yield { scope: cur_scope, begin, end };
-        }
-    }
-
-    static parse_rsp_ptr_from_line(cur_line: string): number {
-        let i = cur_line.indexOf('(%rsp)');
-        i !== -1 || UNREACHABLE();
-        let j = cur_line.lastIndexOf(',', i);
-        j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
-        j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
-        j += 1;
-        const offset = parseInt(cur_line.substring(j, i).trim());
-        !Number.isNaN(offset) || throwError(new Error(`parseInt, line: [${cur_line}]`));
-        return offset;
-    }
-    static replace_rsp_ptr_in_line(lines: string[], c: number, ptr: number): void {
-        const cur_line = lines[c]!;
-        let i = cur_line.indexOf('(%rsp)');
-        i !== -1 || UNREACHABLE();
-        let j = cur_line.lastIndexOf(',', i);
-        j = j === -1 ? cur_line.lastIndexOf(' ', i) : j;
-        j !== -1 && j < i || throwError(new Error(`j=${j}, i=${i} ${cur_line}`));
-        j += 1;
-        lines[c] = `\r${cur_line.substring(0, j)} ${ptr}${cur_line.substring(i)}`;
-    }
-
-    optimize_stack_space() {
-        const lines = this.asm.split('\n');
-        const mapped_rsp_scope = new Map<number, Scope>();
-        const mapped_rsp_loc = new Map<number, { own_offset: number | undefined, size: number }>();
-        for (const { scope, begin, end } of this.iter_scopes(lines)) {
-            lines.slice(begin, end)
-                .filter(l => l.includes('(%rsp)'))
-                .map(cur_line => Context.parse_rsp_ptr_from_line(cur_line))
-                .forEach(rsp => {
-                    if (!mapped_rsp_scope.has(rsp)) {
-                        mapped_rsp_scope.set(rsp, scope)
-                    }
-                });
-        }
-
-        let lowest_ptr: number = 1000;
-        let ptr: number;
-        for (let i = 0; i < lines.length; ++i) {
-            const l = lines[i]!;
-            if (l.includes('(%rsp)')) {
-                ptr = Context.parse_rsp_ptr_from_line(l);
-                if (ptr < lowest_ptr) {
-                    mapped_rsp_loc.set(ptr, { size: lowest_ptr - ptr, own_offset: undefined });
-                    lowest_ptr = ptr;
-                }
-            }
-        }
-
-        for (const { scope, begin, end } of this.iter_scopes(lines)) {
-            for (let l = begin; l < end; ++l) {
-                if (lines[l]!.includes('(%rsp)')) {
-                    const ptr = Context.parse_rsp_ptr_from_line(lines[l]!);
-                    const ptr_scope = mapped_rsp_scope.get(ptr) ?? UNREACHABLE();
-                    const loc = mapped_rsp_loc.get(ptr) ?? UNREACHABLE();
-                    if (ptr_scope == scope) {
-                        if (loc.own_offset === undefined) {
-                            scope.cur_offset -= loc.size;
-                            loc.own_offset = scope.cur_offset;
-                        }
-                        [1, 4, 8].includes(loc.size) || UNREACHABLE();
-                        if (loc.own_offset < 0) {
-                            UNREACHABLE();
-                        }
-                        Context.replace_rsp_ptr_in_line(lines, l, loc.own_offset);
-                    }
-                    else {
-                        const dist = scope.get_distance_to(ptr_scope);
-                        if (loc.own_offset === undefined || dist + loc.own_offset < 0) {
-                            UNREACHABLE();
-                        }
-                        Context.replace_rsp_ptr_in_line(lines, l, dist + loc.own_offset)
-                    }
-                }
-            }
-        }
-
-        for (const i of filterIndexes(lines, l => l.startsWith('#__init_'))) {
-            const scope_name = lines[i]!.split('#__init_', 2)[1]!;
-            const scope = this.dead_scopes.get(scope_name) ?? UNREACHABLE();
-            lines[i + 1] = `subq $${scope.used_space}, %rsp`;
-        }
-        for (const i of filterIndexes(lines, l => l.startsWith('#__clear_'))) {
-            const scope_name = lines[i]!.split('#__clear_', 2)[1]!;
-            const scope = this.dead_scopes.get(scope_name) ?? UNREACHABLE();
-            lines[i + 1] = `addq $${scope.used_space}, %rsp`;
-        }
-
-
-        this.asm = lines.join('\n');
     }
 
     addGlobalStructType(type: StructType) {
@@ -278,21 +62,6 @@ export class Context {
         this.custom_types.push(type);
     }
 
-    addAssembly(asm: string) {
-        this.asm += asm;
-    }
-
-    addScopeValue(value: Value) {
-        if (this.scopes.length === 0) {
-            throwError(new Error(`Trying to access scope though it does not exist: ${value.pos}`));
-        }
-        const scope = this.scopes.at(-1)!;
-        if (!!scope.scopeValues.find(v => v.name === value.name)) {
-            throwError(new Error(`Pushing scope with existing name: [${value.name}]`));
-        }
-        scope.scopeValues.push(value);
-    }
-
     addStringLiteral(literal: string): string {
         if (!this.literals.includes(literal)) {
             this.literals.push(literal);
@@ -300,59 +69,22 @@ export class Context {
         return `"_${this.literals.indexOf(literal)}_literal"`;
     }
 
-    hasValue(name: string): Value | null {
-        if (name === 'print') {
-            return new Value('print', FunctionType.getInstance(VoidType.getInstance(),
-                [PtrType.getInstance(CharType.getInstance()), IntType.getInstance()]), new Position(0, 0, 0), null, AddrType.Stack);
-        }
-        if (name === 'input') {
-            return new Value('input', FunctionType.getInstance(VoidType.getInstance(),
-                [PtrType.getInstance(CharType.getInstance())]), new Position(0, 0, 0), null, AddrType.Stack);
-        }
-
-        const scopeValues = this.scopes.map(s => s.scopeValues);
-        for (let i = scopeValues.length - 1; i > -1; --i) {
-            const val = scopeValues[i]!.find(val => val.name === name);
-            if (!!val) {
-                return val;
-            }
-        }
-        let i;
-        if ((i = this.globals.findIndex(v => v.name === name)) !== -1) {
-            return this.globals[i]!;
-        }
-        return null;
+    addInstruction(instruction: Instruction): void {
+        this.getCurrentScope().addInstruction(instruction);
     }
 
-    hasValueOrThrow(name: string): Value {
-        return this.hasValue(name) || throwError(new ParserError(this.lexer, `No such value name ${name} `));
+    addNewVarValue(val: NamedValue): void {
+        this.getCurrentScope().addNewVarValue(val);
     }
 
-    getValueWithTypeOrThrow(name: string, type: ValueType): Value {
-        const value = this.hasValueOrThrow(name);
-        const expected = value.valueType;
-        const found = type;
-        return expected.isSameType(type) ? value : throwError(new ParserError(this.lexer, `Unmatched type: expected ${expected}, found ${found} `));
+    getNewMemLocation(valueType: ValueType): StackLoc {
+        return this.getCurrentScope().getNewMemLocation(valueType);
     }
 
-    get mark() {
-        return `mark_${this.mark_num} `;
+    getNewMarkToJump(): MarkToJump {
+        return this.getCurrentScope().getNewMarkToJump();
     }
 
-    gen_mark() {
-        return `mark_${this.mark_num++} `;
-    }
-
-    addGlobalValue(value: Value) {
-        if (this.globals.some(v => v.name === value.name)) {
-            throwError(new RulesError(value.pos, `Pushing GLObal scope with existing value: ${value}`));
-        }
-        this.globals.push(value);
-    }
-
-    ends_with_retq(): boolean {
-        return this.asm.replaceAll('\n', ' ').trimEnd().endsWith('retq');
-    }
 }
 
 

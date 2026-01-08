@@ -1,181 +1,122 @@
 import { Context } from "../context";
-import { TODO } from "../helper";
-import { Position } from "../lexer";
-import { temp_t, Value } from "../value";
+import { convert_values_or_throw } from "../converter";
+import { TODO, UNREACHABLE } from "../helper";
+import { DivInstruction, get_div_i_on_sizeoftype, MulInstruction, PlusInstruction, SubInstruction } from "../instruction/binary_op_instruction";
+import { CmpInstr, get_cmp_i_on_size, JniInstr } from "../instruction/comparison_instruction";
+import { get_mov_i_on_size, MovInstr, StringInstruction } from "../instruction/instruction";
+import { LiteralMemLocation, Register } from "../instruction/mem_location";
+import { DebugPosition } from "../lexer";
+import { Value } from "../value";
 import { CharType } from "./char_type";
 
-export interface ValueType {
-    is_const: boolean;
-    toString: () => string;
-    isSameType(type: ValueType): boolean;
-    get size(): number;
+export abstract class ValueType {
+    abstract toString: () => string;
 
-    asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value;
-    asm_copy(context: Context, dst: Value, src: Value): void;
+    abstract isSameType(type: ValueType): boolean;
 
-    asm_from_plus(context: Context, self: Value, rhs: Value): Value;
-    asm_from_minus(context: Context, self: Value, rhs: Value): Value;
-    asm_from_multiply(context: Context, self: Value, rhs: Value): Value;
-    asm_from_divide(context: Context, self: Value, rhs: Value): Value;
-    asm_from_percent(context: Context, self: Value, rhs: Value): Value;
+    abstract get size(): number;
 
-    asm_cmp_less(context: Context, self: Value, rhs: Value): Value;
-    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value;
-    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value;
-    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value;
 
-    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value;
-    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value;
+    abstract from_literal(context: Context, literal: string, pos: DebugPosition): Value;
 
-    asm_to_boolean(context: Context, self: Value): Value;
+    to_boolean(context: Context, self: Value): Value {
+        const memLoc = context.getNewMemLocation(CharType.getInstance());
+        const newValue = new Value(memLoc, CharType.getInstance(), self.pos);
 
-    get reg_i(): REG_I;
-    get mov_i(): MOV_I;
+        context.addInstruction(new MovInstr("movb", memLoc, new LiteralMemLocation(1)));
+        context.addInstruction(new CmpInstr(get_cmp_i_on_size(this.size), new LiteralMemLocation(0), memLoc));
+
+        const mark = context.getNewMarkToJump();
+        context.addInstruction(new JniInstr("jne", mark));
+        context.addInstruction(new MovInstr("movb", memLoc, new LiteralMemLocation(0)));
+        context.addInstruction(mark);
+        return newValue;
+    }
+
+
+    from_null(context: Context, pos: DebugPosition): Value {
+        const newMemLoc = context.getNewMemLocation(this);
+        const newValue = new Value(newMemLoc, this, pos);
+        context.addInstruction(new MovInstr(get_mov_i_on_size(this.size), newMemLoc, new LiteralMemLocation(0)));
+        return newValue;
+    }
+
+    copy_to(context: Context, dst: Value, src: Value): void {
+
+        const register = Register.getFrom("bx", src.valueType.size);
+
+        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), register, src.toMemLoc(context)));
+
+        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), dst.toMemLoc(context), register));
+    }
+
+    cmp_equal(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "je", self, other);
+    }
+
+    cmp_not_equal(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "jne", self, other);
+    }
+
+    cmp_less_or_equal(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "jle", self, other);
+    }
+
+    cmp_greater_or_equal(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "jge", self, other);
+    }
+    cmp_greater(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "jg", self, other);
+
+    }
+    cmp_less(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return JniInstr.generateAsm(context, "jl", self, other);
+    }
+
+    from_plus(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return PlusInstruction.generateAsm(context, self, other);
+    }
+
+    from_minus(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return SubInstruction.generateAsm(context, self, other);
+    }
+
+    from_multiply(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return MulInstruction.generateAsm(context, self, other);
+    }
+    from_divide(context: Context, self: Value, other: Value): Value {
+        self.valueType.isSameType(this) || UNREACHABLE();
+        return DivInstruction.generateAsm(context, self, other);
+    }
+
+    from_percent(context: Context, self: Value, other: Value): Value {
+
+        const { lhs, rhs } = convert_values_or_throw(context, self, other);
+
+        const sizeoftype = lhs.valueType.size;
+        const mov_i = get_mov_i_on_size(sizeoftype);
+        const register = Register.getFrom("ax", sizeoftype);
+        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
+        context.addInstruction(new StringInstruction("cdq"));
+
+        const newMemLoc = context.getNewMemLocation(lhs.valueType);
+        const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
+        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context)));
+
+        context.addInstruction(new MovInstr(mov_i, newMemLoc, Register.getFrom("ex", sizeoftype)));
+
+        return newValue;
+    }
+
+
 }
-
-export enum MOV_I {
-    movl,
-    movr,
-    movb,
-    movq,
-}
-
-export enum BIN_I {
-    addb,
-    addl,
-    addq,
-
-    subb,
-    subl,
-    subq,
-
-    imulb,
-    imull,
-    imulq,
-
-    idivb,
-    idivl,
-    idivq,
-}
-export enum REG_I {
-    ax,
-    al,
-    eax,
-    rax,
-
-    dh,
-    edx,
-    rdx,
-
-    cx,
-    ch,
-    ecx,
-    rcx
-}
-
-
-export enum CMP_I {
-    cmpl,
-    cmpq,
-    cmpb
-}
-
-export enum AddrType {
-    Stack,
-    Indirect,
-}
-
-
-export function asm_div_action(context: Context, mov: MOV_I, div: BIN_I,
-    eax: REG_I, edx: REG_I, ecx: REG_I, ebx: REG_I,
-    lhs: Value, rhs: Value, size: number) {
-    TODO('DIVISION');
-}
-export function asm_to_boolean(context: Context, self: Value, cmp_i: CMP_I): Value {
-    const self_addr = self.stack_addr(context);
-    const result_addr = context.pushStack(CharType.getInstance().size);
-    const mark_if_true = context.gen_mark();
-    context.addAssembly(`
-                \rmovb $1, ${result_addr}(%rsp)
-                \r${CMP_I[cmp_i]} $0, ${self_addr}(%rsp)
-                \rjne ${mark_if_true}
-                \rmovb $0, ${result_addr}(%rsp)
-                ${mark_if_true}:
-            `);
-    return new Value(temp_t.t, CharType.getInstance(), self.pos, result_addr, AddrType.Stack);
-}
-
-export function asm_bin_action(context: Context, mov: MOV_I, act: BIN_I, reg: REG_I, lhs: Value, rhs: Value, size: number): number {
-    const lhs_addr = lhs.stack_addr(context);
-    const rhs_addr = rhs.stack_addr(context);
-    context.addAssembly(`
-                \r${MOV_I[mov]} ${lhs_addr}(%rsp), %${REG_I[reg]}
-                \r${BIN_I[act]} ${rhs_addr}(%rsp), %${REG_I[reg]}
-                \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(size)}(%rsp) 
-            `);
-    return context.stackPtr;
-}
-
-export enum JN_I {
-    jne,
-    je,
-    jge,
-    jle,
-    jg,
-    jl,
-}
-
-export function asm_comp_action_l(context: Context, self: Value, rhs: Value, jn: JN_I) {
-    const mark = context.gen_mark();
-    const bool_addr = context.pushStack(CharType.getInstance().size);
-    const self_addr = self.stack_addr(context);
-    const rhs_addr = rhs.stack_addr(context);
-    context.addAssembly(`
-                \rmovl ${self_addr}(%rsp), %eax
-                \rmovl ${rhs_addr}(%rsp), %ebx
-                \rmovb $1, ${bool_addr}(%rsp) 
-                \rcmpl %eax, %ebx
-                \r${JN_I[jn]} ${mark}
-                \rmovb $0, ${bool_addr}(%rsp) 
-                ${mark}:
-            `);
-
-    return new Value(temp_t.t, CharType.getInstance(), self.pos, bool_addr, AddrType.Stack);
-}
-export function asm_comp_action_b(context: Context, self: Value, rhs: Value, jn: JN_I) {
-    const mark = context.gen_mark();
-    const bool_addr = context.pushStack(CharType.getInstance().size);
-    const self_addr = self.stack_addr(context);
-    const rhs_addr = rhs.stack_addr(context);
-    context.addAssembly(`
-                \rmovb ${self_addr}(%rsp), %ah
-                \rmovb ${rhs_addr}(%rsp), %al
-                \rmovb $1, ${bool_addr}(%rsp) 
-                \rcmpb %ah, %al
-                \r${JN_I[jn]} ${mark}
-                \rmovb $0, ${bool_addr}(%rsp) 
-                ${mark}:
-            `);
-
-    return new Value(temp_t.t, CharType.getInstance(), self.pos, bool_addr, AddrType.Stack);
-}
-
-export function asm_comp_action_q(context: Context, self: Value, rhs: Value, jn: JN_I) {
-    const mark = context.gen_mark();
-    const bool_addr = context.pushStack(CharType.getInstance().size);
-    const self_addr = self.stack_addr(context);
-    const rhs_addr = rhs.stack_addr(context);
-    context.addAssembly(`
-                \rmovq ${self_addr}(%rsp), %rax
-                \rmovq ${rhs_addr}(%rsp), %rbx
-                \rmovb $1, ${bool_addr}(%rsp) 
-                \rcmpq %rax, %rbx
-                \r${JN_I[jn]} ${mark}
-                \rmovb $0, ${bool_addr}(%rsp) 
-                ${mark}:
-            `);
-
-    return new Value(temp_t.t, CharType.getInstance(), self.pos, bool_addr, AddrType.Stack);
-}
-
 

@@ -1,7 +1,7 @@
 import { LexerError, ParserError, throwError } from './helper';
 import { Keyword, KEYWORDS, STOP_SYMBOLS, TokenType } from './token_type';
 
-export class Position {
+export class DebugPosition {
     constructor(public row: number, public col: number, public count: number) {
     }
 
@@ -10,18 +10,14 @@ export class Position {
     }
 
     clone() {
-        return new Position(this.row, this.col, this.count);
+        return new DebugPosition(this.row, this.col, this.count);
+    }
+
+
+    equals(rhs: DebugPosition): boolean {
+        return this.count === rhs.count && this.row === rhs.row && this.col === rhs.col;
     }
 }
-
-function equal(lhs: Position, rhs: Position): boolean {
-    return lhs.count === rhs.count && lhs.row === rhs.row && lhs.col === rhs.col;
-}
-
-function not_equal(lhs: Position, rhs: Position): boolean {
-    return lhs.count !== rhs.count;
-}
-
 
 export class TokenAccessException extends Error {
     constructor(tok: Token) {
@@ -31,10 +27,10 @@ export class TokenAccessException extends Error {
 
 export class Token {
     instance_type?: string;
-    pos: Position;
+    pos: DebugPosition;
     type: TokenType;
     private _text: string;
-    constructor(pos: Position, text: string, type: TokenType) {
+    constructor(pos: DebugPosition, text: string, type: TokenType) {
         this.pos = pos;
         this._text = text;
         this.type = type;
@@ -73,19 +69,19 @@ function isspace(str: string): boolean {
 
 export class Lexer {
     type?: string = 'lexer';
-    cursor: Position = new Position(1, 0, 0);
-    prev_cursor: Position = new Position(1, 0, 0);
+    cursor: DebugPosition = new DebugPosition(1, 0, 0);
+    prev_cursor: DebugPosition = new DebugPosition(1, 0, 0);
     text: string;
     constructor(text: string) {
         this.text = text;
         this.clear_from_tabulations();
     }
 
-    iseof(cursor: Position): boolean {
+    iseof(cursor: DebugPosition): boolean {
         return cursor.count >= this.text.length;
     }
 
-    iter_cursor(cursor: Position, count: number): void {
+    iter_cursor(cursor: DebugPosition, count: number): void {
         for (let i = 0; i < count; ++i) {
             if (this.iseof(cursor)) {
                 break;
@@ -99,7 +95,7 @@ export class Lexer {
             cursor.count++;
         }
     }
-    backward_iter_cursor(cursor: Position): void {
+    backward_iter_cursor(cursor: DebugPosition): void {
         if (this.cursor.count - 1 < 0) {
             throw new LexerError(this, 'Trying to backwar before ZEROR');
         }
@@ -119,35 +115,35 @@ export class Lexer {
         this.text = this.text.replaceAll('\t', ' ');
     }
 
-    ltrim(cursor: Position): void {
+    ltrim(cursor: DebugPosition): void {
         while (!this.iseof(cursor) && isspace(this.at(cursor))) {
             this.iter_cursor(cursor, 1);
         }
     }
 
-    is_equal_to_expr(cursor: Position, expr: string) {
+    is_equal_to_expr(cursor: DebugPosition, expr: string) {
         return cursor.count + expr.length < this.text.length &&
             this.text.substring(this.cursor.count, this.cursor.count + expr.length) === expr;
     }
 
-    at(cursor: Position): string {
+    at(cursor: DebugPosition): string {
         return this.iseof(this.cursor) ?
             throwError(new LexerError(this, "UNCHECKED BOUNDARIES")) :
             this.text[cursor.count] as string;
     }
-    slice(cursor: Position, len: number): string {
+    slice(cursor: DebugPosition, len: number): string {
         if (len === 1) {
             return this.at(cursor);
         }
         return this.text.slice(cursor.count, cursor.count + len < this.text.length ? cursor.count + len : this.text.length);
     }
 
-    iter_while_not_equal_one(cursor: Position, str: string) {
+    iter_while_not_equal_one(cursor: DebugPosition, str: string) {
         while (!this.iseof(cursor) && this.slice(cursor, str.length) !== str) {
             this.iter_cursor(cursor, 1);
         }
     }
-    iter_while_not_equal_arr(cursor: Position, strs: string[]) {
+    iter_while_not_equal_arr(cursor: DebugPosition, strs: string[]) {
         while (!this.iseof(cursor) && !strs.some((s) => this.slice(this.cursor, s.length) === s)) {
             this.iter_cursor(cursor, 1);
         }
@@ -163,7 +159,7 @@ export class Lexer {
     }
 
 
-    substr(prev_cursor: Position, cursor: Position): string {
+    substr(prev_cursor: DebugPosition, cursor: DebugPosition): string {
         return this.text.substring(prev_cursor.count, cursor.count);
     }
 

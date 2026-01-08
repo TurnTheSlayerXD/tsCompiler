@@ -1,42 +1,34 @@
 import { Context } from "./context";
-import { TEMP_NAME, throwError, UNREACHABLE } from "./helper";
-import { Position } from "./lexer";
-import { ValueType, AddrType, REG_I } from "./value_types/value_type";
+import { MemLocation, MovInstr } from "./instruction/instruction";
+import { IndirectStackLoc, Register, IndirectRegister } from "./instruction/mem_location";
+import { DebugPosition } from "./lexer";
+import { ValueType } from "./value_types/value_type";
 
-
-export enum temp_t { t };
-type var_name = string | temp_t;
 
 export class Value {
-    public _address: number | null = null;
-    public name: string;
-    constructor(name: var_name, public valueType: ValueType, public pos: Position, address: number | null = null, public addr_type: AddrType) {
-        this._address = address;
-        if (name === '_temp') {
-            UNREACHABLE('temp');
-        }
-        this.name = typeof name === 'string' ? name : TEMP_NAME;
+    public constructor(private memLoc: MemLocation, public valueType: ValueType, public pos: DebugPosition) {
+    }
+    public toMemLoc(context: Context): MemLocation {
+        if (this.memLoc instanceof IndirectStackLoc) {
+            const dstRegister = Register.getRegisterForIndirect();
+            context.addInstruction(new MovInstr("movq", dstRegister, this.memLoc));
+            return new IndirectRegister(dstRegister);
+        } 1
+        return this.memLoc;
+    }
+}
+
+export class NamedValue extends Value {
+    constructor(public name: string, location: MemLocation, valueType: ValueType, pos: DebugPosition) {
+        super(location, valueType, pos);
     }
 
-    public toString = (): string => {
-        return `Value {\n\r\tName: [${this.name}]\n\r\tType: [${this.valueType.toString()}]\n\r\taddr_type: ${AddrType[this.addr_type]}\n\r}\n`
+    public override toString = (): string => {
+        return `Value ${JSON.stringify(this)}`;
     }
-    stack_addr(context: Context): number {
-        if (this.addr_type === AddrType.Indirect) {
-            context.addAssembly(`
-                \rmovq ${this._address}(%rsp), %rax
-                \rmovl (%rax), %${REG_I[this.valueType.reg_i]}
-                \rmovl %${REG_I[this.valueType.reg_i]}, ${context.pushStack(this.valueType.size)}(%rsp)
-            `);
-            return context.stackPtr;
-        } else {
-            return this.real_addr;
-        }
-    }
+}
+
+export class __IndirectValue extends Value {
 
 
-
-    get real_addr(): number {
-        return this._address ?? throwError(new Error(`Accessed before assigned, ${this}`));
-    }
 }

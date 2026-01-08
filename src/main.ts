@@ -5,7 +5,6 @@ import { getMatchingBracket, iterUntilMatchingBracket, LexerError, ParserError, 
 import { Lexer, Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { parse_declaration_from_ast_node, parse_type_from_ast_node } from "./type_parsing";
-import { get_rax_i, get_rcx_i, get_rdx_i } from "./converter";
 import { AstBuilder } from "./ast_builder";
 import { Value } from "./value";
 import { CharType } from "./value_types/char_type";

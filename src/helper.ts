@@ -202,3 +202,9 @@ ${str}
 
     fs.writeFileSync('./tree.html', style);
 }
+
+export function assert_state(statement: boolean, descr: string): never | undefined {
+    if (!statement) {
+        throwError(new Error(`Assertion failed: ${descr}`));
+    }
+}

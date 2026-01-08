@@ -8,7 +8,12 @@ import { PtrType } from "./value_types/ptr_type";
 import { AddrType, ValueType, REG_I, MOV_I } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 
-type ConversionResult = { ok: boolean, left: Value, right: Value };
+type ConversionResult = { lhs: Value, rhs: Value };
+
+export function convert_values_or_throw(context: Context, lhs: Value, rhs: Value ) : ConversionResult {
+
+}
+
 
 export function convert_values(context: Context, lhs: Value, rhs: Value): ConversionResult {
     if (lhs.valueType.isSameType(rhs.valueType)) {
@@ -59,32 +64,6 @@ export function are_converible_types(lhs: ValueType, rhs: ValueType): boolean {
         return are_converible_types(lhs, rhs);
     }
     return false;
-}
-
-export function get_rax_i(size: number): [REG_I, MOV_I] {
-    switch (size) {
-        case 8: return [REG_I.rax, MOV_I.movq];
-        case 4: return [REG_I.eax, MOV_I.movl];
-        case 1: return [REG_I.al, MOV_I.movb];
-        default: TODO();
-    }
-}
-
-export function get_rcx_i(size: number): [REG_I, MOV_I] {
-    switch (size) {
-        case 8: return [REG_I.rcx, MOV_I.movq];
-        case 4: return [REG_I.eax, MOV_I.movl];
-        case 1: return [REG_I.cx, MOV_I.movb];
-        default: TODO();
-    }
-}
-export function get_rdx_i(size: number): [REG_I, MOV_I] {
-    switch (size) {
-        case 8: return [REG_I.rdx, MOV_I.movq];
-        case 4: return [REG_I.edx, MOV_I.movl];
-        case 1: return [REG_I.dh, MOV_I.movb];
-        default: TODO();
-    }
 }
 
 export function convert_val_to_type(context: Context, val: Value, to_type: ValueType): Value {

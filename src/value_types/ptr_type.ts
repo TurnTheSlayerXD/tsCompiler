@@ -5,7 +5,7 @@ import { Position } from "../lexer";
 import { Value, temp_t } from "../value";
 import { CharType } from "./char_type";
 import { IntType } from "./int_type";
-import { ValueType, REG_I, MOV_I, CMP_I, AddrType, asm_comp_action_q, asm_to_boolean, JN_I } from "./value_type";
+import { ValueType } from "./value_type";
 import { TypeError } from "../helper";
 import { VoidType } from "./void_type";
 export class PtrType implements ValueType {
@@ -15,12 +15,7 @@ export class PtrType implements ValueType {
     asm_from_percent(context: Context, self: Value, rhs: Value): Value {
         throw new Error('Method not implemented.');
     }
-    get reg_i(): REG_I {
-        return REG_I.rdx;
-    }
-    get mov_i(): MOV_I {
-        return MOV_I.movq;
-    }
+
     asm_to_boolean(context: Context, self: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
         return asm_to_boolean(context, self, CMP_I.cmpq);
