@@ -1,26 +1,32 @@
 import { Context } from "../context";
-import { throwError, TokenParserError, UNREACHABLE } from "../helper";
-import { Position, Token } from "../lexer";
-import { TokenType } from "../token_type";
-import { temp_t, Value } from "../value";
-import { AddrType, MOV_I, REG_I, ValueType } from "./value_type";
+import { DebugPosError, throwError, TODO, TokenParserError, UNREACHABLE } from "../helper";
+import { PlusInstruction } from "../instruction/binary_op_instruction";
+import { LeaqInstruction, MovInstr } from "../instruction/instruction";
+import { IndirectRegisterWithOffset, IndirectStackLoc, LiteralMemLocation, MemLocation, Register, StackLoc } from "../instruction/mem_location";
+import { DebugPosition, Token } from "../lexer";
+import { Value, valueToMemLoc } from "../value";
+import { CharType } from "./char_type";
+import { PtrType } from "./ptr_type";
+import { ValueType } from "./value_type";
+
+type StructField = { name: string, type: ValueType, offset: number };
 
 
-
-export class StructType implements ValueType {
+export class StructType extends ValueType {
     private static _instances: StructType[] = [];
-    is_const: boolean = false;
-    public fields: { name: string, type: ValueType, offset: number }[];
+    public fields: StructField[];
 
     public _size: number | null;
     private constructor(public struct_name: string) {
+        super();
         this.fields = [];
         this._size = null;
     }
 
-    toString: () => string = (): string => {
+    override toString: () => string = (): string => {
         return `[struct ${this.struct_name}]`
     };
+    
     isSameType(type: ValueType): boolean {
         if (!(type instanceof StructType)) {
             return false;
@@ -42,77 +48,136 @@ export class StructType implements ValueType {
     get size(): number {
         return this._size ?? UNREACHABLE();
     }
-    asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {
-        if (should_alloc) {
-            for (let _ = 0; _ < this.size; ++_) {
-                context.addAssembly(`
-                    \rmovq $0, ${context.pushStack(1)}(%rsp)
-                `);
-            }
-            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+
+    override from_null(context: Context, debugPos: DebugPosition): Value {
+        const charType = CharType.getInstance();
+        const structSize = this.size;
+        let memloc;
+        for (let i = 0; i < structSize; ++i) {
+            memloc = context.getNewMemLocation(charType);
+            context.addInstruction(new MovInstr("movb", memloc, LiteralMemLocation.staticNull()))
         }
-        return new Value(name, this, pos, null, AddrType.Stack);
-    }
-    asm_from_dot(context: Context, src: Value, field_name: Token): Value {
-        src.valueType.isSameType(this) && field_name.type === TokenType.NAME || UNREACHABLE();
-
-        const struct_field = this.fields.find(f => f.name === field_name.text) ?? throwError(new TokenParserError(field_name, `No field [${field_name.text} on struct ${this.struct_name}]`));
-
-        if (src.addr_type == AddrType.Indirect) {
-            context.addAssembly(`
-                    \rmovq ${src._address}(%rsp), %rdx
-                    \rmovq %rdx, ${context.pushStack(8)}(%rsp)
-                    \raddq $${struct_field.offset}, ${context.stackPtr}(%rsp)
-                `);
-            return new Value(temp_t.t, struct_field.type, field_name.pos, context.stackPtr, AddrType.Indirect);
+        if (!memloc) {
+            UNREACHABLE();
         }
-        return new Value(temp_t.t, struct_field.type, field_name.pos, (src._address ?? UNREACHABLE()) + struct_field.offset, AddrType.Stack);
+
+        return new Value(memloc, this, debugPos);
     }
 
-    asm_copy(context: Context, dst: Value, src: Value): void {
-        throw new Error("Method not implemented.");
+    private putStructAddressToRegister(context: Context, register: Register, memloc: MemLocation) {
+        if (memloc instanceof IndirectStackLoc) {
+            context.addInstruction(new MovInstr("movq", register, memloc));
+        }
+        else {
+            context.addInstruction(new LeaqInstruction("leaq", register, memloc));
+        }
     }
-    asm_from_plus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    private getFieldFromStruct(fieldName: string): StructField {
+        return this.fields.find(f => f.name === fieldName) ?? throwError(new DebugPosError(fieldName, `No field [${fieldName} on struct ${this.struct_name}]`));
     }
-    asm_from_minus(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override copy_to(context: Context, dst: Value, src: Value): void {
+        if (!this.isSameType(dst.valueType) || !this.isSameType(src.valueType)) {
+            throwError(new DebugPosError(dst.pos, `Cannot copy from type ${src.valueType} to type ${dst.valueType}`));
+        }
+
+        let structSize = this.size;
+        const ptrSize = PtrType.getInstance(CharType.getInstance()).size;
+
+        const dstRegister: Register = Register.getFrom("ax", ptrSize);
+        const srcRegister: Register = Register.getFrom("bx", ptrSize);
+        const bufRegister = Register.getFrom("cx", 1);
+
+        this.putStructAddressToRegister(context, srcRegister, src._srcMemLoc);
+        this.putStructAddressToRegister(context, dstRegister, dst._srcMemLoc);
+
+        // UNREACHABLE("ADD PER FIELD STRUCT COPYING INSTEAD OF PER BYTE");
+
+        for (let i = 0; i < structSize; ++i) {
+            context.addInstruction(new MovInstr("movb", bufRegister, new IndirectRegisterWithOffset(srcRegister, i)));
+            context.addInstruction(new MovInstr("movb", new IndirectRegisterWithOffset(dstRegister, i), bufRegister));
+        }
     }
-    asm_from_multiply(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    from_dot(context: Context, src: Value, fieldName: string, debugPos: DebugPosition): Value {
+        if (!this.isSameType(src.valueType)) {
+            UNREACHABLE();
+        }
+        const fieldFromStuct = this.getFieldFromStruct(fieldName);
+
+        const srcRegister = Register.forIndirect();
+        this.putStructAddressToRegister(context, srcRegister, src._srcMemLoc);
+
+        const ptrType = PtrType.getInstance(CharType.getInstance());
+
+        const memloc = new IndirectStackLoc(context.getNewMemLocation(ptrType));
+        const returnVar = new Value(memloc, fieldFromStuct.type, debugPos);
+
+        const bufRegister = Register.getFrom("ax", ptrType.size);
+
+        context.addInstruction(new LeaqInstruction("leaq", bufRegister, new IndirectRegisterWithOffset(srcRegister, fieldFromStuct.offset)));
+        context.addInstruction(new MovInstr("movq", memloc, bufRegister));
+
+        return returnVar;
     }
-    asm_from_divide(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    from_ptr_dot(context: Context, srcVar: Value, fieldName: string, debugPos: DebugPosition): Value {
+        if (!srcVar.valueType.isSameType(PtrType.getInstance(this))) {
+            throwError(`Unexpected method call on type ${this}`);
+        }
+
+        const fieldFromStruct = this.getFieldFromStruct(fieldName);
+        const indirectMemloc = new IndirectStackLoc(context.getNewMemLocation(fieldFromStruct.type));
+        const newVar = new Value(indirectMemloc, fieldFromStruct.type, debugPos);
+        const raxRegister = Register.getInstance("rax");
+        const srcMemLoc = valueToMemLoc(srcVar, context);
+        context.addInstruction(new MovInstr("movq", raxRegister, srcMemLoc));
+        context.addInstruction(new PlusInstruction("addq", raxRegister, new LiteralMemLocation(fieldFromStruct.offset)));
+        context.addInstruction(new MovInstr("movq", indirectMemloc, raxRegister));
+
+        return newVar;
     }
-    asm_from_percent(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override from_literal(context: Context, literal: string, pos: DebugPosition): Value {
+        UNREACHABLE();
     }
-    asm_cmp_less(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override from_plus(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_cmp_greater(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override from_minus(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_cmp_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override from_multiply(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_cmp_not_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+
+    override from_divide(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_cmp_less_or_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+    override from_percent(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_cmp_greater_or_equal(context: Context, self: Value, rhs: Value): Value {
-        throw new Error("Method not implemented.");
+    override cmp_equal(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    asm_to_boolean(context: Context, self: Value): Value {
-        throw new Error("Method not implemented.");
+    override cmp_not_equal(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    get reg_i(): REG_I {
-        throw new Error("Method not implemented.");
+    override cmp_greater(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
-    get mov_i(): MOV_I {
-        throw new Error("Method not implemented.");
+    override cmp_less(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
+    }
+    override cmp_greater_or_equal(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
+    }
+    override cmp_less_or_equal(context: Context, self: Value, other: Value): Value {
+        UNREACHABLE();
     }
 
 }

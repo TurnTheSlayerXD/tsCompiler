@@ -1,8 +1,8 @@
 import { Context } from "./context";
-import { Lexer, Position, Token } from "./lexer";
+import { Lexer, DebugPosition, Token } from "./lexer";
 import { is_op_token_type, O_BRACES, TokenType } from "./token_type";
 
-export function throwError(error: any | undefined = undefined): never {
+export function throwError(error: Error | string | null | undefined = undefined): never {
     if (error instanceof Error) {
         throw error;
     }
@@ -34,20 +34,11 @@ export class TokenParserError extends Error {
 }
 
 
-export class TypeError extends Error {
-    constructor(pos: Position, msg: string) {
-        super(`Type Error at ${pos}\n${msg}\n`);
+export class DebugPosError extends Error {
+    constructor(pos: DebugPosition, msg: string) {
+        super(`Error at ${pos}\n${msg}\n`);
     }
 }
-
-
-
-export class RulesError extends Error {
-    constructor(pos: Position, msg: string) {
-        super(`Rule Error at ${pos}\n${msg}\n`);
-    }
-}
-
 
 
 export function TODO(arg: string = ''): never {

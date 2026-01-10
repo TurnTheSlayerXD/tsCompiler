@@ -1,18 +1,20 @@
 import { OrderedToken } from "./ast_builder";
 import { AstNode } from "./ast_node";
 import { Context } from "./context";
-import { convert_val_to_type, get_rax_i } from "./converter";
-import { TEMP_NAME, throwError, TODO, TokenParserError, UNREACHABLE, TypeError } from "./helper";
+import { convert_val_to_type } from "./converter";
+import { DebugPosError, throwError, TODO, TokenParserError } from "./helper";
+import { get_mov_i_on_size, LeaqInstruction, MovInstr, StringInstruction } from "./instruction/instruction";
+import { LiteralMemLocation, MemLocation, Register } from "./instruction/mem_location";
 import { TokenType } from "./token_type";
 import { parse_type_from_ast_node } from "./type_parsing";
-import { temp_t, Value } from "./value";
-import { TypenameType } from "./value_types";
+import { NamedValue, Value, valueToMemLoc } from "./value";
 import { ArrayType } from "./value_types/array_type";
 import { CharType } from "./value_types/char_type";
 import { FunctionType } from "./value_types/function_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { AddrType, MOV_I, REG_I } from "./value_types/value_type";
+import { StructType } from "./value_types/struct_type";
+import { TypenameType } from "./value_types/typename_type";
 import { VoidType } from "./value_types/void_type";
 
 export class AstBracketNode extends AstNode {
@@ -68,7 +70,7 @@ export class AstBracketNode extends AstNode {
             //handle function call case
             else if (this.left) {
                 const fun_obj = this.left.eval({ is_lvalue: false, can_be_decl: true });
-                if (fun_obj.valueType instanceof FunctionType) {
+                if (fun_obj instanceof NamedValue && fun_obj.valueType instanceof FunctionType) {
                     let params = [];
                     let comma_token: AstNode | null = this.middle;
                     while (comma_token && comma_token.type === TokenType.COMMA) {
@@ -81,32 +83,58 @@ export class AstBracketNode extends AstNode {
                     if (!!comma_token) {
                         params.push(comma_token.eval({ is_lvalue: false, can_be_decl: true }));
                     }
-                    const fun_name = fun_obj.name;
+                    const functionName = fun_obj.name;
                     if (fun_obj.name === 'print') {
-                        context.addAssembly(`
-                        \rmovl $4294967285, %ecx
-                        \rcallq *__imp_GetStdHandle(%rip)
-                        \rmovq %rax, ${context.pushStack(8)}(%rsp)
-                        \rmovl $0, ${context.pushStack(4)}(%rsp)
-                        \rmovq ${context.stackPtr + 4}(%rsp), %rcx
-                        \rleaq ${context.stackPtr}(%rsp), %r9
-                    `);
-                        context.addAssembly(`
-                        \rmovq  ${params[0]?.stack_addr(context) ?? 'Expected first param for built-in PRINT function'}(%rsp), %rdx
-                    `);
-                        context.addAssembly(`
-                        \rmovl  ${params[1]?.stack_addr(context) ?? 'Expected second param for built-in PRINT function'}(%rsp), %r8d
-                    `);
-                        context.addAssembly(`
-                        \rcallq	 *__imp_WriteConsoleA(%rip)
-                    `);
-                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
+
+                        const memlocOne = context.getNewMemLocationFromOffset(8);
+                        const memlocTwo = context.getNewMemLocationFromOffset(4);
+
+                        context.addInstruction(new StringInstruction("movl $429496"))
+                        context.addInstruction(new StringInstruction('callq *__imp_GetStdHandle(%rip)'))
+                        context.addInstruction(new MovInstr("movq", memlocOne, Register.getInstance("rax")));
+                        context.addInstruction(new MovInstr("movq", memlocTwo, LiteralMemLocation.staticNull()));
+
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("rcx"), memlocOne));
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("r9"), memlocTwo));
+                        /*
+                            context.addAssembly(`
+                            \rmovl $4294967285, %ecx
+                            \rcallq *__imp_GetStdHandle(%rip)
+                            \rmovq %rax, ${context.pushStack(8)}(%rsp)
+                            \rmovl $0, ${context.pushStack(4)}(%rsp)
+                            \rmovq ${context.stackPtr + 4}(%rsp), %rcx
+                            \rleaq ${context.stackPtr}(%rsp), %r9
+                        `);
+                        */
+                        const paramOne = params[0]!;
+                        const paramTwo = params[1]!;
+                        if (params.length !== 2 ||
+                            !PtrType.getInstance(CharType.getInstance()).isSameType(paramOne.valueType) ||
+                            !IntType.getInstance().isSameType(paramTwo.valueType)) {
+                            throwError(`Expected built-in PRINT function parameters to be of type (char *, int).\n\rActual parameters are (${paramOne?.valueType},${paramTwo?.valueType})`);
+                        }
+
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(paramOne, context)));
+                        context.addInstruction(new MovInstr("movl", Register.getInstance("r8d"), valueToMemLoc(paramTwo, context)));
+                        context.addInstruction(new StringInstruction("callq *__imp_WriteConsoleA(%rip)"));
+                        /*
+                            context.addAssembly(`\rmovq  ${params[0].stack_addr(context) ?? throwError('Expected')}(%rsp), %rdx`);
+                            context.addAssembly(`\rmovl  ${params[1].stack_addr(context) ?? throwError('Expected')}(%rsp), %r8d`);
+                            context.addAssembly(`\rcallq	 *__imp_WriteConsoleA(%rip)`);
+                        */
+                        return new Value(new LiteralMemLocation(0), VoidType.getInstance(), token.pos);
                     }
                     else if (fun_obj.name === 'input') {
-                        if (params.length > 1 || !params[0]?.valueType.isSameType(PtrType.getInstance(CharType.getInstance()))) {
-                            throw new TypeError(fun_obj.pos, `built-in "input" function can accept only one argument of type char*\nfound:${params.map(t => t.valueType)}`);
+                        const param = params[0]!;
+                        if (params.length !== 1 || !param.valueType.isSameType(PtrType.getInstance(CharType.getInstance()))) {
+                            throw new DebugPosError(fun_obj.pos, `built-in "input" function can accept only one argument of type char*\nfound:${param?.valueType}`);
                         }
-                        const param = params[0];
+                        context.addInstruction(new MovInstr("movl", context.getNewMemLocationFromOffset(4), LiteralMemLocation.staticNull()));
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(param, context)));
+                        context.addInstruction(new StringInstruction("leaq scanf_mark(%rip) %rcx"));
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("rax"), LiteralMemLocation.staticNull()));
+                        context.addInstruction(new StringInstruction("callq scanf"));
+                        /*
                         context.addAssembly(`
                             \rmovl $0, ${context.pushStack(4)}(%rsp)
                         `);
@@ -118,7 +146,8 @@ export class AstBracketNode extends AstNode {
                         context.addAssembly(`
                             \rcallq	scanf
                         `);
-                        return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
+                        */
+                        return new Value(LiteralMemLocation.staticNull(), VoidType.getInstance(), token.pos);
                     }
                     else {
                         let in_stack: Value | undefined;
@@ -127,23 +156,43 @@ export class AstBracketNode extends AstNode {
                             throwError(`Unmatched parameter count\nExpected: ${paramTypes}\nFound: ${params}`);
                         }
                         for (let i = 0; i < paramTypes.length; ++i) {
-                            in_stack = paramTypes[i]!.asm_from_literal(context, temp_t.t, null, params[i]!.pos, true);
-                            in_stack.valueType.asm_copy(context, in_stack, params[i]!);
+                            in_stack = paramTypes[i]!.from_null(context, params[i]!.pos);
+                            in_stack.valueType.copy_to(context, in_stack, params[i]!);
                         }
-                        if (params.length > 0) {
+                        if (paramTypes.length > 0) {
+                            const lastInStackParam = in_stack!;
+                            context.addInstruction(new StringInstruction("#__parameter_offset_pass"));
+                            context.addInstruction(new LeaqInstruction("leaq", Register.forParamPass(), valueToMemLoc(lastInStackParam, context)));
+                        }
+                        context.addInstruction(new StringInstruction(`callq ${functionName}`));
+                        /*
+                            if (params.length > 0) {
+                                context.addAssembly(`
+                                    \r#__parameter_offset_pass
+                                    \rleaq ${!in_stack ? UNREACHABLE() : in_stack.stack_addr(context)}(%rsp), %rcx
+                                `);
+                            }
                             context.addAssembly(`
-                        \r#__parameter_offset_pass
-                        \rleaq ${!in_stack ? UNREACHABLE() : in_stack.stack_addr(context)}(%rsp), %rcx
-                    `);
+                                \rcallq ${functionName}
+                            `);
+                        */
+                        const returnType = fun_obj.valueType.returnType;
+
+                        if (returnType instanceof StructType) {
+                            TODO();
                         }
-                        context.addAssembly(`
-                        \rcallq ${fun_name}
-                    `);
-                        const [reg, mov] = get_rax_i(fun_obj.valueType.returnType.size);
-                        context.addAssembly(`   
-                        \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_obj.valueType.returnType.size)}(%rsp)
-                    `);
-                        return new Value(temp_t.t, fun_obj.valueType.returnType, token.pos, context.stackPtr, AddrType.Stack);
+
+                        const returnTypeSize = returnType.size;
+                        const memloc = context.getNewMemLocation(returnType);
+                        context.addInstruction(new MovInstr(get_mov_i_on_size(returnTypeSize), memloc, Register.forReturnValue(returnType)));
+
+                        /*
+                            const [reg, mov] = get_rax_i(fun_obj.valueType.returnType.size);
+                            context.addAssembly(`   
+                                \r${MOV_I[mov]} %${REG_I[reg]}, ${context.pushStack(fun_obj.valueType.returnType.size)}(%rsp)
+                            `);
+                        */
+                        return new Value(memloc, returnType, token.pos);
                     }
                 }
 
@@ -164,7 +213,7 @@ export class AstBracketNode extends AstNode {
                 return this.middle.eval({ is_lvalue: is_lvalue, can_be_decl: true });
             }
             //otherwise it is just for operation ordering
-            return new Value(temp_t.t, VoidType.getInstance(), token.pos, null, AddrType.Stack);
+            return new Value(LiteralMemLocation.staticNull(), VoidType.getInstance(), token.pos);
         }
         if ([TokenType.O_SQR].includes(type)) {
             if (!this.middle || !this.left) {
@@ -172,10 +221,9 @@ export class AstBracketNode extends AstNode {
             }
             const ind_val = this.middle.eval({ is_lvalue: false, can_be_decl: true });
             const ptr_val = this.left.eval({ is_lvalue: false, can_be_decl: true });
-            const applied = ptr_val.valueType.asm_from_plus(context, ptr_val, ind_val);
-            const applied_type = applied.valueType as PtrType ?? throwError(new TokenParserError(token, 'Expected PTR type'));
-            const res = applied_type.asm_dereference(context, temp_t.t, applied, is_lvalue);
-            return res;
+            const ptrWithOffset = ptr_val.valueType.from_plus(context, ptr_val, ind_val);
+            const retunVar = (ptrWithOffset.valueType as PtrType).dereference_from(context, ptrWithOffset, token.pos);
+            return retunVar;
         }
         if ([TokenType.O_CURL].includes(type)) {
             const params = [];
@@ -191,26 +239,11 @@ export class AstBracketNode extends AstNode {
                 params.push(comma_token.eval({ is_lvalue: false, can_be_decl: true }));
             }
             params.reverse();
-            if (params.length > 0) {
-                const valueType = params[0]!.valueType;
-                for (const src of params) {
-                    const dst = new Value(temp_t.t, valueType, src.pos, context.pushStack(valueType.size), AddrType.Stack);
-                    valueType.asm_copy(context, dst, src);
-                }
-                context.addAssembly(`
-                        \rleaq ${context.stackPtr}(%rsp), %rdx
-                        \rmovq %rdx, ${context.pushStack(8)}(%rsp)
-                    `);
-                const ret = new Value(temp_t.t, ArrayType.getArrayInstance(valueType, params.length), params[0]!.pos, context.stackPtr, AddrType.Stack);
-                return ret;
-            }
-            context.addAssembly(`
-                    \rmovq $0, ${context.pushStack(8)}
-                `);
-            return new Value(temp_t.t, ArrayType.getArrayInstance(IntType.getInstance(), 0), token.pos, context.stackPtr, AddrType.Stack);
+            const paramType = params.length > 0 ? params[0]!.valueType : CharType.getInstance();
+            return ArrayType.getArrayInstance(paramType, params.length).from_params(context, params, token.pos);
         }
-        TODO(`unhandeled: ${token}`);
 
+        TODO(`unhandeled: ${token}`);
     }
 
 }

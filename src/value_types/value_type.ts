@@ -1,12 +1,12 @@
 import { Context } from "../context";
 import { convert_values_or_throw } from "../converter";
-import { TODO, UNREACHABLE } from "../helper";
+import { DebugPosError, throwError, TODO, UNREACHABLE } from "../helper";
 import { DivInstruction, get_div_i_on_sizeoftype, MulInstruction, PlusInstruction, SubInstruction } from "../instruction/binary_op_instruction";
 import { CmpInstr, get_cmp_i_on_size, JniInstr } from "../instruction/comparison_instruction";
 import { get_mov_i_on_size, MovInstr, StringInstruction } from "../instruction/instruction";
 import { LiteralMemLocation, Register } from "../instruction/mem_location";
 import { DebugPosition } from "../lexer";
-import { Value } from "../value";
+import { Value, valueToMemLoc } from "../value";
 import { CharType } from "./char_type";
 
 export abstract class ValueType {
@@ -24,11 +24,11 @@ export abstract class ValueType {
         const newValue = new Value(memLoc, CharType.getInstance(), self.pos);
 
         context.addInstruction(new MovInstr("movb", memLoc, new LiteralMemLocation(1)));
-        context.addInstruction(new CmpInstr(get_cmp_i_on_size(this.size), new LiteralMemLocation(0), memLoc));
+        context.addInstruction(new CmpInstr(get_cmp_i_on_size(this.size), LiteralMemLocation.staticNull(), memLoc));
 
         const mark = context.getNewMarkToJump();
         context.addInstruction(new JniInstr("jne", mark));
-        context.addInstruction(new MovInstr("movb", memLoc, new LiteralMemLocation(0)));
+        context.addInstruction(new MovInstr("movb", memLoc, LiteralMemLocation.staticNull()));
         context.addInstruction(mark);
         return newValue;
     }
@@ -37,17 +37,18 @@ export abstract class ValueType {
     from_null(context: Context, pos: DebugPosition): Value {
         const newMemLoc = context.getNewMemLocation(this);
         const newValue = new Value(newMemLoc, this, pos);
-        context.addInstruction(new MovInstr(get_mov_i_on_size(this.size), newMemLoc, new LiteralMemLocation(0)));
+        context.addInstruction(new MovInstr(get_mov_i_on_size(this.size), newMemLoc, LiteralMemLocation.staticNull()));
         return newValue;
     }
 
     copy_to(context: Context, dst: Value, src: Value): void {
+        if (!this.isSameType(src.valueType) || !this.isSameType(dst.valueType)) {
+            throwError(new DebugPosError(src.pos, `Unmatched types: dst = ${dst.valueType} | src = ${src.valueType}`));
+        }
 
         const register = Register.getFrom("bx", src.valueType.size);
-
-        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), register, src.toMemLoc(context)));
-
-        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), dst.toMemLoc(context), register));
+        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), register, valueToMemLoc(src, context)));
+        context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), valueToMemLoc(dst, context), register));
     }
 
     cmp_equal(context: Context, self: Value, other: Value): Value {
@@ -105,12 +106,12 @@ export abstract class ValueType {
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
         const register = Register.getFrom("ax", sizeoftype);
-        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
+        context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
         context.addInstruction(new StringInstruction("cdq"));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
-        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context)));
+        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
         context.addInstruction(new MovInstr(mov_i, newMemLoc, Register.getFrom("ex", sizeoftype)));
 

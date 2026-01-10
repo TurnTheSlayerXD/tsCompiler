@@ -1,13 +1,12 @@
 import { Context } from "../context";
-import { convert_string_to_char_codes } from "../helper";
-import { Position } from "../lexer";
-import { temp_t, Value } from "../value";
-import { CharType } from "./char_type";
+import { LeaqInstruction, MovInstr } from "../instruction/instruction";
+import { LiteralMemLocation, MemLocation, Register } from "../instruction/mem_location";
+import { DebugPosition } from "../lexer";
+import { Value } from "../value";
 import { PtrType } from "./ptr_type";
-import { ValueType, AddrType } from "./value_type";
+import { ValueType } from "./value_type";
 
 export class ArrayType extends PtrType {
-    override is_const: boolean = false;
     private static _instances: ArrayType[] = [];
     private constructor(ptrTo: ValueType, public array_size: number | null) {
         super(ptrTo);
@@ -21,7 +20,7 @@ export class ArrayType extends PtrType {
         return false;
     }
 
-    static getArrayInstance(ptrTo: ValueType, array_size: number | null): ArrayType {
+    static getArrayInstance(ptrTo: ValueType, array_size: number): ArrayType {
         let inst: ArrayType | undefined = this._instances.find(i => i.ptrTo.isSameType(ptrTo) && i.array_size === array_size);
         if (!inst) {
             inst = new ArrayType(ptrTo, array_size);
@@ -33,42 +32,29 @@ export class ArrayType extends PtrType {
         return 8;
     }
 
-    override asm_from_literal(context: Context, name: string | temp_t, literal: string | null, pos: Position, should_alloc: boolean): Value {
-        if (should_alloc) {
-            if (this.array_size) {
-                for (let i = 0; i < this.array_size; ++i) {
-                    this.ptrTo.asm_from_literal(context, temp_t.t, null, pos, true);
-                }
-            }
-            else if (literal !== null) {
-                context.addAssembly(`
-                    \rmovb $0, ${context.pushStack(CharType.getInstance().size)}(%rsp)
-                `);
-                const codes = convert_string_to_char_codes(literal).reverse();
-                for (const c of codes) {
-                    context.addAssembly(`
-                    \rmovb $${c}, ${context.pushStack(CharType.getInstance().size)}(%rsp)
-                `);
-                }
-                context.addAssembly(`
-                    \rleaq ${context.stackPtr}(%rsp), %rdx
-                `);
-                context.addAssembly(`
-                    \rmovq %rdx, ${context.pushStack(this.size)}(%rsp) 
-                `);
-                this.array_size = codes.length;
-                return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
-            }
 
-            context.addAssembly(`
-                \rleaq ${context.stackPtr}(%rsp), %rdx
-                \rmovq %rdx, ${context.pushStack(this.size)}(%rsp)
-            `);
-            return new Value(name, this, pos, context.stackPtr, AddrType.Stack);
+    from_params(context: Context, params: Value[], debugPos: DebugPosition): Value {
+        if (params.length > 0) {
+            const valueType = params[0]!.valueType;
+            let memloc: MemLocation;
+            for (const src of params) {
+                memloc = context.getNewMemLocation(valueType);
+                const dst = new Value(memloc, valueType, src.pos);
+                valueType.copy_to(context, dst, src);
+            }
+            const lastMemLoc = memloc!;
+            context.addInstruction(new LeaqInstruction("leaq", Register.getInstance("rdx"), lastMemLoc));
+
+            const arrayType = ArrayType.getArrayInstance(valueType, params.length);
+            const arrayMemLoc = context.getNewMemLocation(arrayType);
+            const arrayVal = new Value(arrayMemLoc, arrayType, debugPos);
+            context.addInstruction(new MovInstr("movq", arrayMemLoc, Register.getInstance("rdx")));
+
+            return arrayVal;
         }
-        else {
-            return new Value(name, this, pos, null, AddrType.Stack);
-        }
+        const memloc = context.getNewMemLocation(this);
+        context.addInstruction(new MovInstr("movq", memloc, new LiteralMemLocation(0)));
+        return new Value(memloc, this, debugPos);
     }
 }
 

@@ -1,18 +1,15 @@
-import { filterIndexes, findIndex, LexerError, ParserError, RulesError, throwError, TODO, TokenParserError, toReversed, UNREACHABLE } from "./helper";
+import { DebugPosError, throwError, UNREACHABLE } from "./helper";
 import { Lexer } from "./lexer";
-import * as fs from 'fs';
-import { Scope, TypeofScope } from "./scope";
+import { GlobalScope, Scope, TypeofScope } from "./scope";
 import { NamedValue, Value } from "./value";
 import { CharType } from "./value_types/char_type";
-import { FunctionType } from "./value_types/function_type";
 import { IntType } from "./value_types/int_type";
-import { PtrType } from "./value_types/ptr_type";
 import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { StructType } from "./value_types/struct_type";
-import { SCANF_DECL } from "./imp_scanf";
-import { Instruction, MarkToJump } from "./instruction/instruction";
+import { Instruction, MarkToJump, ScopeEndInstr, ScopeStartInstr } from "./instruction/instruction";
 import { StackLoc } from "./instruction/mem_location";
+import { FunctionType } from "./value_types/function_type";
 
 export class Context {
 
@@ -24,9 +21,16 @@ export class Context {
 
     private literals: string[] = [];
 
-    scopes: Scope[] = [];
+    lexer: Lexer;
+    _currentScope: Scope;
 
-    constructor(public lexer: Lexer) { }
+    public currentFunction: NamedValue | null;
+
+    constructor(lexer: Lexer) {
+        this.lexer = lexer;
+        this._currentScope = new GlobalScope();
+        this.currentFunction = null;
+    }
 
     getTypeFromTypename(typename: string): ValueType | null {
         switch (typename) {
@@ -43,16 +47,28 @@ export class Context {
         }
     }
 
-    pushScope(typeofScope: TypeofScope) {
+    pushScope(typeofScope: TypeofScope): Scope {
+        const newScope = new Scope(
+            this._currentScope,
+            this._currentScope.childScopes.at(-1) ?? null,
+            typeofScope,
+        );
 
+        this._currentScope.childScopes.push(newScope);
+        this._currentScope.addInstruction(new ScopeStartInstr(newScope));
+        this._currentScope = newScope;
+        return newScope;
     }
 
     popScope(): Scope {
-
+        const prevScope = this._currentScope;
+        this._currentScope = prevScope?.parentScope ?? throwError(`Cannot pop global scope!`);
+        this._currentScope.addInstruction(new ScopeEndInstr(prevScope));
+        return prevScope;
     }
 
     getCurrentScope(): Scope {
-        return this.scopes.at(-1) ?? UNREACHABLE();
+        return this._currentScope;
     }
 
     addGlobalStructType(type: StructType) {
@@ -72,19 +88,40 @@ export class Context {
     addInstruction(instruction: Instruction): void {
         this.getCurrentScope().addInstruction(instruction);
     }
+    addInstructionList(instructions: Instruction[]): void {
+        for (const i of instructions) {
+            this.getCurrentScope().addInstruction(i);
+        }
+    }
 
     addNewVarValue(val: NamedValue): void {
-        this.getCurrentScope().addNewVarValue(val);
+        const currentScope = this.getCurrentScope();
+        if (currentScope.getVarValue(val.name)) {
+            throwError(new DebugPosError(val.pos, `Value with name (${val.name}) already exists in scope`));
+        }
+        currentScope.addNewVarValue(val);
+    }
+
+    getVarValue(varName: string): NamedValue {
+        return this.getCurrentScope().getVarValueOrThrow(varName);
     }
 
     getNewMemLocation(valueType: ValueType): StackLoc {
         return this.getCurrentScope().getNewMemLocation(valueType);
     }
 
+    getNewMemLocationFromOffset(offset: number): StackLoc {
+        return this.getCurrentScope().getNewMemLocationFromOffset(offset);
+
+    }
+
     getNewMarkToJump(): MarkToJump {
         return this.getCurrentScope().getNewMarkToJump();
     }
 
+    isTypenameDefined(typename: string): boolean {
+        return !!this.getTypeFromTypename(typename);
+    }
 }
 
 

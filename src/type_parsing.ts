@@ -2,7 +2,6 @@ import { AstBracketNode } from "./ast_bracket_node";
 import { AstNode } from "./ast_node";
 import { Context } from "./context";
 import { throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
-import { Token } from "./lexer";
 import { TokenType } from "./token_type";
 import { ArrayType } from "./value_types/array_type";
 import { FunctionType } from "./value_types/function_type";
@@ -35,7 +34,7 @@ export function parse_type_from_ast_node(context: Context, root: AstNode): PARSE
             const node = type_modifiers[i]!;
             if (node.type === TokenType.O_SQR) {
                 const bracket_node = node as AstBracketNode ?? UNREACHABLE();
-                let array_size: number | null = null;
+                let array_size: number = 0;
                 if (bracket_node.middle) {
                     if (bracket_node.middle.type !== TokenType.NUM_INT) {
                         throwError(new TokenParserError(bracket_node.order.tok, `Expected constant expression inside Array size qualifier. Found: ${bracket_node.middle.order.tok}`))
@@ -46,6 +45,10 @@ export function parse_type_from_ast_node(context: Context, root: AstNode): PARSE
                     }
                 }
                 get_type(i + 1);
+                if (array_size === 0) {
+                    UNREACHABLE();
+                }
+
                 final_type = ArrayType.getArrayInstance(final_type, array_size);
                 return;
             }

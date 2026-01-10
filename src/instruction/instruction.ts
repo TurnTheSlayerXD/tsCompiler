@@ -1,7 +1,6 @@
 import { UNREACHABLE } from "../helper";
-import { MemLocation } from "./mem_location";
-
-
+import { Scope } from "../scope";
+import { MemLocation, Register } from "./mem_location";
 
 
 export abstract class Instruction {
@@ -54,4 +53,61 @@ export class StringInstruction extends Instruction {
     }
 }
 
-export { MemLocation };
+
+type lea_i = "leaq";
+export class LeaqInstruction extends Instruction {
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+
+    constructor(lea_i: lea_i, public dst: Register, public src: MemLocation) {
+        super();
+    }
+}
+
+export class ScopeStartInstr extends Instruction {
+    constructor(public scope: Scope) {
+        super();
+    }
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+}
+
+export class ScopeEndInstr extends Instruction {
+    constructor(public scope: Scope) {
+        super();
+    }
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+}
+
+
+export class PushScopeInstr extends Instruction {
+    constructor(public scope: Scope) {
+        super();
+    }
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+}
+
+
+export class PopScopeInstr extends Instruction {
+    constructor(public scope: Scope) {
+        super();
+    }
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+}
+
+export class JmpInstr extends Instruction {
+    constructor(public markToJmp: MarkToJump) {
+        super();
+    }
+    override non(): void {
+        throw new Error("Method not implemented.");
+    }
+}

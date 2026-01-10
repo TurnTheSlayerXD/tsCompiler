@@ -1,7 +1,6 @@
-import { name } from "assert";
 import { throwError, UNREACHABLE } from "./helper";
-import { Instruction, MarkToJump, MovInstr, StringInstruction } from "./instruction/instruction";
-import { MemLocation, StackLoc, StaticLocation } from "./instruction/mem_location";
+import { Instruction, MarkToJump, MovInstr, PushScopeInstr, ScopeEndInstr, ScopeStartInstr, StringInstruction } from "./instruction/instruction";
+import { IndirectRegister, IndirectRegisterWithOffset, IndirectStackLoc, LiteralMemLocation, MemLocation, Register, StackLoc, StaticLocation } from "./instruction/mem_location";
 import { NamedValue, Value } from "./value";
 import { CharType } from "./value_types/char_type";
 import { FunctionType } from "./value_types/function_type";
@@ -10,6 +9,7 @@ import { PtrType } from "./value_types/ptr_type";
 import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { DebugPosition } from "./lexer";
+import { DivInstruction, MulInstruction, PlusInstruction, SubInstruction } from "./instruction/binary_op_instruction";
 
 
 export enum TypeofScope {
@@ -19,13 +19,23 @@ export enum TypeofScope {
     GLOBAL_SCOPE,
 }
 
+type ScopeParams =
+    { typeofScope: TypeofScope.IF_SCOPE } |
+    { typeofScope: TypeofScope.GLOBAL_SCOPE } |
+    { typeofScope: TypeofScope.FUN_SCOPE } |
+    { typeofScope: TypeofScope.CYCLE_SCOPE, markToEnterCycle: MarkToJump, markToExitCycle: MarkToJump };
+
+
 export class Scope {
     localVarValues: NamedValue[];
     stackLocs: StackLoc[];
 
     public parentScope: Scope | null;
     public siblingScope: Scope | null;
-    public typeofScope: TypeofScope;
+    public childScopes: Scope[];
+
+    public scopeParams: ScopeParams;
+
     public instructions: Instruction[];
     public marksToJump: MarkToJump[];
 
@@ -38,13 +48,31 @@ export class Scope {
     ) {
         this.parentScope = parentScope;
         this.siblingScope = siblingScope;
-        this.typeofScope = typeofScope;
+
+
+        this.childScopes = [];
 
         this.localVarValues = [];
         this.stackLocs = [];
         this.instructions = [];
         this.marksToJump = [];
         this.markCounter = 0;
+
+        switch (typeofScope) {
+            case TypeofScope.CYCLE_SCOPE:
+                this.scopeParams = { typeofScope: TypeofScope.CYCLE_SCOPE, markToEnterCycle: this.getNewMarkToJump(), markToExitCycle: this.getNewMarkToJump() };
+                break;
+            case TypeofScope.FUN_SCOPE:
+                this.scopeParams = { typeofScope: typeofScope };
+                break;
+            case TypeofScope.IF_SCOPE: case TypeofScope.GLOBAL_SCOPE:
+                this.scopeParams = { typeofScope: typeofScope };
+        }
+
+    }
+
+    get typeofScope(): TypeofScope {
+        return this.scopeParams.typeofScope;
     }
 
     get scopeOrderIndex(): number {
@@ -70,20 +98,24 @@ export class Scope {
         return lastStackLoc.offset + lastStackLoc.allocSize;
     }
 
-    get_distance_to(rhs: Scope): number {
-        let parent = this.parentScope;
-        while (rhs !== parent) {
-            if (parent === null) {
-                UNREACHABLE();
-            }
-            offset += parent._used_space;
-            parent = parent.parentScope;
-        }
-        return offset;
+    getNewMemLocation(valueType: ValueType): StackLoc {
+        const newStackLoc = new StackLoc(
+            `stack_alloc_${this.scopeId}_${this.allocsCounter}`,
+            this.currentStackOffset,
+            valueType.size,
+            this,
+        );
+        this.stackLocs.push(newStackLoc);
+        return newStackLoc;
     }
 
-    getNewMemLocation(valueType: ValueType): StackLoc {
-        const newStackLoc = new StackLoc(`stack_alloc_${this.scopeId}_${this.allocsCounter}`, this.currentStackOffset, valueType.size);
+    getNewMemLocationFromOffset(offset: number): StackLoc {
+        const newStackLoc = new StackLoc(
+            `stack_alloc_${this.scopeId}_${this.allocsCounter}`,
+            this.currentStackOffset,
+            offset,
+            this,
+        );
         this.stackLocs.push(newStackLoc);
         return newStackLoc;
     }
@@ -94,7 +126,7 @@ export class Scope {
         return newMark;
     }
 
-    getVarValue(varName: string): Value | null {
+    getVarValue(varName: string): NamedValue | null {
         let scope: Scope | null = this;
         let varValue = null;
         while (scope && !(varValue = scope.localVarValues.find((value) => value.name === varName))) {
@@ -103,7 +135,7 @@ export class Scope {
         return varValue ?? null;
     }
 
-    getVarValueOrThrow(varName: string): Value {
+    getVarValueOrThrow(varName: string): NamedValue {
         return this.getVarValue(varName) ?? throwError(new Error(`No var ${varName} in scope ${this.scopeId}`));
     }
 
@@ -119,17 +151,85 @@ export class Scope {
         this.instructions.push(instruction);
     }
 
+    public totalAllocs() {
 
-    interpretMemLocation(memLoc: MemLocation): string {
-        if (memLoc instanceof StackLoc) {
-            
-        }
     }
 
-    interpretInstructions(): string {
+    private getTotalStackSpace(): number {
+        return this.stackLocs.map(l => l.allocSize).reduce((s, l) => s + l);
+    }
+
+    private getDistanceToScope(locationScope: Scope): number {
+        let distance = 0;
+        let scope: Scope | null = this;
+        while (scope && scope !== locationScope) {
+            scope = scope.parentScope;
+            distance += scope?.getTotalStackSpace() ?? 0;
+        }
+        if (!scope) {
+            UNREACHABLE();
+        }
+        return distance;
+    }
+
+    private doStackLocationProcessing(memLoc: StackLoc): string {
+        let totalStackSpace = this.getTotalStackSpace();
+        if (memLoc.relatedScope === this) {
+            return `${totalStackSpace - memLoc.offset - memLoc.allocSize}(%rsp)`;
+        }
+        const distanceToScope = this.getDistanceToScope(memLoc.relatedScope);
+        return `${distanceToScope - memLoc.offset - memLoc.allocSize + totalStackSpace}(%rsp)`;
+    }
+
+    private interpretMemLocation(memLoc: MemLocation): string {
+        if (memLoc instanceof StackLoc) {
+            return this.doStackLocationProcessing(memLoc);
+        }
+        if (memLoc instanceof IndirectStackLoc) {
+            return this.doStackLocationProcessing(memLoc.stackLoc);
+        }
+        else if (memLoc instanceof LiteralMemLocation) {
+            return `$${memLoc.literal}`;
+        }
+        else if (memLoc instanceof Register) {
+            return `%${memLoc.registerName}`;
+        }
+        else if (memLoc instanceof IndirectRegister) {
+            return `(%${memLoc.register.registerName})`;
+        }
+        else if (memLoc instanceof IndirectRegisterWithOffset) {
+            return `${memLoc.offset}(%${memLoc.register.registerName})`
+        }
+        else {
+            UNREACHABLE();
+        }
+
+    }
+
+    interpretInstructions(): string[] {
         let asm: string[] = [];
         for (const instr of this.instructions) {
-            if (instr instanceof MovInstr) {
+            if (instr instanceof ScopeStartInstr) {
+                if (this.childScopes.indexOf(instr.scope) === -1) {
+                    UNREACHABLE();
+                }
+                asm.push(`#SCOPE START ${instr.scope.scopeId}`);
+                asm.push(...instr.scope.interpretInstructions());
+            }
+            else if (instr instanceof ScopeEndInstr) {
+                if (this.childScopes.indexOf(instr.scope) === -1) {
+                    UNREACHABLE();
+                }
+                asm.push(`#SCOPE END ${instr.scope.scopeId}`);
+            }
+            else if (instr instanceof PushScopeInstr) {
+                asm.push(`subq $${this.getTotalStackSpace()}, %rsp`);
+            }
+            else if (instr instanceof PushScopeInstr) {
+                asm.push(`addq $${this.getTotalStackSpace()}, %rsp`);
+            }
+
+            else if (instr instanceof MovInstr) {
                 const dstStr = this.interpretMemLocation(instr.dst);
                 const srcStr = this.interpretMemLocation(instr.src);
                 asm.push(`${instr.mov_i} ${srcStr} ${dstStr}`);
@@ -140,15 +240,32 @@ export class Scope {
             else if (instr instanceof StringInstruction) {
                 asm.push(`${instr.text}`);
             }
+            else if (instr instanceof PlusInstruction) {
+                const lhsStr = this.interpretMemLocation(instr.src);
+                const rhsStr = this.interpretMemLocation(instr.dst);
+                asm.push(`${instr.add_i} ${lhsStr} ${rhsStr}`);
+            }
+            else if (instr instanceof SubInstruction) {
+                const lhsStr = this.interpretMemLocation(instr.src);
+                const rhsStr = this.interpretMemLocation(instr.dst);
+                asm.push(`${instr.sub_i} ${lhsStr} ${rhsStr}`);
+            }
+            else if (instr instanceof MulInstruction) {
+                const memLocStr = this.interpretMemLocation(instr.memloc);
+                asm.push(`${instr.mul_i} ${memLocStr}`);
+            }
+            else if (instr instanceof DivInstruction) {
+                const memLocStr = this.interpretMemLocation(instr.memloc);
+                asm.push(`${instr.div_i} ${memLocStr}`);
+            }
+
             else {
                 UNREACHABLE();
             }
         }
-
-        return asm.join('\n');
+        return asm;
     }
 }
-
 
 export class GlobalScope extends Scope {
 
@@ -174,32 +291,36 @@ export class GlobalScope extends Scope {
     }
 
 
-    override getVarValue(varName: string): Value | null {
-        if (name === 'print') {
+    override getVarValue(varName: string): NamedValue | null {
+        if (varName === 'print') {
             return new NamedValue(
-                "input",
-                new StaticLocation(),
-                FunctionType.getInstance(
-                    VoidType.getInstance(),
-                    [
-                        PtrType.getInstance(CharType.getInstance()),
-                        IntType.getInstance(),
-                    ],
-                ),
-                new DebugPosition(0, 0, 0),
+                "print",
+                new Value(
+                    new StaticLocation(),
+                    FunctionType.getInstance(
+                        VoidType.getInstance(),
+                        [
+                            PtrType.getInstance(CharType.getInstance()),
+                            IntType.getInstance(),
+                        ],
+                    ),
+                    new DebugPosition(0, 0, 0),
+                )
             );
         }
-        if (name === 'input') {
+        if (varName === 'input') {
             return new NamedValue(
                 "input",
-                new StaticLocation(),
-                FunctionType.getInstance(
-                    VoidType.getInstance(),
-                    [
-                        PtrType.getInstance(CharType.getInstance()),
-                    ],
-                ),
-                new DebugPosition(0, 0, 0),
+                new Value(
+                    new StaticLocation(),
+                    FunctionType.getInstance(
+                        VoidType.getInstance(),
+                        [
+                            PtrType.getInstance(CharType.getInstance()),
+                        ],
+                    ),
+                    new DebugPosition(0, 0, 0),
+                )
             );
         }
         return super.getVarValue(varName);

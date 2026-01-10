@@ -1,9 +1,9 @@
 import { Context } from "../context";
 import { convert_values_or_throw } from "../converter";
 import { UNREACHABLE } from "../helper";
-import { Value } from "../value";
+import { Value, valueToMemLoc } from "../value";
 import { CharType } from "../value_types/char_type";
-import { get_mov_i_on_size, MarkToJump, MovInstr, MovLiteralInstr } from "./instruction";
+import { get_mov_i_on_size, MarkToJump, MovInstr } from "./instruction";
 import { Instruction } from "./instruction";
 import { LiteralMemLocation, MemLocation, Register } from "./mem_location";
 
@@ -45,8 +45,8 @@ export class JniInstr extends Instruction {
         const ax_register = Register.getFrom("ax", sizeoftype);
         const bx_register = Register.getFrom("bx", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, lhs.toMemLoc(context), ax_register));
-        context.addInstruction(new MovInstr(mov_i, rhs.toMemLoc(context), bx_register));
+        context.addInstruction(new MovInstr(mov_i, valueToMemLoc(lhs, context), ax_register));
+        context.addInstruction(new MovInstr(mov_i, valueToMemLoc(rhs, context), bx_register));
 
         const newMemLoc = context.getNewMemLocation(CharType.getInstance());
         const newValue = new Value(newMemLoc, CharType.getInstance(), self.pos);
@@ -56,7 +56,7 @@ export class JniInstr extends Instruction {
 
         const newMark = context.getNewMarkToJump();
         context.addInstruction(new JniInstr(jn_i, newMark));
-        context.addInstruction(new MovInstr("movb", newMemLoc, new LiteralMemLocation(0)));
+        context.addInstruction(new MovInstr("movb", newMemLoc, LiteralMemLocation.staticNull()));
         context.addInstruction(newMark);
         return newValue;
     }

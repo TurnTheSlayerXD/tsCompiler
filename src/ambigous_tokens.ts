@@ -33,7 +33,7 @@ export function replace_ambigous_token_types(context: Context, tokens: Token[]) 
                 cur.type = TokenType.OP_LOGICAL_PLUS;
             }
         }
-        else if (cur.type === TokenType.NAME && context.hasTypeAsBool(cur.text)) {
+        else if (cur.type === TokenType.NAME && context.isTypenameDefined(cur.text)) {
             cur.type = TokenType.DECL_TYPENAME;
         }
 

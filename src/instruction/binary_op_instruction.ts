@@ -1,7 +1,7 @@
 import { Context } from "../context";
 import { convert_values_or_throw } from "../converter";
 import { UNREACHABLE } from "../helper";
-import { Value } from "../value";
+import { Value, valueToMemLoc } from "../value";
 import { get_mov_i_on_size, Instruction, MovInstr, StringInstruction } from "./instruction";
 import { MemLocation, Register } from "./mem_location";
 
@@ -22,7 +22,7 @@ function get_add_i_on_sizeoftype(sizeoftype: number): add_i {
     }
 }
 export class PlusInstruction extends Instruction {
-    public constructor(public add_i: add_i, public lhs: MemLocation, public rhs: Register) {
+    public constructor(public add_i: add_i, public dst: MemLocation, public src: MemLocation) {
         super();
     }
     override non(): void { }
@@ -35,8 +35,8 @@ export class PlusInstruction extends Instruction {
 
         const register = Register.getFrom("ax", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
-        context.addInstruction(new PlusInstruction(get_add_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context), register));
+        context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
+        context.addInstruction(new PlusInstruction(get_add_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context), register));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
@@ -66,7 +66,7 @@ export class SubInstruction extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
-    public constructor(public sub_i: sub_i, public lhs: MemLocation, public rhs: Register) {
+    public constructor(public sub_i: sub_i, public dst: MemLocation, public src: Register) {
         super();
     }
 
@@ -79,8 +79,8 @@ export class SubInstruction extends Instruction {
 
         const register = Register.getFrom("ax", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
-        context.addInstruction(new SubInstruction(get_sub_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context), register));
+        context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
+        context.addInstruction(new SubInstruction(get_sub_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context), register));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
@@ -118,8 +118,8 @@ export class MulInstruction extends Instruction {
         const mov_i = get_mov_i_on_size(sizeoftype);
         const register = Register.getFrom("ax", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
-        context.addInstruction(new MulInstruction(get_mul_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context)));
+        context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
+        context.addInstruction(new MulInstruction(get_mul_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
@@ -154,11 +154,11 @@ export class DivInstruction extends Instruction {
         const mov_i = get_mov_i_on_size(sizeoftype);
         const register = Register.getFrom("ax", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, register, lhs.toMemLoc(context)));
+        context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
 
         context.addInstruction(new StringInstruction("cdq"));
 
-        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), rhs.toMemLoc(context)));
+        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);

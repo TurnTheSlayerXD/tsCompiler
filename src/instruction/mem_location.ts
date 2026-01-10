@@ -1,3 +1,6 @@
+import { Scope } from "../scope";
+import { ValueType } from "../value_types/value_type";
+
 export interface MemLocation {
 
     non(): void;
@@ -9,7 +12,7 @@ export class StaticLocation implements MemLocation {
 
 export class StackLoc implements MemLocation {
 
-    constructor(public stackPos: string, private _offset: number, private _allocSize: number) {
+    constructor(public stackPos: string, private _offset: number, private _allocSize: number, public relatedScope: Scope) {
 
     }
 
@@ -21,17 +24,6 @@ export class StackLoc implements MemLocation {
         return this._allocSize;
     }
 
-    non(): void {
-        throw new Error("Method not implemented.");
-    }
-}
-
-
-export class LiteralMemLocation implements MemLocation {
-
-    public constructor(public literal: number) {
-
-    }
     non(): void {
         throw new Error("Method not implemented.");
     }
@@ -50,7 +42,36 @@ export class IndirectStackLoc implements MemLocation {
     }
 }
 
-type PossibleRegisterNames = 'rax' | 'eax' | 'ax' | 'rcx' | 'ecx' | 'cx' | 'ax';
+
+
+export class LiteralMemLocation implements MemLocation {
+    private static _staticNull: LiteralMemLocation | undefined;
+    private static _staticOne: LiteralMemLocation | undefined;
+
+    public constructor(public literal: number) {
+
+    }
+    non(): void {
+        throw new Error("Method not implemented.");
+    }
+
+    static staticNull(): LiteralMemLocation {
+        if (!LiteralMemLocation._staticNull) {
+            LiteralMemLocation._staticNull = new LiteralMemLocation(0);
+        }
+        return LiteralMemLocation._staticNull;
+    }
+
+    static staticOne(): LiteralMemLocation {
+        if (!LiteralMemLocation._staticOne) {
+            LiteralMemLocation._staticOne = new LiteralMemLocation(1);
+        }
+        return LiteralMemLocation._staticOne;
+    }
+}
+
+
+type PossibleRegisterNames = 'rax' | 'eax' | 'ax' | 'rcx' | 'ecx' | 'cx' | 'ax' | 'r9' | 'rdx' | 'r8d' | 'dh' | 'al';
 
 type BaseRegisterNames = "ax" | "bx" | "cx" | "ex";
 export class Register implements MemLocation {
@@ -80,8 +101,14 @@ export class Register implements MemLocation {
         return existing;
     }
 
-    public static getRegisterForIndirect(): Register {
+    public static forIndirect(): Register {
         return this.getInstance("rcx");
+    }
+    public static forParamPass(): Register {
+        return this.getInstance("rdx")
+    }
+    public static forReturnValue(returnType: ValueType): Register {
+        return this.getFrom("ax", returnType.size);
     }
 }
 
@@ -95,3 +122,10 @@ export class IndirectRegister implements MemLocation {
     }
 }
 
+export class IndirectRegisterWithOffset implements IndirectRegister {
+    constructor(public register: Register, public offset: number) {
+    }
+    non(): void {
+        throw new Error("Method not implemented.");
+    }
+}

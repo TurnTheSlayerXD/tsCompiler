@@ -1,34 +1,34 @@
 import { Context } from "./context";
-import { MemLocation, MovInstr } from "./instruction/instruction";
-import { IndirectStackLoc, Register, IndirectRegister } from "./instruction/mem_location";
+import { MovInstr } from "./instruction/instruction";
+import { IndirectStackLoc, Register, IndirectRegister, MemLocation } from "./instruction/mem_location";
 import { DebugPosition } from "./lexer";
 import { ValueType } from "./value_types/value_type";
 
 
 export class Value {
-    public constructor(private memLoc: MemLocation, public valueType: ValueType, public pos: DebugPosition) {
+    public constructor(public _srcMemLoc: MemLocation, public valueType: ValueType, public pos: DebugPosition) {
     }
-    public toMemLoc(context: Context): MemLocation {
-        if (this.memLoc instanceof IndirectStackLoc) {
-            const dstRegister = Register.getRegisterForIndirect();
-            context.addInstruction(new MovInstr("movq", dstRegister, this.memLoc));
-            return new IndirectRegister(dstRegister);
-        } 1
-        return this.memLoc;
+
+    public toString = (): string => {
+        return `Named Value ${JSON.stringify(this)}`;
     }
 }
 
 export class NamedValue extends Value {
-    constructor(public name: string, location: MemLocation, valueType: ValueType, pos: DebugPosition) {
-        super(location, valueType, pos);
+    constructor(public name: string, value: Value) {
+        super(value._srcMemLoc, value.valueType, value.pos);
     }
 
     public override toString = (): string => {
-        return `Value ${JSON.stringify(this)}`;
+        return `Named Value ${JSON.stringify(this)}`;
     }
 }
 
-export class __IndirectValue extends Value {
-
-
+export function valueToMemLoc(value: Value, context: Context): MemLocation {
+    if (value._srcMemLoc instanceof IndirectStackLoc) {
+        const dstRegister = Register.forIndirect();
+        context.addInstruction(new MovInstr("movq", dstRegister, value._srcMemLoc));
+        return new IndirectRegister(dstRegister);
+    }
+    return value._srcMemLoc;
 }

@@ -5,11 +5,6 @@ import { Value } from "../value";
 import { ValueType } from "./value_type";
 
 export class FunctionType extends ValueType {
-    override from_literal(context: Context, literal: string, pos: DebugPosition): Value {
-        UNREACHABLE();
-    }
-
-    
 
     private static instances: FunctionType[] = [];
     private constructor(public returnType: ValueType, public paramTypes: ValueType[]) { super(); }
@@ -22,6 +17,8 @@ export class FunctionType extends ValueType {
         }
         return this.instances.find(tp => tp.isSameType(new_inst)) ?? UNREACHABLE();
     }
+
+
 
     override isSameType(rhs: ValueType): boolean {
         if (!(rhs instanceof FunctionType)) {
@@ -45,4 +42,9 @@ export class FunctionType extends ValueType {
         return `${this.returnType.toString()} (${this.paramTypes.map((p) => p.toString()).join(', ')})`;
     }
     get size(): number { return 8; }
+
+    override from_literal(context: Context, literal: string, pos: DebugPosition): Value {
+        UNREACHABLE();
+    }
+
 }

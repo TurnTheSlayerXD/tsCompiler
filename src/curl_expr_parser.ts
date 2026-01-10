@@ -1,189 +1,49 @@
 import { Context } from "./context";
-import { convert_val_to_type, get_rax_i } from "./converter";
-import { findIndex, getMatchingBracket, splitBy, throwError, TODO, TokenParserError, UNREACHABLE } from "./helper";
+import { convert_val_to_type } from "./converter";
+import { DebugPosError, findIndex, getMatchingBracket, splitBy, throwError, TokenParserError, UNREACHABLE } from "./helper";
+import { CmpInstr, JniInstr } from "./instruction/comparison_instruction";
+import { get_mov_i_on_size, JmpInstr, MarkToJump, MovInstr, PopScopeInstr, StringInstruction } from "./instruction/instruction";
+import { LiteralMemLocation, Register } from "./instruction/mem_location";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
 import { Scope, TypeofScope } from "./scope";
 import { TokenType } from "./token_type";
-import { Value } from "./value";
+import { Value, valueToMemLoc } from "./value";
 import { FunctionType } from "./value_types/function_type";
-import { MOV_I, REG_I } from "./value_types/value_type";
 
 export class CurlExpressionParser {
 
-    constructor(public context: Context, public tokens: Token[], public parent_cycle_begin_mark: string | null, public parent_cycle_end_mark: string | null) {
+    constructor(public context: Context, public tokens: Token[]) {
     }
 
 
     parse(): Value | null {
-        const { context, tokens } = this;
         // console.log('CurlExpressionParser\n', `${tokens}`);
-        const parse_IF_expr = (i: number, with_condition: boolean, mark_if_false: string, mark_if_true: string): number => {
-            let o_paren_pos;
-            let c_paren_pos = i;
-            let token = tokens[i]!;
-            if (with_condition) {
-                o_paren_pos = i + 1;
-                if (o_paren_pos >= tokens.length
-                    || tokens[o_paren_pos]!.type !== TokenType.O_PAREN
-                    || (c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN)) === -1) {
-                    throwError(new TokenParserError(token, `No matching O_PAREN found for IF keyword`));
-                }
-                const res = new SemicolonExprParser(context, tokens.slice(o_paren_pos + 1, c_paren_pos)).parse_with_ast(false, false);
-                // res - 1 byte value which either $0 or $1
-                context.addAssembly(`
-                        \r #IF
-                        \rxor %edx, %edx
-                        \rmovb ${res.stack_addr(context)}(%rsp), %dh
-                        \rcmpb $0, %dh
-                        \rje ${mark_if_false}
-                `);
-            }
-            context.pushScope(TypeofScope.IF_SCOPE);
-            let o_curl_pos = c_paren_pos + 1, c_curl_pos;
-            if (o_curl_pos >= tokens.length
-                || tokens[o_curl_pos]!.type !== TokenType.O_CURL
-                || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
-                throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
-            }
-            new CurlExpressionParser(context,
-                tokens.slice(o_curl_pos + 1, c_curl_pos), this.parent_cycle_begin_mark, this.parent_cycle_end_mark).parse();
-            context.popScope();
-            context.addAssembly(`
-                \rjmp ${mark_if_true}
-                `);
-            return c_curl_pos;
-        };
 
-        const parse_FOR_expr = (i: number): number => {
-
-            if (i + 1 >= tokens.length || tokens[i + 1]!.type !== TokenType.O_PAREN) {
-                throwError(new TokenParserError(tokens[i]!, 'Expected bracket after FOR keyword'));
-            }
-            let o_paren_pos = i + 1;
-            let c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
-            if (c_paren_pos === -1) {
-                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
-            }
-            let splitted = splitBy(tokens.slice(o_paren_pos + 1, c_paren_pos), (t) => t.type === TokenType.SEMICOLON);
-            if (splitted.length !== 3) {
-                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Expected three expressions inside FOR braces'));
-            }
-
-
-            context.pushScope(TypeofScope.CYCLE_SCOPE);
-            if (splitted[0]!.length > 0) {
-                new SemicolonExprParser(context, splitted[0]!).parse_with_ast(false, true);
-            }
-
-            const cycle_begin_mark = context.gen_mark();
-            const cycle_end_mark = context.gen_mark();
-
-            context.addAssembly(`
-                    \r  ${cycle_begin_mark}:
-                `);
-            if (splitted[1]!.length > 0) {
-                const cond_res = new SemicolonExprParser(context, splitted[1]!).parse_with_ast(false, true);
-                // res - 1 byte value which either $0 or $1
-                context.addAssembly(`
-                        \r      #FOR
-                        \rxor %edx, %edx
-                        \rmovb ${cond_res.stack_addr(context)}(%rsp), %dh
-                        \rcmpb $0, %dh
-                        \rje ${cycle_end_mark}
-                `);
-            }
-
-            let o_curl_pos = c_paren_pos + 1, c_curl_pos;
-            if (o_curl_pos >= tokens.length
-                || tokens[o_curl_pos]!.type !== TokenType.O_CURL
-                || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
-                throwError(new TokenParserError(tokens[i]!, `No matching O_CURL found for FOR keyword`));
-            }
-            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), cycle_begin_mark, cycle_end_mark).parse();
-
-            if (splitted[2]!.length > 0) {
-                new SemicolonExprParser(context, splitted[2]!).parse_with_ast(false, true);
-            }
-            context.addAssembly(`
-                \rjmp ${cycle_begin_mark}
-                `);
-            context.addAssembly(`
-                    \r${cycle_end_mark}:
-                `);
-            context.popScope();
-            return c_curl_pos;
-        }
-        const parse_WHILE_expr = (i: number): number => {
-
-            if (i + 1 >= tokens.length || tokens[i + 1]!.type !== TokenType.O_PAREN) {
-                throwError(new TokenParserError(tokens[i]!, 'Expected bracket after FOR keyword'));
-            }
-            let o_paren_pos = i + 1;
-            let c_paren_pos = getMatchingBracket(tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
-            if (c_paren_pos === -1) {
-                throwError(new TokenParserError(tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
-            }
-
-            const condition_tokens = tokens.slice(o_paren_pos + 1, c_paren_pos);
-            context.pushScope(TypeofScope.CYCLE_SCOPE);
-
-            if (!condition_tokens.length) {
-                throwError(new TokenParserError(tokens[i]!, 'Expected expression inside WHILE braces'));
-            }
-            const cycle_begin_mark = context.gen_mark();
-            const cycle_end_mark = context.gen_mark();
-            context.addAssembly(`
-                    \r${cycle_begin_mark}:
-                `);
-            const cond_res = new SemicolonExprParser(context, condition_tokens).parse_with_ast(false, true);
-            // res - 1 byte value which either $0 or $1
-            context.addAssembly(`
-                    \r #WHILE
-                    \rxor %edx, %edx
-                    \rmovb ${cond_res.stack_addr(context)}(%rsp), %dh
-                    \rcmpb $0, %dh
-                    \rje ${cycle_end_mark}
-                `);
-
-            let o_curl_pos = c_paren_pos + 1, c_curl_pos;
-            if (o_curl_pos >= tokens.length
-                || tokens[o_curl_pos]!.type !== TokenType.O_CURL
-                || (c_curl_pos = getMatchingBracket(tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL)) === -1) {
-                throwError(new TokenParserError(tokens[i]!, `No matching O_CURL found for FOR keyword`));
-            }
-            new CurlExpressionParser(context, tokens.slice(o_curl_pos + 1, c_curl_pos), cycle_begin_mark, cycle_end_mark).parse();
-            context.addAssembly(`
-                \rjmp ${cycle_begin_mark}
-                `);
-            context.addAssembly(`
-                    \r${cycle_end_mark}:
-                `);
-            context.popScope();
-            return c_curl_pos;
-        }
-
-
-        for (let i = 0; i < tokens.length; ++i) {
-            let token = tokens[i]!;
+        for (let i = 0; i < this.tokens.length; ++i) {
+            let token = this.tokens[i]!;
             if (token.type === TokenType.KWD_IF) {
-                let mark_if_false = context.gen_mark();
-                let mark_if_true = context.gen_mark();
-                i = parse_IF_expr(i, true, mark_if_false, mark_if_true);
-                while (++i < tokens.length) {
-                    if (tokens[i]!.type === TokenType.KWD_ELSE && tokens[i + 1]!.type === TokenType.KWD_IF) {
-                        context.addAssembly(`
-                            \r${mark_if_false}:
-                            `);
-                        mark_if_false = context.gen_mark();
-                        i = parse_IF_expr(i + 1, true, mark_if_false, mark_if_true);
+                let forBranchFailedCase = this.context.getNewMarkToJump();
+                const forBranchSuccededCase = this.context.getNewMarkToJump();
+                i = this.parse_IF_expr(i, true, forBranchFailedCase, forBranchSuccededCase);
+                while (++i < this.tokens.length) {
+                    if (this.tokens[i]!.type === TokenType.KWD_ELSE && this.tokens[i + 1]!.type === TokenType.KWD_IF) {
+
+                        //mark to jump if previous condition failed
+                        this.context.addInstruction(forBranchFailedCase);
+
+                        const newMark = this.context.getNewMarkToJump();
+                        forBranchFailedCase = newMark;
+
+                        i = this.parse_IF_expr(i + 1, true, forBranchFailedCase, forBranchSuccededCase);
                     }
-                    else if (tokens[i]!.type === TokenType.KWD_ELSE) {
-                        context.addAssembly(`
-                            \r${mark_if_false}:
-                            `);
-                        mark_if_false = context.gen_mark();
-                        i = parse_IF_expr(i, false, mark_if_false, mark_if_true);
+                    else if (this.tokens[i]!.type === TokenType.KWD_ELSE) {
+
+                        this.context.addInstruction(forBranchFailedCase);
+
+                        const newMark = this.context.getNewMarkToJump();
+                        forBranchFailedCase = newMark;
+                        i = this.parse_IF_expr(i, false, forBranchFailedCase, forBranchSuccededCase);
                         break;
                     }
                     else {
@@ -191,96 +51,293 @@ export class CurlExpressionParser {
                         break;
                     }
                 }
-                context.addAssembly(`
-                        \r${mark_if_false}:
-                    `);
-                context.addAssembly(`
-                        \r${mark_if_true}:
-                    `);
+                this.context.addInstruction(forBranchFailedCase);
+                this.context.addInstruction(forBranchSuccededCase);
             }
-            else if (tokens[i]!.type === TokenType.KWD_ELSE) {
-                throwError(new TokenParserError(tokens[i]!, 'KWD ELSE must be preceeded with IF expression'));
+            else if (this.tokens[i]!.type === TokenType.KWD_ELSE) {
+                throwError(new TokenParserError(this.tokens[i]!, 'KWD ELSE must be preceeded with IF expression'));
             }
-            else if (tokens[i]!.type === TokenType.KWD_FOR) {
-                i = parse_FOR_expr(i);
+            else if (this.tokens[i]!.type === TokenType.KWD_FOR) {
+                i = this.parse_FOR_expr(i);
             }
-            else if (tokens[i]!.type === TokenType.KWD_WHILE) {
-                i = parse_WHILE_expr(i);
+            else if (this.tokens[i]!.type === TokenType.KWD_WHILE) {
+                i = this.parse_WHILE_expr(i);
             }
-            else if (tokens[i]!.type === TokenType.KWD_BREAK) {
-                const gen = context.asm_pop_scope();
-                while (true) {
-                    if ((gen.next().value as Scope ?? UNREACHABLE()).typeofScope === TypeofScope.CYCLE_SCOPE) {
-                        gen.next();
-                        break;
-                    }
+            else if (this.tokens[i]!.type === TokenType.KWD_BREAK) {
+                let poppedScope: Scope | null = this.context.getCurrentScope();
+                while (poppedScope && poppedScope.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+                    this.context.addInstruction(new PopScopeInstr(poppedScope));
+                    poppedScope = poppedScope.parentScope;
                 }
-                context.addAssembly(`
-                        \rjmp ${this.parent_cycle_end_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD BREAK can be used only inside CYCLE'))}
-                    `);
-            }
-            else if (tokens[i]!.type === TokenType.KWD_CONTINUE) {
-                const gen = context.asm_pop_scope();
-                while (true) {
-                    if ((gen.next().value as Scope ?? UNREACHABLE()).typeofScope === TypeofScope.CYCLE_SCOPE) {
-                        break;
-                    }
+                if (!poppedScope) {
+                    throwError(new DebugPosError(this.tokens[i]!.pos, 'KWD BREAK can be used only inside CYCLE'));
                 }
-                context.addAssembly(`
-                        \rjmp ${this.parent_cycle_begin_mark ?? throwError(new TokenParserError(tokens[i]!, 'KWD CONTINUE can be used only inside CYCLE'))}
-                    `);
-            }
-            else if (tokens[i]!.type === TokenType.KWD_RETURN) {
-                let semi_pos = findIndex(tokens, t => t.type === TokenType.SEMICOLON, i);
-                if (semi_pos === -1) {
-                    throwError(new TokenParserError(tokens[i]!, `Expected SEMICOLON after expression`));
+                //for compiler
+                if (poppedScope.scopeParams.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+                    UNREACHABLE();
                 }
-                const { cur_function } = context;
-                const fun_type = cur_function?.valueType as FunctionType ?? UNREACHABLE();
 
-                if (semi_pos !== i + 1) {
-                    let res = new SemicolonExprParser(context, tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
-                    res = convert_val_to_type(context, res, fun_type.returnType);
-                    const [reg, mov] = get_rax_i(res.valueType.size);
-                    context.addAssembly(`
-                        \r${MOV_I[mov]} ${res.stack_addr(context)}(%rsp), %${REG_I[reg]} 
-                    `);
-                }
-                if (!cur_function) {
-                    throwError(new TokenParserError(tokens[i]!, 'Unexpected KWD_RETURN as not in function'));
-                }
-                context.clearAllStacks();
-                if (cur_function.name === 'main') {
-                    context.addAssembly(`
-                        \rxor %rax, %rax
-                        \rretq
-                    `);
-                } else {
-                    context.addAssembly(`
-                        \rretq
-                    `);
-                }
-                i = semi_pos;
+                this.context.addInstruction(new PopScopeInstr(poppedScope));
+                this.context.addInstruction(new JmpInstr(poppedScope.scopeParams.markToExitCycle));
             }
-            else if (tokens[i]!.type === TokenType.PREPROCESSOR) {
+            else if (this.tokens[i]!.type === TokenType.KWD_CONTINUE) {
+                let poppedScope: Scope | null = this.context.getCurrentScope();
+                while (poppedScope && poppedScope.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+                    this.context.addInstruction(new PopScopeInstr(poppedScope));
+                    poppedScope = poppedScope.parentScope;
+                }
+                if (!poppedScope) {
+                    throwError(new DebugPosError(this.tokens[i]!.pos, 'KWD BREAK can be used only inside CYCLE'));
+                }
+                //for compiler
+                if (poppedScope.scopeParams.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+                    UNREACHABLE();
+                }
+
+                this.context.addInstruction(new JmpInstr(poppedScope.scopeParams.markToEnterCycle));
+            }
+            else if (this.tokens[i]!.type === TokenType.KWD_RETURN) {
+                let semi_pos = findIndex(this.tokens, t => t.type === TokenType.SEMICOLON, i);
+                if (semi_pos === -1) {
+                    throwError(new TokenParserError(this.tokens[i]!, `Expected SEMICOLON after expression`));
+                }
+                const { currentFunction } = this.context;
+                if (!currentFunction || !(currentFunction.valueType instanceof FunctionType)) {
+                    UNREACHABLE();
+                }
+                const currentFunctionType = currentFunction.valueType;
+
+                const functionType = currentFunctionType as FunctionType;
+                if (semi_pos !== i + 1) {
+                    const resultVar = new SemicolonExprParser(this.context, this.tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
+                    const convertedVar = convert_val_to_type(this.context, resultVar, functionType.returnType);
+
+                    this.context.addInstruction(new MovInstr(get_mov_i_on_size(functionType.returnType.size), Register.forReturnValue(functionType.returnType), valueToMemLoc(convertedVar, this.context)));
+                }
+
+                let poppedScope: Scope | null = this.context.getCurrentScope();
+                while (poppedScope && poppedScope.typeofScope !== TypeofScope.FUN_SCOPE) {
+                    this.context.addInstruction(new PopScopeInstr(poppedScope));
+                    poppedScope = poppedScope.parentScope;
+                }
+                if (!poppedScope) {
+                    throwError(new DebugPosError(this.tokens[i]!.pos, "Unexpected RETURN expression"));
+                }
+                this.context.addInstruction(new PopScopeInstr(poppedScope));
+
+                if (currentFunction.name === 'main') {
+                    this.context.addInstruction(new StringInstruction("xor %rax, %rax"));
+                    this.context.addInstruction(new StringInstruction("retq"));
+                }
+                else {
+                    this.context.addInstruction(new StringInstruction("retq"));
+                }
+
+                i = semi_pos;
+
+            }
+            else if (this.tokens[i]!.type === TokenType.PREPROCESSOR) {
                 continue;
             }
             else {
-                let j = tokens.slice(i).findIndex((t) => t.type === TokenType.SEMICOLON);
+                let j = this.tokens.slice(i).findIndex((t) => t.type === TokenType.SEMICOLON);
                 if (j === -1) {
-                    throwError(new TokenParserError(tokens[i]!, `Unknown expression type:\n ${tokens.slice(i)}`));
+                    throwError(new TokenParserError(this.tokens[i]!, `Unknown expression type:\n ${this.tokens.slice(i)}`));
                 }
                 j += i;
                 if (i === j) {
                     break;
                 }
-                new SemicolonExprParser(context, tokens.slice(i, j)).parse_with_ast(false, true);
+                new SemicolonExprParser(this.context, this.tokens.slice(i, j)).parse_with_ast(false, true);
                 i = j;
             }
 
         }
+
         return null;
     }
+
+
+    parse_IF_expr(startSearchPos: number, hasConditionPart: boolean, mark_if_false: MarkToJump, mark_if_true: MarkToJump): number {
+
+        let o_paren_pos: number;
+        let c_paren_pos: number;
+
+        let i = startSearchPos;
+        let token = this.tokens[i]!;
+        if (hasConditionPart) {
+            o_paren_pos = i + 1;
+            c_paren_pos = getMatchingBracket(this.tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
+
+            if (o_paren_pos >= this.tokens.length
+                || this.tokens[o_paren_pos]!.type !== TokenType.O_PAREN
+                || c_paren_pos === -1) {
+                throwError(new TokenParserError(token, `No matching O_PAREN found for IF keyword`));
+            }
+
+            const conditionResultVar = new SemicolonExprParser(
+                this.context,
+                this.tokens.slice(o_paren_pos + 1, c_paren_pos)
+            ).parse_with_ast(false, false);
+
+            // res - 1 byte value which either $0 or $1
+            this.context.addInstruction(new StringInstruction("\t#IF"));
+            this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
+            this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(conditionResultVar, this.context)));
+            this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+            this.context.addInstruction(new JniInstr("je", mark_if_false));
+
+        }
+        else {
+            c_paren_pos = i;
+        }
+        this.context.pushScope(TypeofScope.IF_SCOPE);
+        c_paren_pos = i;
+
+        let o_curl_pos = c_paren_pos + 1;
+        let c_curl_pos = getMatchingBracket(this.tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL);
+
+        if (this.tokens[o_curl_pos]?.type !== TokenType.O_CURL
+            || c_curl_pos === -1) {
+            throwError(new TokenParserError(token, `No matching O_CURL found for IF keyword`));
+        }
+
+        new CurlExpressionParser(
+            this.context,
+            this.tokens.slice(o_curl_pos + 1, c_curl_pos),
+        ).parse();
+
+        this.context.popScope();
+
+        this.context.addInstruction(new JmpInstr(mark_if_true));
+        return c_curl_pos;
+    }
+
+
+    parse_FOR_expr(startSearchPos: number): number {
+        let i = startSearchPos;
+
+        if (this.tokens[i + 1]?.type !== TokenType.O_PAREN) {
+            throwError(new TokenParserError(this.tokens[i]!, 'Expected bracket after FOR keyword'));
+        }
+        let o_paren_pos = i + 1;
+        let c_paren_pos = getMatchingBracket(this.tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
+        if (c_paren_pos === -1) {
+            throwError(new TokenParserError(this.tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
+        }
+        let splitted = splitBy(this.tokens.slice(o_paren_pos + 1, c_paren_pos), (t) => t.type === TokenType.SEMICOLON);
+
+        const [declarationPart, comparePart, iterPart] = splitted;
+
+        if (!declarationPart || !comparePart || !iterPart) {
+            throwError(new TokenParserError(this.tokens[o_paren_pos]!, 'Expected three expressions inside FOR braces'));
+        }
+
+        const currentScope = this.context.pushScope(TypeofScope.CYCLE_SCOPE);
+        if (splitted[0]!.length > 0) {
+            new SemicolonExprParser(this.context, declarationPart).parse_with_ast(false, true);
+        }
+
+        if (currentScope.scopeParams.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+            UNREACHABLE();
+        }
+
+        const { markToEnterCycle, markToExitCycle } = currentScope.scopeParams;
+        currentScope.addInstruction(markToEnterCycle);
+
+
+        if (splitted[1]!.length > 0) {
+            const condResultVar = new SemicolonExprParser(
+                this.context,
+                comparePart,
+            ).parse_with_ast(false, true);
+            // res - 1 byte value which either $0 or $1
+            this.context.addInstruction(new StringInstruction("      #FOR"));
+            this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
+            this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(condResultVar, this.context)));
+            this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+            this.context.addInstruction(new JniInstr("je", markToExitCycle));
+        }
+
+        let o_curl_pos = c_paren_pos + 1;
+        let c_curl_pos = getMatchingBracket(this.tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL);
+
+        if (this.tokens[o_curl_pos]?.type !== TokenType.O_CURL
+            || c_curl_pos === -1) {
+            throwError(new TokenParserError(this.tokens[i]!, `No matching O_CURL found for FOR keyword`));
+        }
+
+        new CurlExpressionParser(
+            this.context,
+            this.tokens.slice(o_curl_pos + 1, c_curl_pos),
+        ).parse();
+
+        if (iterPart.length > 0) {
+            new SemicolonExprParser(this.context, iterPart).parse_with_ast(false, true);
+        }
+
+        this.context.addInstruction(new JmpInstr(markToEnterCycle));
+        this.context.addInstruction(new JmpInstr(markToExitCycle));
+
+        this.context.popScope();
+
+        return c_curl_pos;
+    }
+
+
+    parse_WHILE_expr(startSearchPos: number): number {
+        let i = startSearchPos;
+
+        if (this.tokens[i + 1]?.type !== TokenType.O_PAREN) {
+            throwError(new TokenParserError(this.tokens[i]!, 'Expected bracket after FOR keyword'));
+        }
+        let o_paren_pos = i + 1;
+        let c_paren_pos = getMatchingBracket(this.tokens, o_paren_pos, TokenType.O_PAREN, TokenType.C_PAREN);
+        if (c_paren_pos === -1) {
+            throwError(new TokenParserError(this.tokens[o_paren_pos]!, 'Unmatched O_PAREN'));
+        }
+
+        const condition_tokens = this.tokens.slice(o_paren_pos + 1, c_paren_pos);
+        if (!condition_tokens.length) {
+            throwError(new TokenParserError(this.tokens[i]!, 'Expected expression inside WHILE braces'));
+        }
+
+        const currentScope = this.context.pushScope(TypeofScope.CYCLE_SCOPE);
+        // for ts compiler
+        if (currentScope.scopeParams.typeofScope !== TypeofScope.CYCLE_SCOPE) {
+            UNREACHABLE();
+        }
+
+        const { markToEnterCycle, markToExitCycle } = currentScope.scopeParams;
+        this.context.addInstruction(markToEnterCycle);
+        const condiditonResVar = new SemicolonExprParser(this.context, condition_tokens).parse_with_ast(false, true);
+        // res - 1 byte value which either $0 or $1
+        this.context.addInstruction(new StringInstruction("\t#WHILE"));
+        this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
+        this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(condiditonResVar, this.context)));
+        this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+        this.context.addInstruction(new JniInstr("je", markToExitCycle));
+
+        let o_curl_pos = c_paren_pos + 1;
+        let c_curl_pos = getMatchingBracket(this.tokens, o_curl_pos, TokenType.O_CURL, TokenType.C_CURL);
+        if (this.tokens[o_curl_pos]?.type !== TokenType.O_CURL || c_curl_pos === -1) {
+            throwError(new TokenParserError(this.tokens[i]!, `No matching O_CURL found for FOR keyword`));
+        }
+
+        new CurlExpressionParser(
+            this.context,
+            this.tokens.slice(o_curl_pos + 1, c_curl_pos),
+        ).parse();
+
+        this.context.addInstruction(new JmpInstr(markToEnterCycle));
+        this.context.addInstruction(markToExitCycle);
+
+        this.context.popScope();
+
+        return c_curl_pos;
+    }
+
+
 
 }
 

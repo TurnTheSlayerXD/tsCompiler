@@ -1,16 +1,16 @@
 import { Context } from "./context";
-import { throwError, TODO, TypeError } from "./helper";
-import { Position } from "./lexer";
-import { temp_t, Value } from "./value";
+import { throwError, TODO } from "./helper";
+import { DebugPosition } from "./lexer";
+import { Value } from "./value";
 import { CharType } from "./value_types/char_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
-import { AddrType, ValueType, REG_I, MOV_I } from "./value_types/value_type";
+import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 
 type ConversionResult = { lhs: Value, rhs: Value };
 
-export function convert_values_or_throw(context: Context, lhs: Value, rhs: Value ) : ConversionResult {
+export function convert_values_or_throw(context: Context, lhs: Value, rhs: Value): ConversionResult {
 
 }
 
