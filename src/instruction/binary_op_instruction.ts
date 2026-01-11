@@ -45,6 +45,7 @@ export class PlusInstr extends Instruction {
 
         return newValue;
     }
+    override toString: () => string = () => 'ADD';
 }
 
 type sub_i =
@@ -89,6 +90,9 @@ export class SubInstr extends Instruction {
 
         return newValue;
     }
+
+    override toString: () => string = () => 'SUB';
+
 }
 
 type mul_i = 'imulb' | 'imulr' | 'imull' | 'imulq';
@@ -125,6 +129,9 @@ export class MulInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+
+    override toString: () => string = () => 'MUL';
+
 }
 
 type div_i =
@@ -166,5 +173,8 @@ export class DivInstr extends Instruction {
 
         return newValue;
     }
+
+    override toString: () => string = () => 'DIV';
+
 }
 

@@ -1,5 +1,5 @@
 import { Context } from "../context";
-import { convert_values_or_throw } from "../converter";
+import { convert_val_to_type, convert_values_or_throw } from "../converter";
 import { DebugPosError, throwError, UNREACHABLE } from "../helper";
 import { DivInstr, get_div_i_on_sizeoftype, MulInstr, PlusInstr, SubInstr } from "../instruction/binary_op_instruction";
 import { CmpInstr, get_cmp_i_on_size, JniInstr } from "../instruction/comparison_instruction";
@@ -42,9 +42,12 @@ export abstract class ValueType {
     }
 
     copy_to(context: Context, dst: Value, src: Value): void {
+        src = convert_val_to_type(context, src, dst.valueType);
+
         if (!this.isSameType(src.valueType) || !this.isSameType(dst.valueType)) {
             throwError(new DebugPosError(src.pos, `Unmatched types: dst = ${dst.valueType} | src = ${src.valueType}`));
         }
+
 
         const register = Register.getFrom("b", src.valueType.size);
         context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), register, valueToMemLoc(src, context)));

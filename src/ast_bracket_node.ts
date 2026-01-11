@@ -115,6 +115,17 @@ export class AstBracketNode extends AstNode {
 
                         context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(paramOne, context)));
                         context.addInstruction(new MovInstr("movl", Register.getInstance("r8d"), valueToMemLoc(paramTwo, context)));
+
+
+                        const charsWrittenMemLoc = context.getNewMemLocationFromOffset(8);
+
+                        const r9Register = Register.getInstance("r9");
+                        context.addInstruction(new LeaqInstruction("leaq", r9Register, charsWrittenMemLoc));
+                        context.addInstruction(new MovInstr("movq", charsWrittenMemLoc, new LiteralMemLocation(0)));
+
+                        const shadowSpaceMemloc = context.getNewMemLocationFromOffset(32);
+                        context.addInstruction(new MovInstr("movq", shadowSpaceMemloc, new LiteralMemLocation(0)));
+
                         context.addInstruction(new StringInstruction("callq *__imp_WriteConsoleA(%rip)"));
                         /*
                             context.addAssembly(`\rmovq  ${params[0].stack_addr(context) ?? throwError('Expected')}(%rsp), %rdx`);

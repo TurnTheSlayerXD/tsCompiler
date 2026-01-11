@@ -1,19 +1,14 @@
 
 int main(int argc, char **argv)
 {
+    int i = 0;
 
-    char a = (char)1;
+    char[10] x;
+    for (int i = 0; i < 10; i += 1){
+        x[i] = 'a' + i;
+    }
 
-    print("Hello, world", 13);
-    // char *b =&a;
-    // *b = 3;
-    // char *c = &(*(b+51));
+    x[9] = '\0';
 
-    // root.val = 1;
-    // left.val = 2;
-    // right.val = 3;
-    //
-    // root.left = &left;
-    // root.right = &right;
-    //
+    print(x, 10);
 }

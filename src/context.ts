@@ -106,7 +106,8 @@ export class Context {
 
     addNewVarValue(val: NamedValue): void {
         const currentScope = this.getCurrentScope();
-        if (currentScope.getVarValue(val.name)) {
+        const doesAlreadyExist = currentScope.localVarValues.some(t => val.name === t.name);
+        if (doesAlreadyExist) {
             throwError(new DebugPosError(val.pos, `Value with name (${val.name}) already exists in scope`));
         }
         currentScope.addNewVarValue(val);

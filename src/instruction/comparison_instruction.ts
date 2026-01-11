@@ -26,6 +26,8 @@ export class CmpInstr extends Instruction {
     }
     override non(): void {
     }
+
+    override toString: () => string = () => `CMP`;
 }
 
 type jni_i = "jne" |
@@ -45,14 +47,14 @@ export class JniInstr extends Instruction {
         const ax_register = Register.getFrom("a", sizeoftype);
         const bx_register = Register.getFrom("b", sizeoftype);
 
-        context.addInstruction(new MovInstr(mov_i, valueToMemLoc(lhs, context), ax_register));
-        context.addInstruction(new MovInstr(mov_i, valueToMemLoc(rhs, context), bx_register));
+        context.addInstruction(new MovInstr(mov_i, ax_register, valueToMemLoc(lhs, context)));
+        context.addInstruction(new MovInstr(mov_i, bx_register, valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(CharType.getInstance());
         const newValue = new Value(newMemLoc, CharType.getInstance(), self.pos);
 
         context.addInstruction(new MovInstr("movb", newMemLoc, new LiteralMemLocation(1)));
-        context.addInstruction(new CmpInstr(get_cmp_i_on_size(sizeoftype), ax_register, bx_register));
+        context.addInstruction(new CmpInstr(get_cmp_i_on_size(sizeoftype), bx_register, ax_register));
 
         const newMark = context.getNewMarkToJump();
         context.addInstruction(new JniInstr(jn_i, newMark));
@@ -61,6 +63,7 @@ export class JniInstr extends Instruction {
         return newValue;
     }
     override non(): void { }
+    override toString: () => string = () => 'JNI';
 }
 
 

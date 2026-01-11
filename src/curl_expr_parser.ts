@@ -190,7 +190,7 @@ export class CurlExpressionParser {
             this.context.addInstruction(new StringInstruction("\t#IF"));
             this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
             this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(conditionResultVar, this.context)));
-            this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+            this.context.addInstruction(new CmpInstr("cmpb", LiteralMemLocation.staticNull(), Register.getInstance("dh")));
             this.context.addInstruction(new JniInstr("je", mark_if_false));
 
         }
@@ -261,7 +261,7 @@ export class CurlExpressionParser {
             this.context.addInstruction(new StringInstruction("      #FOR"));
             this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
             this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(condResultVar, this.context)));
-            this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+            this.context.addInstruction(new CmpInstr("cmpb", LiteralMemLocation.staticNull(), Register.getInstance("dh")));
             this.context.addInstruction(new JniInstr("je", markToExitCycle));
         }
 
@@ -321,7 +321,7 @@ export class CurlExpressionParser {
         this.context.addInstruction(new StringInstruction("\t#WHILE"));
         this.context.addInstruction(new StringInstruction("xor %edx, %edx"));
         this.context.addInstruction(new MovInstr("movb", Register.getInstance("dh"), valueToMemLoc(condiditonResVar, this.context)));
-        this.context.addInstruction(new CmpInstr("cmpb", Register.getInstance("dh"), LiteralMemLocation.staticNull()));
+        this.context.addInstruction(new CmpInstr("cmpb", LiteralMemLocation.staticNull(), Register.getInstance("dh")));
         this.context.addInstruction(new JniInstr("je", markToExitCycle));
 
         let o_curl_pos = c_paren_pos + 1;

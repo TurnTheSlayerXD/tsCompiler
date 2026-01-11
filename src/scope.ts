@@ -1,5 +1,5 @@
 import { DebugPosError, throwError, TODO, UNREACHABLE } from "./helper";
-import { Instruction, LeaqInstruction, MarkToJump, MovInstr, PopScopeInstr, PushScopeInstr, RetqInstr, ScopeEndInstr, ScopeStartInstr, StringInstruction } from "./instruction/instruction";
+import { Instruction, JmpInstr, LeaqInstruction, MarkToJump, MovInstr, PopScopeInstr, PushScopeInstr, RetqInstr, ScopeEndInstr, ScopeStartInstr, StringInstruction } from "./instruction/instruction";
 import { IndirectRegister, IndirectRegisterWithOffset, IndirectStackLoc, LiteralMemLocation, MemLocation, Register, StackLoc, StaticLocation } from "./instruction/mem_location";
 import { NamedValue, Value } from "./value";
 import { CharType } from "./value_types/char_type";
@@ -10,6 +10,7 @@ import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { DebugPosition } from "./lexer";
 import { PlusInstr, SubInstr, MulInstr, DivInstr } from "./instruction/binary_op_instruction";
+import { CmpInstr, JniInstr } from "./instruction/comparison_instruction";
 
 
 export enum TypeofScope {
@@ -58,15 +59,18 @@ export class Scope {
         this.marksToJump = [];
         this.markCounter = 0;
 
+        const scopeId = `${this.parentScope?.scopeId ?? ''}_${TypeofScope[typeofScope]}_${this.scopeOrderIndex}`;
         switch (typeofScope) {
             case TypeofScope.CYCLE_SCOPE:
-                this.scopeParams = { typeofScope: TypeofScope.CYCLE_SCOPE, markToEnterCycle: this.getNewMarkToJump(), markToExitCycle: this.getNewMarkToJump() };
+                this.scopeParams = { typeofScope: TypeofScope.CYCLE_SCOPE, markToEnterCycle: this.getNewMarkWithSuppliedScopeId(scopeId), markToExitCycle: this.getNewMarkWithSuppliedScopeId(scopeId) };
                 break;
             case TypeofScope.FUN_SCOPE:
                 this.scopeParams = { typeofScope: typeofScope };
                 break;
             case TypeofScope.IF_SCOPE: case TypeofScope.GLOBAL_SCOPE:
                 this.scopeParams = { typeofScope: typeofScope };
+                break;
+            default: UNREACHABLE();
         }
 
     }
@@ -120,6 +124,12 @@ export class Scope {
         return newStackLoc;
     }
 
+    private getNewMarkWithSuppliedScopeId(scopeId: string) {
+        const newMark = new MarkToJump(`mark_${scopeId}_${this.markCounter++}`);
+        this.marksToJump.push(newMark);
+        return newMark;
+    }
+
     getNewMarkToJump(): MarkToJump {
         const newMark = new MarkToJump(`mark_${this.scopeId}_${this.markCounter++}`);
         this.marksToJump.push(newMark);
@@ -156,7 +166,8 @@ export class Scope {
     }
 
     private getTotalStackSpace(): number {
-        return this.stackLocs.map(l => l.allocSize).reduce((s, l) => s + l);
+        const realTotalStackSpace = this.stackLocs.map(l => l.allocSize).reduce((s, l) => s + l);
+        return 16 - (realTotalStackSpace % 16) + realTotalStackSpace;
     }
 
     private getDistanceToScope(locationScope: Scope): number {
@@ -266,8 +277,17 @@ export class Scope {
             else if (instr instanceof RetqInstr) {
                 asm.push("retq");
             }
-
-
+            else if (instr instanceof CmpInstr) {
+                const lhsStr = this.interpretMemLocation(instr.lhs);
+                const rhsStr = this.interpretMemLocation(instr.rhs);
+                asm.push(`${instr.cmp_i} ${lhsStr}, ${rhsStr}`);
+            }
+            else if (instr instanceof JniInstr) {
+                asm.push(`${instr.jni_i} ${instr.mark.tag}`);
+            }
+            else if (instr instanceof JmpInstr) {
+                asm.push(`jmp ${instr.markToJmp.tag}`);
+            }
             else {
                 TODO(`UNHANDELED INSTRUCTION ${instr}`);
             }
