@@ -42,8 +42,8 @@ export class JniInstr extends Instruction {
         const { lhs, rhs } = convert_values_or_throw(context, self, other);
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
-        const ax_register = Register.getFrom("ax", sizeoftype);
-        const bx_register = Register.getFrom("bx", sizeoftype);
+        const ax_register = Register.getFrom("a", sizeoftype);
+        const bx_register = Register.getFrom("b", sizeoftype);
 
         context.addInstruction(new MovInstr(mov_i, valueToMemLoc(lhs, context), ax_register));
         context.addInstruction(new MovInstr(mov_i, valueToMemLoc(rhs, context), bx_register));

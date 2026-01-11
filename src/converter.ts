@@ -1,7 +1,8 @@
 import { Context } from "./context";
-import { throwError, TODO } from "./helper";
-import { DebugPosition } from "./lexer";
-import { Value } from "./value";
+import { DebugPosError, throwError, TODO } from "./helper";
+import { MovInstr } from "./instruction/instruction";
+import { Register } from "./instruction/mem_location";
+import { Value, valueToMemLoc } from "./value";
 import { CharType } from "./value_types/char_type";
 import { IntType } from "./value_types/int_type";
 import { PtrType } from "./value_types/ptr_type";
@@ -10,24 +11,34 @@ import { VoidType } from "./value_types/void_type";
 
 type ConversionResult = { lhs: Value, rhs: Value };
 
-export function convert_values_or_throw(context: Context, lhs: Value, rhs: Value): ConversionResult {
-
+export function convert_values_or_throw(context: Context, lhsVar: Value, rhsVar: Value): ConversionResult {
+    const { ok, lhs, rhs } = convert_values(context, lhsVar, rhsVar);
+    if (!ok) {
+        throwError(new DebugPosError(lhs.pos, `Cannot convert ${lhsVar} to ${rhsVar}`));
+    }
+    return { lhs, rhs };
 }
 
 
-export function convert_values(context: Context, lhs: Value, rhs: Value): ConversionResult {
+export function convert_values(context: Context, lhs: Value, rhs: Value): ConversionResult & { ok: boolean } {
+    const intAndChar = [IntType.getInstance(), CharType.getInstance()];
     if (lhs.valueType.isSameType(rhs.valueType)) {
-        return { ok: true, left: lhs, right: rhs };
+        return { ok: true, lhs: lhs, rhs: rhs };
     }
-    else if ((lhs.valueType instanceof IntType || rhs.valueType instanceof IntType)
-        && (lhs.valueType instanceof CharType || rhs.valueType instanceof CharType)) {
-        const to_convert = lhs.valueType instanceof CharType ? lhs : rhs;
-        context.addAssembly(`
-                    \rmovsbl ${to_convert.stack_addr(context)}(%rsp), %edx
-                    \rmovl %edx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
-                `);
-        const new_value = new Value(temp_t.t, IntType.getInstance(), lhs.pos, context.stackPtr, AddrType.Stack);
-        return lhs.valueType instanceof CharType ? { ok: false, left: new_value, right: rhs } : { ok: false, left: lhs, right: new_value };
+    else if (intAndChar.includes(lhs.valueType) && intAndChar.includes(rhs.valueType)) {
+        const varToConvert = lhs.valueType instanceof CharType ? lhs : rhs;
+
+        const memlocConverted = context.getNewMemLocation(IntType.getInstance());
+        const bufRegister = Register.getInstance("ebx");
+
+        context.addInstruction(new MovInstr("movsbl", bufRegister, valueToMemLoc(varToConvert, context)));
+        context.addInstruction(new MovInstr("movl", memlocConverted, bufRegister));
+        const convertedValue = new Value(memlocConverted, IntType.getInstance(), lhs.pos);
+
+        if (convertedValue !== lhs) {
+            return { ok: true, lhs, rhs: convertedValue };
+        }
+        return { ok: true, lhs: convertedValue, rhs };
     }
     if (lhs.valueType instanceof PtrType && rhs.valueType instanceof PtrType) {
         let lhs_type: ValueType = lhs.valueType;
@@ -37,9 +48,9 @@ export function convert_values(context: Context, lhs: Value, rhs: Value): Conver
             rhs_type = rhs_type.ptrTo;
         }
         if (!(lhs_type instanceof PtrType) && !(rhs_type instanceof PtrType) && (lhs_type instanceof VoidType || rhs_type instanceof VoidType)) {
-            return { ok: true, left: lhs, right: rhs };
+            return { ok: true, lhs, rhs };
         }
-        throwError(new TypeError(lhs.pos, `Unable to convert ptr of type ${lhs.valueType} to ptr of type ${rhs}`))
+        throwError(new DebugPosError(lhs.pos, `Unable to convert ptr of type ${lhs.valueType} to ptr of type ${rhs}`))
     }
 
     TODO(`CONVERTION:\nlhs: ${lhs}\nrhs: ${rhs}`);
@@ -71,12 +82,15 @@ export function convert_val_to_type(context: Context, val: Value, to_type: Value
         return val;
     }
     else if (val.valueType instanceof CharType && to_type instanceof IntType) {
-        context.addAssembly(`
-                    \rmovsbl ${val.stack_addr(context)}(%rsp), %edx
-                    \rmovl %edx, ${context.pushStack(IntType.getInstance().size)}(%rsp)
-                `);
-        const new_value = new Value(temp_t.t, IntType.getInstance(), val.pos, context.stackPtr, AddrType.Stack);
-        return new_value;
+        const memlocConverted = context.getNewMemLocation(IntType.getInstance());
+        const bufRegister = Register.getInstance("ebx");
+        context.addInstruction(new MovInstr("movsbl", bufRegister, valueToMemLoc(val, context)));
+        context.addInstruction(new MovInstr("movl", memlocConverted, bufRegister));
+        const convertedValue = new Value(memlocConverted, IntType.getInstance(), val.pos);
+        return convertedValue;
+    }
+    else if (val.valueType instanceof IntType && to_type instanceof CharType) {
+        return new Value(val._srcMemLoc, CharType.getInstance(), val.pos);
     }
     if (val.valueType instanceof PtrType && to_type instanceof PtrType) {
         let lhs: ValueType = val.valueType;
@@ -89,7 +103,7 @@ export function convert_val_to_type(context: Context, val: Value, to_type: Value
             val.valueType = to_type;
             return val;
         }
-        throwError(new TypeError(val.pos, `Unable to convert ptr of type ${val.valueType} to ptr of type ${to_type}`))
+        throwError(new DebugPosError(val.pos, `Unable to convert ptr of type ${val.valueType} to ptr of type ${to_type}`))
     }
     TODO(`Conversion from ${val.valueType} to ${to_type}`);
 }

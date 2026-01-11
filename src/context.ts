@@ -7,7 +7,7 @@ import { IntType } from "./value_types/int_type";
 import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { StructType } from "./value_types/struct_type";
-import { Instruction, MarkToJump, ScopeEndInstr, ScopeStartInstr } from "./instruction/instruction";
+import { Instruction, MarkToJump, PopScopeInstr, PushScopeInstr, ScopeEndInstr, ScopeStartInstr } from "./instruction/instruction";
 import { StackLoc } from "./instruction/mem_location";
 import { FunctionType } from "./value_types/function_type";
 
@@ -21,14 +21,14 @@ export class Context {
 
     private literals: string[] = [];
 
-    lexer: Lexer;
+    _initialGlobalScope: GlobalScope;
     _currentScope: Scope;
 
     public currentFunction: NamedValue | null;
 
-    constructor(lexer: Lexer) {
-        this.lexer = lexer;
-        this._currentScope = new GlobalScope();
+    constructor() {
+        this._initialGlobalScope = new GlobalScope();
+        this._currentScope = this._initialGlobalScope;
         this.currentFunction = null;
     }
 
@@ -47,7 +47,7 @@ export class Context {
         }
     }
 
-    pushScope(typeofScope: TypeofScope): Scope {
+    pushScope(typeofScope: TypeofScope, { withPushInstr }: { withPushInstr: boolean } = { withPushInstr: true }): Scope {
         const newScope = new Scope(
             this._currentScope,
             this._currentScope.childScopes.at(-1) ?? null,
@@ -55,13 +55,23 @@ export class Context {
         );
 
         this._currentScope.childScopes.push(newScope);
+
         this._currentScope.addInstruction(new ScopeStartInstr(newScope));
         this._currentScope = newScope;
+
+        if (withPushInstr) {
+            newScope.addInstruction(new PushScopeInstr(newScope));
+        }
+
         return newScope;
     }
 
-    popScope(): Scope {
+    popScope({ withPopInstr }: { withPopInstr: boolean } = { withPopInstr: true }): Scope {
         const prevScope = this._currentScope;
+        if (withPopInstr) {
+            prevScope.addInstruction(new PopScopeInstr(prevScope));
+
+        }
         this._currentScope = prevScope?.parentScope ?? throwError(`Cannot pop global scope!`);
         this._currentScope.addInstruction(new ScopeEndInstr(prevScope));
         return prevScope;
@@ -121,6 +131,13 @@ export class Context {
 
     isTypenameDefined(typename: string): boolean {
         return !!this.getTypeFromTypename(typename);
+    }
+
+    interpretInstructions(): string[] {
+        if (this._initialGlobalScope !== this._currentScope) {
+            UNREACHABLE();
+        }
+        return this._currentScope.interpretInstructions();
     }
 }
 

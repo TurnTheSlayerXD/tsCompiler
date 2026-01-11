@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "./src/main.ts",
   "scripts": {
-    "debug": "npx ts-node ./src/main.ts ./example/test_input.c ./out/out.asm && clang ./out/out.asm -o ./out.exe",
+    "debug": "npx ts-node ./src/main.ts ./example/main.c ./out/out.asm && clang ./out/out.asm -o ./out/out.exe",
     "compile": "npx tsc --build ./tsconfig.json && node ./dist/main.js ./example/main.c && clang ./out.asm -o ./out.exe",
     "build": "npx tsc",
     "start": "npx ts-node ."

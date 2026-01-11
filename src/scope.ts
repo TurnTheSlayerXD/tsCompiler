@@ -1,5 +1,5 @@
-import { throwError, UNREACHABLE } from "./helper";
-import { Instruction, MarkToJump, MovInstr, PushScopeInstr, ScopeEndInstr, ScopeStartInstr, StringInstruction } from "./instruction/instruction";
+import { DebugPosError, throwError, TODO, UNREACHABLE } from "./helper";
+import { Instruction, LeaqInstruction, MarkToJump, MovInstr, PopScopeInstr, PushScopeInstr, RetqInstr, ScopeEndInstr, ScopeStartInstr, StringInstruction } from "./instruction/instruction";
 import { IndirectRegister, IndirectRegisterWithOffset, IndirectStackLoc, LiteralMemLocation, MemLocation, Register, StackLoc, StaticLocation } from "./instruction/mem_location";
 import { NamedValue, Value } from "./value";
 import { CharType } from "./value_types/char_type";
@@ -9,7 +9,7 @@ import { PtrType } from "./value_types/ptr_type";
 import { ValueType } from "./value_types/value_type";
 import { VoidType } from "./value_types/void_type";
 import { DebugPosition } from "./lexer";
-import { DivInstruction, MulInstruction, PlusInstruction, SubInstruction } from "./instruction/binary_op_instruction";
+import { PlusInstr, SubInstr, MulInstr, DivInstr } from "./instruction/binary_op_instruction";
 
 
 export enum TypeofScope {
@@ -225,14 +225,19 @@ export class Scope {
             else if (instr instanceof PushScopeInstr) {
                 asm.push(`subq $${this.getTotalStackSpace()}, %rsp`);
             }
-            else if (instr instanceof PushScopeInstr) {
+            else if (instr instanceof PopScopeInstr) {
                 asm.push(`addq $${this.getTotalStackSpace()}, %rsp`);
             }
 
             else if (instr instanceof MovInstr) {
                 const dstStr = this.interpretMemLocation(instr.dst);
                 const srcStr = this.interpretMemLocation(instr.src);
-                asm.push(`${instr.mov_i} ${srcStr} ${dstStr}`);
+                asm.push(`${instr.mov_i} ${srcStr}, ${dstStr}`);
+            }
+            else if (instr instanceof LeaqInstruction) {
+                const dstStr = this.interpretMemLocation(instr.dst);
+                const srcStr = this.interpretMemLocation(instr.src);
+                asm.push(`leaq ${srcStr}, ${dstStr}`);
             }
             else if (instr instanceof MarkToJump) {
                 asm.push(`${instr.tag}:`);
@@ -240,27 +245,31 @@ export class Scope {
             else if (instr instanceof StringInstruction) {
                 asm.push(`${instr.text}`);
             }
-            else if (instr instanceof PlusInstruction) {
+            else if (instr instanceof PlusInstr) {
                 const lhsStr = this.interpretMemLocation(instr.src);
                 const rhsStr = this.interpretMemLocation(instr.dst);
-                asm.push(`${instr.add_i} ${lhsStr} ${rhsStr}`);
+                asm.push(`${instr.add_i} ${lhsStr}, ${rhsStr}`);
             }
-            else if (instr instanceof SubInstruction) {
+            else if (instr instanceof SubInstr) {
                 const lhsStr = this.interpretMemLocation(instr.src);
                 const rhsStr = this.interpretMemLocation(instr.dst);
-                asm.push(`${instr.sub_i} ${lhsStr} ${rhsStr}`);
+                asm.push(`${instr.sub_i} ${lhsStr}, ${rhsStr}`);
             }
-            else if (instr instanceof MulInstruction) {
+            else if (instr instanceof MulInstr) {
                 const memLocStr = this.interpretMemLocation(instr.memloc);
                 asm.push(`${instr.mul_i} ${memLocStr}`);
             }
-            else if (instr instanceof DivInstruction) {
+            else if (instr instanceof DivInstr) {
                 const memLocStr = this.interpretMemLocation(instr.memloc);
                 asm.push(`${instr.div_i} ${memLocStr}`);
             }
+            else if (instr instanceof RetqInstr) {
+                asm.push("retq");
+            }
+
 
             else {
-                UNREACHABLE();
+                TODO(`UNHANDELED INSTRUCTION ${instr}`);
             }
         }
         return asm;
@@ -272,28 +281,9 @@ export class GlobalScope extends Scope {
 
     constructor() {
         super(null, null, TypeofScope.GLOBAL_SCOPE);
-    }
 
-
-    override get scopeId(): string {
-        return TypeofScope[this.typeofScope];
-    }
-
-    override addNewVarValue(val: NamedValue): void {
-        UNREACHABLE();
-    }
-
-    addFunctionValue(val: NamedValue) {
-        if (!(val.valueType instanceof FunctionType)) {
-            throwError(`Only function types can be added to global scope. Trying to add typeof ${val.valueType}`);
-        }
-        this.localVarValues.push(val);
-    }
-
-
-    override getVarValue(varName: string): NamedValue | null {
-        if (varName === 'print') {
-            return new NamedValue(
+        this.localVarValues.push(
+            new NamedValue(
                 "print",
                 new Value(
                     new StaticLocation(),
@@ -306,10 +296,8 @@ export class GlobalScope extends Scope {
                     ),
                     new DebugPosition(0, 0, 0),
                 )
-            );
-        }
-        if (varName === 'input') {
-            return new NamedValue(
+            ),
+            new NamedValue(
                 "input",
                 new Value(
                     new StaticLocation(),
@@ -321,8 +309,20 @@ export class GlobalScope extends Scope {
                     ),
                     new DebugPosition(0, 0, 0),
                 )
-            );
-        }
-        return super.getVarValue(varName);
+            ),
+        );
     }
+
+
+    override get scopeId(): string {
+        return TypeofScope[this.typeofScope];
+    }
+
+    override addNewVarValue(val: NamedValue): void {
+        if (!(val.valueType instanceof FunctionType)) {
+            throwError(new DebugPosError(val.pos, `Only FUNCTION object types can exist in global scope`));
+        }
+        super.addNewVarValue(val);
+    }
+
 }

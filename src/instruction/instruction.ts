@@ -11,7 +11,8 @@ type mov_i =
     "movb" |
     "movr" |
     "movl" |
-    "movq";
+    "movq" |
+    "movsbl";
 
 export function get_mov_i_on_size(sizeoftype: number): mov_i {
 
@@ -31,6 +32,7 @@ export class MovInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `MOV_INSTR`;
 }
 
 export class MarkToJump extends Instruction {
@@ -40,6 +42,7 @@ export class MarkToJump extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `MARK_TO_JUMP`;
 }
 
 
@@ -51,6 +54,7 @@ export class StringInstruction extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `STRING`;
 }
 
 
@@ -60,9 +64,11 @@ export class LeaqInstruction extends Instruction {
         throw new Error("Method not implemented.");
     }
 
-    constructor(lea_i: lea_i, public dst: Register, public src: MemLocation) {
+    constructor(public lea_i: lea_i, public dst: Register, public src: MemLocation) {
         super();
     }
+    override toString: () => string = () : string => `LEA`;
+
 }
 
 export class ScopeStartInstr extends Instruction {
@@ -72,6 +78,8 @@ export class ScopeStartInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `SCOPE_START_INSTR`;
+
 }
 
 export class ScopeEndInstr extends Instruction {
@@ -81,6 +89,8 @@ export class ScopeEndInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `SCOPE_END_INSTR`;
+
 }
 
 
@@ -91,6 +101,8 @@ export class PushScopeInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `PUSH_SCOPE`;
+
 }
 
 
@@ -101,6 +113,8 @@ export class PopScopeInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `POP_SCOPE`;
+
 }
 
 export class JmpInstr extends Instruction {
@@ -110,4 +124,17 @@ export class JmpInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
+    override toString: () => string = () : string => `JMP`;
+
+}
+
+export class RetqInstr extends Instruction {
+    constructor() {
+        super();
+    }
+    override non(): void {
+
+    }
+
+    override toString: () => string = () : string => `RETQ`;
 }

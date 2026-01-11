@@ -1,7 +1,7 @@
 import { Context } from "../context";
 import { convert_values_or_throw } from "../converter";
-import { DebugPosError, throwError, TODO, UNREACHABLE } from "../helper";
-import { DivInstruction, get_div_i_on_sizeoftype, MulInstruction, PlusInstruction, SubInstruction } from "../instruction/binary_op_instruction";
+import { DebugPosError, throwError, UNREACHABLE } from "../helper";
+import { DivInstr, get_div_i_on_sizeoftype, MulInstr, PlusInstr, SubInstr } from "../instruction/binary_op_instruction";
 import { CmpInstr, get_cmp_i_on_size, JniInstr } from "../instruction/comparison_instruction";
 import { get_mov_i_on_size, MovInstr, StringInstruction } from "../instruction/instruction";
 import { LiteralMemLocation, Register } from "../instruction/mem_location";
@@ -46,7 +46,7 @@ export abstract class ValueType {
             throwError(new DebugPosError(src.pos, `Unmatched types: dst = ${dst.valueType} | src = ${src.valueType}`));
         }
 
-        const register = Register.getFrom("bx", src.valueType.size);
+        const register = Register.getFrom("b", src.valueType.size);
         context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), register, valueToMemLoc(src, context)));
         context.addInstruction(new MovInstr(get_mov_i_on_size(src.valueType.size), valueToMemLoc(dst, context), register));
     }
@@ -82,21 +82,21 @@ export abstract class ValueType {
 
     from_plus(context: Context, self: Value, other: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        return PlusInstruction.generateAsm(context, self, other);
+        return PlusInstr.generateAsm(context, self, other);
     }
 
     from_minus(context: Context, self: Value, other: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        return SubInstruction.generateAsm(context, self, other);
+        return SubInstr.generateAsm(context, self, other);
     }
 
     from_multiply(context: Context, self: Value, other: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        return MulInstruction.generateAsm(context, self, other);
+        return MulInstr.generateAsm(context, self, other);
     }
     from_divide(context: Context, self: Value, other: Value): Value {
         self.valueType.isSameType(this) || UNREACHABLE();
-        return DivInstruction.generateAsm(context, self, other);
+        return DivInstr.generateAsm(context, self, other);
     }
 
     from_percent(context: Context, self: Value, other: Value): Value {
@@ -105,15 +105,15 @@ export abstract class ValueType {
 
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
-        const register = Register.getFrom("ax", sizeoftype);
+        const register = Register.getFrom("a", sizeoftype);
         context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
         context.addInstruction(new StringInstruction("cdq"));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
-        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
+        context.addInstruction(new DivInstr(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
-        context.addInstruction(new MovInstr(mov_i, newMemLoc, Register.getFrom("ex", sizeoftype)));
+        context.addInstruction(new MovInstr(mov_i, newMemLoc, Register.getFrom("d", sizeoftype)));
 
         return newValue;
     }

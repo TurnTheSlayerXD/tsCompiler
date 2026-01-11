@@ -1,3 +1,4 @@
+import { UNREACHABLE } from "../helper";
 import { Scope } from "../scope";
 import { ValueType } from "../value_types/value_type";
 
@@ -71,12 +72,21 @@ export class LiteralMemLocation implements MemLocation {
 }
 
 
-type PossibleRegisterNames = 'rax' | 'eax' | 'ax' | 'rcx' | 'ecx' | 'cx' | 'ax' | 'r9' | 'rdx' | 'r8d' | 'dh' | 'al';
+type PossibleRegisterNames = 'rax' | 'eax' | 'ax' | 'rcx' | 'ecx' | 'cx' | 'ax' | 'r9' | 'rdx' | 'r8d' | 'dh' | 'al' | 'ah' | 'bh' | 'bx' | 'ebx' | 'rbx' | 'ch' | 'dx' | 'edx' | 'r8b' | 'r8w' | 'r8d' | 'r8' | 'r9b' | 'r9w' | 'r9d';
 
-type BaseRegisterNames = "ax" | "bx" | "cx" | "ex";
+type BaseRegisterNames = "a" | "b" | "c" | "d" | "r8" | "r9";
 export class Register implements MemLocation {
 
     protected static staticRegisters: Register[] = [];
+
+    private static MAPPER: Record<BaseRegisterNames, Record<number, PossibleRegisterNames>> = {
+        "a": { 1: "ah", 2: "ax", 4: "eax", 8: "rax" },
+        "b": { 1: "bh", 2: "bx", 4: "ebx", 8: "rbx" },
+        "c": { 1: "ch", 2: "cx", 4: "ecx", 8: "rcx" },
+        "d": { 1: "dh", 2: "dx", 4: "edx", 8: "rdx" },
+        "r8": { 1: "r8b", 2: "r8w", 4: "r8d", 8: "r8" },
+        "r9": { 1: "r9b", 2: "r9w", 4: "r9d", 8: "r9" },
+    };
 
     private constructor(public registerName: PossibleRegisterNames) {
     }
@@ -84,7 +94,13 @@ export class Register implements MemLocation {
         throw new Error("Method not implemented.");
     }
 
-    public static getRegisterNameBasedOnSizeofType(register_prefix: BaseRegisterNames, size: number): PossibleRegisterNames {
+    private static getRegisterNameBasedOnSizeofType(register_prefix: BaseRegisterNames, size: number): PossibleRegisterNames {
+        if (size !== 1 && size !== 2 && size !== 4 && size !== 8) {
+            UNREACHABLE();
+        }
+
+        return this.MAPPER[register_prefix][size]!;
+
     }
 
     public static getFrom(register_prefix: BaseRegisterNames, size: number): Register {
@@ -108,7 +124,7 @@ export class Register implements MemLocation {
         return this.getInstance("rdx")
     }
     public static forReturnValue(returnType: ValueType): Register {
-        return this.getFrom("ax", returnType.size);
+        return this.getFrom("a", returnType.size);
     }
 }
 

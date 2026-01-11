@@ -1,6 +1,6 @@
 import { Context } from "../context";
 import { DebugPosError, throwError, TODO, TokenParserError, UNREACHABLE } from "../helper";
-import { PlusInstruction } from "../instruction/binary_op_instruction";
+import { PlusInstr } from "../instruction/binary_op_instruction";
 import { LeaqInstruction, MovInstr } from "../instruction/instruction";
 import { IndirectRegisterWithOffset, IndirectStackLoc, LiteralMemLocation, MemLocation, Register, StackLoc } from "../instruction/mem_location";
 import { DebugPosition, Token } from "../lexer";
@@ -74,7 +74,7 @@ export class StructType extends ValueType {
     }
 
     private getFieldFromStruct(fieldName: string): StructField {
-        return this.fields.find(f => f.name === fieldName) ?? throwError(new DebugPosError(fieldName, `No field [${fieldName} on struct ${this.struct_name}]`));
+        return this.fields.find(f => f.name === fieldName) ?? throwError( `No field [${fieldName} on struct ${this.struct_name}]`);
     }
 
     override copy_to(context: Context, dst: Value, src: Value): void {
@@ -85,9 +85,9 @@ export class StructType extends ValueType {
         let structSize = this.size;
         const ptrSize = PtrType.getInstance(CharType.getInstance()).size;
 
-        const dstRegister: Register = Register.getFrom("ax", ptrSize);
-        const srcRegister: Register = Register.getFrom("bx", ptrSize);
-        const bufRegister = Register.getFrom("cx", 1);
+        const dstRegister: Register = Register.getFrom("a", ptrSize);
+        const srcRegister: Register = Register.getFrom("b", ptrSize);
+        const bufRegister = Register.getFrom("c", 1);
 
         this.putStructAddressToRegister(context, srcRegister, src._srcMemLoc);
         this.putStructAddressToRegister(context, dstRegister, dst._srcMemLoc);
@@ -114,7 +114,7 @@ export class StructType extends ValueType {
         const memloc = new IndirectStackLoc(context.getNewMemLocation(ptrType));
         const returnVar = new Value(memloc, fieldFromStuct.type, debugPos);
 
-        const bufRegister = Register.getFrom("ax", ptrType.size);
+        const bufRegister = Register.getFrom("a", ptrType.size);
 
         context.addInstruction(new LeaqInstruction("leaq", bufRegister, new IndirectRegisterWithOffset(srcRegister, fieldFromStuct.offset)));
         context.addInstruction(new MovInstr("movq", memloc, bufRegister));
@@ -133,7 +133,7 @@ export class StructType extends ValueType {
         const raxRegister = Register.getInstance("rax");
         const srcMemLoc = valueToMemLoc(srcVar, context);
         context.addInstruction(new MovInstr("movq", raxRegister, srcMemLoc));
-        context.addInstruction(new PlusInstruction("addq", raxRegister, new LiteralMemLocation(fieldFromStruct.offset)));
+        context.addInstruction(new PlusInstr("addq", raxRegister, new LiteralMemLocation(fieldFromStruct.offset)));
         context.addInstruction(new MovInstr("movq", indirectMemloc, raxRegister));
 
         return newVar;

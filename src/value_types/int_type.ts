@@ -1,6 +1,6 @@
 
 import { Context } from "../context";
-import { DebugPosError, LexerError, throwError } from "../helper";
+import { DebugPosError, throwError } from "../helper";
 import { get_mov_i_on_size, MovInstr } from "../instruction/instruction";
 import { LiteralMemLocation } from "../instruction/mem_location";
 import { DebugPosition } from "../lexer";

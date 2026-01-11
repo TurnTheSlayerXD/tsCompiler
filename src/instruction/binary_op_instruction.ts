@@ -21,7 +21,7 @@ function get_add_i_on_sizeoftype(sizeoftype: number): add_i {
         default: UNREACHABLE();
     }
 }
-export class PlusInstruction extends Instruction {
+export class PlusInstr extends Instruction {
     public constructor(public add_i: add_i, public dst: MemLocation, public src: MemLocation) {
         super();
     }
@@ -33,10 +33,10 @@ export class PlusInstruction extends Instruction {
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
 
-        const register = Register.getFrom("ax", sizeoftype);
+        const register = Register.getFrom("a", sizeoftype);
 
         context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
-        context.addInstruction(new PlusInstruction(get_add_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context), register));
+        context.addInstruction(new PlusInstr(get_add_i_on_sizeoftype(sizeoftype), register, valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
@@ -62,11 +62,11 @@ function get_sub_i_on_sizeoftype(sizeoftype: number): sub_i {
         default: UNREACHABLE();
     }
 }
-export class SubInstruction extends Instruction {
+export class SubInstr extends Instruction {
     override non(): void {
         throw new Error("Method not implemented.");
     }
-    public constructor(public sub_i: sub_i, public dst: MemLocation, public src: Register) {
+    public constructor(public sub_i: sub_i, public dst: MemLocation, public src: MemLocation) {
         super();
     }
 
@@ -77,10 +77,10 @@ export class SubInstruction extends Instruction {
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
 
-        const register = Register.getFrom("ax", sizeoftype);
+        const register = Register.getFrom("a", sizeoftype);
 
         context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
-        context.addInstruction(new SubInstruction(get_sub_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context), register));
+        context.addInstruction(new SubInstr(get_sub_i_on_sizeoftype(sizeoftype), register, valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
@@ -101,30 +101,29 @@ function get_mul_i_on_sizeoftype(sizeoftype: number): mul_i {
         default: UNREACHABLE();
     }
 }
-export class MulInstruction extends Instruction {
-    override non(): void {
-        throw new Error("Method not implemented.");
-    }
-
+export class MulInstr extends Instruction {
     public constructor(public mul_i: mul_i, public memloc: MemLocation) {
         super();
     }
-
 
     public static generateAsm(context: Context, self: Value, other: Value): Value {
         const { lhs, rhs } = convert_values_or_throw(context, self, other);
         const sizeoftype = lhs.valueType.size;
 
         const mov_i = get_mov_i_on_size(sizeoftype);
-        const register = Register.getFrom("ax", sizeoftype);
+        const register = Register.getFrom("a", sizeoftype);
 
         context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
-        context.addInstruction(new MulInstruction(get_mul_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
+        context.addInstruction(new MulInstr(get_mul_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);
         context.addInstruction(new MovInstr(mov_i, newMemLoc, register));
         return newValue;
+    }
+
+    override non(): void {
+        throw new Error("Method not implemented.");
     }
 }
 
@@ -142,7 +141,7 @@ export function get_div_i_on_sizeoftype(sizeoftype: number): div_i {
         default: UNREACHABLE();
     }
 }
-export class DivInstruction extends Instruction {
+export class DivInstr extends Instruction {
 
     public constructor(public div_i: div_i, public memloc: MemLocation) { super(); }
     override non(): void { }
@@ -152,13 +151,13 @@ export class DivInstruction extends Instruction {
         const sizeoftype = lhs.valueType.size;
 
         const mov_i = get_mov_i_on_size(sizeoftype);
-        const register = Register.getFrom("ax", sizeoftype);
+        const register = Register.getFrom("a", sizeoftype);
 
         context.addInstruction(new MovInstr(mov_i, register, valueToMemLoc(lhs, context)));
 
         context.addInstruction(new StringInstruction("cdq"));
 
-        context.addInstruction(new DivInstruction(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
+        context.addInstruction(new DivInstr(get_div_i_on_sizeoftype(sizeoftype), valueToMemLoc(rhs, context)));
 
         const newMemLoc = context.getNewMemLocation(lhs.valueType);
         const newValue = new Value(newMemLoc, lhs.valueType, lhs.pos);

@@ -1,14 +1,14 @@
 import { Context } from "../context";
-import { convert_values, are_converible_types } from "../converter";
-import { UNREACHABLE, convert_string_to_char_codes, TODO, throwError } from "../helper";
+import { UNREACHABLE, convert_string_to_char_codes } from "../helper";
 import { DebugPosition } from "../lexer";
-import { Value } from "../value";
+import { Value, valueToMemLoc } from "../value";
 import { CharType } from "./char_type";
-import { IntType } from "./int_type";
 import { ValueType } from "./value_type";
-import { VoidType } from "./void_type";
 import { IndirectRegister, IndirectStackLoc, LiteralMemLocation, Register, StackLoc } from "../instruction/mem_location";
 import { get_mov_i_on_size, LeaqInstruction, MovInstr } from "../instruction/instruction";
+import { convert_val_to_type } from "../converter";
+import { IntType } from "./int_type";
+import { MulInstr, PlusInstr, SubInstr } from "../instruction/binary_op_instruction";
 
 export class PtrType extends ValueType {
     private static instances: PtrType[] = [];
@@ -53,7 +53,7 @@ export class PtrType extends ValueType {
                 self._srcMemLoc,
             ));
 
-            const bufRegister = Register.getFrom("bx", this.ptrTo.size);
+            const bufRegister = Register.getFrom("b", this.ptrTo.size);
 
             context.addInstruction(new MovInstr(
                 get_mov_i_on_size(this.ptrTo.size),
@@ -96,6 +96,8 @@ export class PtrType extends ValueType {
             context.addInstruction(new LeaqInstruction("leaq", Register.forIndirect(), lastMemLoc));
 
             const ptrMemLoc = context.getNewMemLocation(this);
+            context.addInstruction(new MovInstr("movq", ptrMemLoc, Register.forIndirect()))
+
             const returnVar = new Value(ptrMemLoc, this, debugPos);
             return returnVar;
         }
@@ -105,11 +107,37 @@ export class PtrType extends ValueType {
     }
 
     override from_plus(context: Context, self: Value, other: Value): Value {
+        if (!this.isSameType(self.valueType)) {
+            UNREACHABLE();
+        }
+        other = convert_val_to_type(context, other, IntType.getInstance());
 
+        const newMemloc = context.getNewMemLocation(this);
+        const bufRegister = Register.getFrom("a", this.size);
+        context.addInstruction(new MovInstr("movq", bufRegister, valueToMemLoc(other, context)));
+        context.addInstruction(new MulInstr("imulq", new LiteralMemLocation(this.ptrTo.size)));
+
+        context.addInstruction(new PlusInstr("addq", bufRegister, valueToMemLoc(self, context)));
+        context.addInstruction(new MovInstr("movq", newMemloc, bufRegister));
+        const newVar = new Value(newMemloc, this, other.pos);
+        return newVar;
     }
 
     override from_minus(context: Context, self: Value, other: Value): Value {
+        if (!this.isSameType(self.valueType)) {
+            UNREACHABLE();
+        }
+        other = convert_val_to_type(context, other, IntType.getInstance());
 
+        const newMemloc = context.getNewMemLocation(this);
+        const bufRegister = Register.getFrom("a", this.size);
+        context.addInstruction(new MovInstr("movq", bufRegister, valueToMemLoc(other, context)));
+        context.addInstruction(new MulInstr("imulq", new LiteralMemLocation(this.ptrTo.size)));
+
+        context.addInstruction(new SubInstr("subq", bufRegister, valueToMemLoc(self, context)));
+        context.addInstruction(new MovInstr("movq", newMemloc, bufRegister));
+        const newVar = new Value(newMemloc, this, other.pos);
+        return newVar;
     }
 
     override from_multiply(context: Context, self: Value, other: Value): Value {

@@ -2,7 +2,7 @@ import { Context } from "./context";
 import { convert_val_to_type } from "./converter";
 import { DebugPosError, findIndex, getMatchingBracket, splitBy, throwError, TokenParserError, UNREACHABLE } from "./helper";
 import { CmpInstr, JniInstr } from "./instruction/comparison_instruction";
-import { get_mov_i_on_size, JmpInstr, MarkToJump, MovInstr, PopScopeInstr, StringInstruction } from "./instruction/instruction";
+import { get_mov_i_on_size, JmpInstr, MarkToJump, MovInstr, PopScopeInstr, RetqInstr, StringInstruction } from "./instruction/instruction";
 import { LiteralMemLocation, Register } from "./instruction/mem_location";
 import { Token } from "./lexer";
 import { SemicolonExprParser } from "./rvalue_expression_parser";
@@ -10,6 +10,7 @@ import { Scope, TypeofScope } from "./scope";
 import { TokenType } from "./token_type";
 import { Value, valueToMemLoc } from "./value";
 import { FunctionType } from "./value_types/function_type";
+import { VoidType } from "./value_types/void_type";
 
 export class CurlExpressionParser {
 
@@ -105,14 +106,19 @@ export class CurlExpressionParser {
                 if (!currentFunction || !(currentFunction.valueType instanceof FunctionType)) {
                     UNREACHABLE();
                 }
-                const currentFunctionType = currentFunction.valueType;
 
-                const functionType = currentFunctionType as FunctionType;
+                const functionType = currentFunction.valueType as FunctionType;
+
                 if (semi_pos !== i + 1) {
                     const resultVar = new SemicolonExprParser(this.context, this.tokens.slice(i + 1, semi_pos)).parse_with_ast(false, true);
+
                     const convertedVar = convert_val_to_type(this.context, resultVar, functionType.returnType);
 
                     this.context.addInstruction(new MovInstr(get_mov_i_on_size(functionType.returnType.size), Register.forReturnValue(functionType.returnType), valueToMemLoc(convertedVar, this.context)));
+                }
+
+                if (semi_pos === i + 1 && !(functionType.returnType instanceof VoidType)) {
+                    throwError(new DebugPosError(this.tokens[i]!.pos, `Expected return type of function to be [${functionType.returnType}].\nActual type: ${VoidType.getInstance()}`));
                 }
 
                 let poppedScope: Scope | null = this.context.getCurrentScope();
@@ -125,13 +131,13 @@ export class CurlExpressionParser {
                 }
                 this.context.addInstruction(new PopScopeInstr(poppedScope));
 
-                if (currentFunction.name === 'main') {
-                    this.context.addInstruction(new StringInstruction("xor %rax, %rax"));
-                    this.context.addInstruction(new StringInstruction("retq"));
-                }
-                else {
-                    this.context.addInstruction(new StringInstruction("retq"));
-                }
+                this.context.addInstruction(new RetqInstr());
+                // if (currentFunction.name === 'main') {
+                //     this.context.addInstruction(new StringInstruction("xor %rax, %rax"));
+                // }
+                // else {
+                //     this.context.addInstruction(new StringInstruction("retq"));
+                // }
 
                 i = semi_pos;
 

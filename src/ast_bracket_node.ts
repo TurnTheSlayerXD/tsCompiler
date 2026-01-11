@@ -89,13 +89,13 @@ export class AstBracketNode extends AstNode {
                         const memlocOne = context.getNewMemLocationFromOffset(8);
                         const memlocTwo = context.getNewMemLocationFromOffset(4);
 
-                        context.addInstruction(new StringInstruction("movl $429496"))
+                        context.addInstruction(new MovInstr("movl", Register.getInstance("ecx"), new LiteralMemLocation(4294967285)));
                         context.addInstruction(new StringInstruction('callq *__imp_GetStdHandle(%rip)'))
                         context.addInstruction(new MovInstr("movq", memlocOne, Register.getInstance("rax")));
-                        context.addInstruction(new MovInstr("movq", memlocTwo, LiteralMemLocation.staticNull()));
+                        context.addInstruction(new MovInstr("movl", memlocTwo, LiteralMemLocation.staticNull()));
 
                         context.addInstruction(new MovInstr("movq", Register.getInstance("rcx"), memlocOne));
-                        context.addInstruction(new MovInstr("movq", Register.getInstance("r9"), memlocTwo));
+                        context.addInstruction(new LeaqInstruction("leaq", Register.getInstance("r9"), memlocTwo));
                         /*
                             context.addAssembly(`
                             \rmovl $4294967285, %ecx
@@ -106,9 +106,8 @@ export class AstBracketNode extends AstNode {
                             \rleaq ${context.stackPtr}(%rsp), %r9
                         `);
                         */
-                        const paramOne = params[0]!;
-                        const paramTwo = params[1]!;
-                        if (params.length !== 2 ||
+                        const [paramOne, paramTwo] = params;
+                        if (!paramOne || !paramTwo || params.length !== 2 ||
                             !PtrType.getInstance(CharType.getInstance()).isSameType(paramOne.valueType) ||
                             !IntType.getInstance().isSameType(paramTwo.valueType)) {
                             throwError(`Expected built-in PRINT function parameters to be of type (char *, int).\n\rActual parameters are (${paramOne?.valueType},${paramTwo?.valueType})`);
@@ -131,7 +130,7 @@ export class AstBracketNode extends AstNode {
                         }
                         context.addInstruction(new MovInstr("movl", context.getNewMemLocationFromOffset(4), LiteralMemLocation.staticNull()));
                         context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(param, context)));
-                        context.addInstruction(new StringInstruction("leaq scanf_mark(%rip) %rcx"));
+                        context.addInstruction(new StringInstruction("leaq scanf_mark(%rip), %rcx"));
                         context.addInstruction(new MovInstr("movq", Register.getInstance("rax"), LiteralMemLocation.staticNull()));
                         context.addInstruction(new StringInstruction("callq scanf"));
                         /*
