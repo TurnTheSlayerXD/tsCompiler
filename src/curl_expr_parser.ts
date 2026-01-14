@@ -284,6 +284,7 @@ export class CurlExpressionParser {
 
         this.context.addInstruction(new JmpInstr(markToEnterCycle));
         this.context.addInstruction(new JmpInstr(markToExitCycle));
+        this.context.addInstruction(markToExitCycle);
 
         this.context.popScope();
 

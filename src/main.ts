@@ -14,7 +14,7 @@ const main = () => {
         throwError(`No correct input filepath provided. Provided - ${main_c}`);
     }
 
-    const asmGenerator = new AsmGenerator;
+    const asmGenerator = new AsmGenerator();
     fs.writeFileSync(out_asm, asmGenerator.parseProgram(programText));
 };
 

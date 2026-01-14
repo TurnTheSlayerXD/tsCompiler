@@ -5,7 +5,7 @@ import { Value, valueToMemLoc } from "../value";
 import { CharType } from "./char_type";
 import { ValueType } from "./value_type";
 import { IndirectRegister, IndirectStackLoc, LiteralMemLocation, Register, StackLoc } from "../instruction/mem_location";
-import { get_mov_i_on_size, LeaqInstruction, MovInstr } from "../instruction/instruction";
+import { get_mov_i_on_size, LeaqInstruction, MovInstr, StringInstruction } from "../instruction/instruction";
 import { convert_val_to_type } from "../converter";
 import { IntType } from "./int_type";
 import { MulInstr, PlusInstr, SubInstr } from "../instruction/binary_op_instruction";
@@ -112,13 +112,18 @@ export class PtrType extends ValueType {
         }
         other = convert_val_to_type(context, other, IntType.getInstance());
 
-        const newMemloc = context.getNewMemLocation(this);
-        const bufRegister = Register.getFrom("a", this.size);
-        context.addInstruction(new MovInstr("movq", bufRegister, valueToMemLoc(other, context)));
-        context.addInstruction(new MulInstr("imulq", new LiteralMemLocation(this.ptrTo.size)));
+        const mulResRegister = Register.getFrom("a", this.size);
+        context.addInstruction(new MovInstr("movq", mulResRegister, valueToMemLoc(other, context)));
 
-        context.addInstruction(new PlusInstr("addq", bufRegister, valueToMemLoc(self, context)));
-        context.addInstruction(new MovInstr("movq", newMemloc, bufRegister));
+        const bRegister = Register.getFrom("b", this.size);
+        
+        context.addInstruction(new MovInstr("movq", bRegister, new LiteralMemLocation(this.ptrTo.size)))
+        context.addInstruction(new MulInstr("imulq", bRegister));
+
+        context.addInstruction(new PlusInstr("addq", mulResRegister, valueToMemLoc(self, context)));
+
+        const newMemloc = context.getNewMemLocation(this);
+        context.addInstruction(new MovInstr("movq", newMemloc, mulResRegister));
         const newVar = new Value(newMemloc, this, other.pos);
         return newVar;
     }

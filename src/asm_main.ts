@@ -20,6 +20,7 @@ import { get_mov_i_on_size, MovInstr, RetqInstr, StringInstruction } from "./ins
 import { SCANF_DECL } from "./imp_scanf";
 
 export class AsmGenerator {
+    
     public parseProgram(programText: string, genParams: { doImportScanf?: boolean } = { doImportScanf: false }): string {
         const context = new Context();
         const lexer = new Lexer(programText);

@@ -1,14 +1,10 @@
 
 int main(int argc, char **argv)
 {
-    int i = 0;
 
-    char[10] x;
+    char *x = "0000000000";
     for (int i = 0; i < 10; i += 1){
-        x[i] = 'a' + i;
+        *(x + i) = 'a';
     }
-
-    x[9] = '\0';
-
-    print(x, 10);
+    // print(x, 10);
 }
