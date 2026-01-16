@@ -9,6 +9,7 @@ import { get_mov_i_on_size, LeaqInstruction, MovInstr, StringInstruction } from 
 import { convert_val_to_type } from "../converter";
 import { IntType } from "./int_type";
 import { MulInstr, PlusInstr, SubInstr } from "../instruction/binary_op_instruction";
+import { LongType } from "./long_type";
 
 export class PtrType extends ValueType {
     private static instances: PtrType[] = [];
@@ -110,7 +111,8 @@ export class PtrType extends ValueType {
         if (!this.isSameType(self.valueType)) {
             UNREACHABLE();
         }
-        other = convert_val_to_type(context, other, IntType.getInstance());
+
+        other = LongType.convertToFromValue(context, other, other.pos);
 
         const mulResRegister = Register.getFrom("a", this.size);
         context.addInstruction(new MovInstr("movq", mulResRegister, valueToMemLoc(other, context)));

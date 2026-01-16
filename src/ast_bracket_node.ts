@@ -86,6 +86,16 @@ export class AstBracketNode extends AstNode {
                     const functionName = fun_obj.name;
                     if (fun_obj.name === 'print') {
 
+                        const [paramOne, paramTwo] = params;
+                        if (!paramOne || !paramTwo || params.length !== 2 ||
+                            !PtrType.getInstance(CharType.getInstance()).isSameType(paramOne.valueType) ||
+                            !IntType.getInstance().isSameType(paramTwo.valueType)) {
+                            throwError(`Expected built-in PRINT function parameters to be of type (char *, int).\n\rActual parameters are (${paramOne?.valueType},${paramTwo?.valueType})`);
+                        }
+                        context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(paramOne, context)));
+                        context.addInstruction(new MovInstr("movl", Register.getInstance("r8d"), valueToMemLoc(paramTwo, context)));
+
+                        // start for compatiblity
                         const memlocOne = context.getNewMemLocationFromOffset(8);
                         const memlocTwo = context.getNewMemLocationFromOffset(4);
 
@@ -96,6 +106,7 @@ export class AstBracketNode extends AstNode {
 
                         context.addInstruction(new MovInstr("movq", Register.getInstance("rcx"), memlocOne));
                         context.addInstruction(new LeaqInstruction("leaq", Register.getInstance("r9"), memlocTwo));
+                        // end for compatiblity
                         /*
                             context.addAssembly(`
                             \rmovl $4294967285, %ecx
@@ -106,15 +117,6 @@ export class AstBracketNode extends AstNode {
                             \rleaq ${context.stackPtr}(%rsp), %r9
                         `);
                         */
-                        const [paramOne, paramTwo] = params;
-                        if (!paramOne || !paramTwo || params.length !== 2 ||
-                            !PtrType.getInstance(CharType.getInstance()).isSameType(paramOne.valueType) ||
-                            !IntType.getInstance().isSameType(paramTwo.valueType)) {
-                            throwError(`Expected built-in PRINT function parameters to be of type (char *, int).\n\rActual parameters are (${paramOne?.valueType},${paramTwo?.valueType})`);
-                        }
-
-                        context.addInstruction(new MovInstr("movq", Register.getInstance("rdx"), valueToMemLoc(paramOne, context)));
-                        context.addInstruction(new MovInstr("movl", Register.getInstance("r8d"), valueToMemLoc(paramTwo, context)));
 
 
                         const charsWrittenMemLoc = context.getNewMemLocationFromOffset(8);

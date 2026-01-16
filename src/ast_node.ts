@@ -55,8 +55,6 @@ export class AstNode {
                     const l_value = this.left.eval({ is_lvalue: true, can_be_decl: false });
                     const r_value = this.right.eval({ is_lvalue: false, can_be_decl: false });
 
-                    console.log('TokenType.OP_ASSIGNMENT_PLUS');
-                    console.log(l_value, r_value);
 
                     const new_value = l_value.valueType.from_plus(context, l_value, r_value);
                     l_value.valueType.copy_to(context, l_value, new_value);
@@ -205,9 +203,6 @@ export class AstNode {
                 ? this.left.eval({ is_lvalue: false, can_be_decl: true })
                 : rightVar.valueType.from_null(context, token.pos);
 
-            console.log('TokenType.OP_PLUS');
-            console.log(leftVar, rightVar);
-
             switch (type) {
                 case TokenType.OP_PLUS: return leftVar.valueType.from_plus(context, leftVar, rightVar);
                 case TokenType.OP_MINUS: return leftVar.valueType.from_minus(context, leftVar, rightVar);
@@ -275,7 +270,6 @@ export class AstNode {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
 
-            console.log("TokenType.STRING_LITERAL", token.text);
             this.context.addStringLiteral(token.text);
             const new_value = PtrType.getInstance(CharType.getInstance()).from_literal(this.context, token.text, token.pos);
             return new_value;
@@ -284,7 +278,6 @@ export class AstNode {
             if (this.left || this.right) {
                 TODO(`UNKNOWN EXPR: ${this}`);
             }
-            console.log("TokenType.CHAR_LITERAL", token.text);
 
             const new_value = CharType.getInstance().from_literal(this.context, token.text, token.pos);
             return new_value;

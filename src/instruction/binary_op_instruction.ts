@@ -30,8 +30,11 @@ export class PlusInstr extends Instruction {
     public static generateAsm(context: Context, self: Value, other: Value): Value {
 
         const { lhs, rhs } = convert_values_or_throw(context, self, other);
+
+
         const sizeoftype = lhs.valueType.size;
         const mov_i = get_mov_i_on_size(sizeoftype);
+
 
         const register = Register.getFrom("a", sizeoftype);
 

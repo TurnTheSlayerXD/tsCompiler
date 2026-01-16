@@ -1,5 +1,5 @@
 import { Context } from "./context";
-import { DebugPosError, throwError, TODO } from "./helper";
+import { DebugPosError, throwError, TODO, UNREACHABLE } from "./helper";
 import { MovInstr } from "./instruction/instruction";
 import { Register } from "./instruction/mem_location";
 import { Value, valueToMemLoc } from "./value";
@@ -13,32 +13,36 @@ type ConversionResult = { lhs: Value, rhs: Value };
 
 export function convert_values_or_throw(context: Context, lhsVar: Value, rhsVar: Value): ConversionResult {
     const { ok, lhs, rhs } = convert_values(context, lhsVar, rhsVar);
+
     if (!ok) {
         throwError(new DebugPosError(lhs.pos, `Cannot convert ${lhsVar} to ${rhsVar}`));
     }
     return { lhs, rhs };
 }
 
+function privateCharToInt(context: Context, value: Value) {
+    const varToConvert = value;
+    const memlocConverted = context.getNewMemLocation(IntType.getInstance());
+    const bufRegister = Register.getInstance("ebx");
+    context.addInstruction(new MovInstr("movsbl", bufRegister, valueToMemLoc(varToConvert, context)));
+    context.addInstruction(new MovInstr("movl", memlocConverted, bufRegister));
+    return new Value(memlocConverted, IntType.getInstance(), value.pos);
+}
 
 export function convert_values(context: Context, lhs: Value, rhs: Value): ConversionResult & { ok: boolean } {
+
     const intAndChar = [IntType.getInstance(), CharType.getInstance()];
+
     if (lhs.valueType.isSameType(rhs.valueType)) {
         return { ok: true, lhs: lhs, rhs: rhs };
     }
-    else if (intAndChar.includes(lhs.valueType) && intAndChar.includes(rhs.valueType)) {
-        const varToConvert = lhs.valueType instanceof CharType ? lhs : rhs;
-
-        const memlocConverted = context.getNewMemLocation(IntType.getInstance());
-        const bufRegister = Register.getInstance("ebx");
-
-        context.addInstruction(new MovInstr("movsbl", bufRegister, valueToMemLoc(varToConvert, context)));
-        context.addInstruction(new MovInstr("movl", memlocConverted, bufRegister));
-        const convertedValue = new Value(memlocConverted, IntType.getInstance(), lhs.pos);
-
-        if (convertedValue !== lhs) {
-            return { ok: true, lhs, rhs: convertedValue };
-        }
+    else if (lhs.valueType instanceof CharType && rhs.valueType instanceof IntType) {
+        const convertedValue = privateCharToInt(context, lhs);
         return { ok: true, lhs: convertedValue, rhs };
+    }
+    else if (rhs.valueType instanceof CharType && lhs.valueType instanceof IntType) {
+        const convertedValue = privateCharToInt(context, rhs);
+        return { ok: true, lhs, rhs: convertedValue };
     }
     if (lhs.valueType instanceof PtrType && rhs.valueType instanceof PtrType) {
         let lhs_type: ValueType = lhs.valueType;

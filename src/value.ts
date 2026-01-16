@@ -10,7 +10,7 @@ export class Value {
     }
 
     public toString = (): string => {
-        return `Named Value ${JSON.stringify(this)}`;
+        return `Value ${{}}`;
     }
 }
 
@@ -20,7 +20,7 @@ export class NamedValue extends Value {
     }
 
     public override toString = (): string => {
-        return `Named Value ${JSON.stringify(this)}`;
+        return `Named Value ${[`name: ${this.name}`, `type: ${this.valueType}`, `pos: ${this.pos}`]}`;
     }
 }
 

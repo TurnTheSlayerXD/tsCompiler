@@ -13,7 +13,9 @@ type mov_i =
     "movr" |
     "movl" |
     "movq" |
-    "movsbl";
+    "movsbl" |
+    "movsbq" |
+    "movslq";
 
 export function get_mov_i_on_size(sizeoftype: number): mov_i {
 
